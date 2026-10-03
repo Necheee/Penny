@@ -1,25 +1,26 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Layout from './components/layout/Layout';
+import Home from './pages/Home';
 
-// Layout
-// import Layout from './components/layout/Layout';
-
-// Pages (placeholders for now)
-const Home = () => <div className="p-8">Home Page Content</div>;
-const Shop = () => <div className="p-8">Shop Page Content</div>;
+// Placeholder for Shop - Real page will be built in Phase 5
+const Shop = () => (
+  <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
+    <h1 className="text-4xl font-serif mb-4 text-brand-charcoal">The Shop</h1>
+    <p className="text-brand-taupe">The Product Grid and Shop Filters are coming in Phase 5.</p>
+  </div>
+);
 
 function App() {
   return (
     <Router>
-      <div className="flex flex-col min-h-screen">
-        {/* We will add Layout later containing Header and Footer */}
-        <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/shop" element={<Shop />} />
-            {/* Add more routes in the future */}
-          </Routes>
-        </main>
-      </div>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/shop" element={<Shop />} />
+          {/* Temporary catch-all to prevent 404s while clicking header links */}
+          <Route path="*" element={<Home />} />
+        </Routes>
+      </Layout>
     </Router>
   );
 }
