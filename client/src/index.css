@@ -8,7 +8,7 @@
   --color-brand-border: #D1CCC5;
 
   --font-serif: "Cormorant Garamond", "Lora", serif;
-  --font-sans: "Inter", "DM Sans", sans-serif;
+  --font-sans: "DM Sans", "Inter", sans-serif;
 }
 
 @layer base {
