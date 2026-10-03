@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-offwhite: #FAF9F6;
+  --color-brand-beige: #EBE5D9;
+  --color-brand-charcoal: #222222;
+  --color-brand-taupe: #8C837A;
+  --color-brand-border: #D1CCC5;
+
+  --font-serif: "Cormorant Garamond", "Lora", serif;
+  --font-sans: "Inter", "DM Sans", sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-brand-offwhite);
+    color: var(--color-brand-charcoal);
+    font-family: var(--font-sans);
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif);
+  }
+}
