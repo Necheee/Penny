@@ -1,6 +1,3 @@
-// PENNY Centralized Mock Product Catalogue
-// This structure is designed to be easily replaceable by a real backend API.
-
 export const categories = [
   { id: 'tops', name: 'Tops', slug: 'tops' },
   { id: 'bottoms', name: 'Bottoms', slug: 'bottoms' },
@@ -10,13 +7,13 @@ export const categories = [
 export const subcategories = {
   tops: ['T-Shirts', 'Henleys', 'Polos', 'Long-Sleeve Shirts', 'Hoodies', 'Sweatshirts', 'Quarter-Zips', 'Sweaters', 'Overshirts'],
   bottoms: ['Trousers', 'Chinos', 'Jeans', 'Shorts', 'Joggers', 'Cargo Pants'],
-  sets: ['Linen Sets'] // Future set types can be added here
+  sets: ['Linen Sets', 'Cotton Lounge Sets']
 };
 
 export const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
-// Central catalogue
 export const products = [
+  // --- TWO PIECE SETS ---
   {
     id: 'p-001',
     name: 'The Linen Two-Piece Set',
@@ -29,17 +26,419 @@ export const products = [
     care: 'Machine wash cold on gentle cycle. Hang to dry. Warm iron if needed.',
     shipping: 'Free delivery on orders above ₦75,000. Ships within 1-3 days in Lagos.',
     images: {
-      primary: '/images/products/linen-set-cream-primary.jpg',
-      gallery: [
-        '/images/products/linen-set-cream-model.jpg',
-        '/images/products/linen-set-cream-detail.jpg'
-      ]
+      primary: '/images/products/linen-set-1.jpg',
+      gallery: ['/images/products/linen-set-2.jpg', '/images/products/linen-set-3.jpg']
     },
     colors: ['Cream', 'Black', 'Olive'],
-    availableSizes: ['S', 'M', 'L', 'XL'], // XS and XXL are currently unavailable (disabled state demo)
+    availableSizes: ['S', 'M', 'L', 'XL'],
     featured: true,
     createdAt: '2023-10-01T00:00:00Z',
     inStock: true,
   },
-  // We will populate the remaining 20-30 products in Phase 2
+  {
+    id: 'p-002',
+    name: 'Heavyweight Cotton Lounge Set',
+    category: 'sets',
+    subcategory: 'Cotton Lounge Sets',
+    price: 52000,
+    description: 'A structured yet comfortable lounge set crafted from heavyweight organic cotton. Perfect for travel or elevated weekend wear.',
+    material: '100% Organic Heavyweight Cotton',
+    fit: 'True to size with a slightly boxy drape.',
+    care: 'Machine wash cold. Tumble dry low.',
+    shipping: 'Free delivery on orders above ₦75,000. Ships within 1-3 days in Lagos.',
+    images: {
+      primary: '/images/products/lounge-set-1.jpg',
+      gallery: ['/images/products/lounge-set-2.jpg']
+    },
+    colors: ['Charcoal', 'Taupe'],
+    availableSizes: ['S', 'M', 'L', 'XL', 'XXL'],
+    featured: false,
+    createdAt: '2023-10-05T00:00:00Z',
+    inStock: true,
+  },
+
+  // --- TOPS ---
+  {
+    id: 'p-003',
+    name: 'The Essential T-Shirt',
+    category: 'tops',
+    subcategory: 'T-Shirts',
+    price: 15000,
+    description: 'The foundation of any capsule wardrobe. A mid-weight, ultra-soft crewneck that retains its shape wash after wash.',
+    material: '100% Supima Cotton',
+    fit: 'Tailored but not tight.',
+    care: 'Machine wash cold with like colors.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/essential-tee-1.jpg',
+      gallery: ['/images/products/essential-tee-2.jpg']
+    },
+    colors: ['White', 'Black', 'Navy', 'Sand'],
+    availableSizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+    featured: true,
+    createdAt: '2023-09-15T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-004',
+    name: 'Textured Henley',
+    category: 'tops',
+    subcategory: 'Henleys',
+    price: 22000,
+    description: 'A slub-cotton henley featuring a three-button placket and raw-edge detailing for a subtly rugged look.',
+    material: '95% Cotton, 5% Elastane',
+    fit: 'Slim fit. Size up if between sizes.',
+    care: 'Machine wash cold. Lay flat to dry.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/henley-1.jpg',
+      gallery: ['/images/products/henley-2.jpg']
+    },
+    colors: ['Off-White', 'Olive', 'Charcoal'],
+    availableSizes: ['S', 'M', 'L', 'XL'],
+    featured: false,
+    createdAt: '2023-09-20T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-005',
+    name: 'Knit Polo Shirt',
+    category: 'tops',
+    subcategory: 'Polos',
+    price: 28000,
+    description: 'An elevated take on the classic polo. Made from fine merino wool blend, offering breathability and natural wrinkle resistance.',
+    material: '70% Merino Wool, 30% Silk',
+    fit: 'Classic fit.',
+    care: 'Hand wash cold or dry clean.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/polo-1.jpg',
+      gallery: ['/images/products/polo-2.jpg']
+    },
+    colors: ['Navy', 'Taupe', 'Black'],
+    availableSizes: ['M', 'L', 'XL', 'XXL'], // XS, S out of stock
+    featured: true,
+    createdAt: '2023-10-10T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-006',
+    name: 'Everyday Long-Sleeve',
+    category: 'tops',
+    subcategory: 'Long-Sleeve Shirts',
+    price: 18000,
+    description: 'A versatile long-sleeve crewneck ideal for layering or wearing solo during transitional weather.',
+    material: '100% Organic Cotton',
+    fit: 'Regular fit.',
+    care: 'Machine wash cold.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/longsleeve-1.jpg',
+      gallery: ['/images/products/longsleeve-2.jpg']
+    },
+    colors: ['White', 'Grey', 'Black'],
+    availableSizes: ['S', 'M', 'L', 'XL'],
+    featured: false,
+    createdAt: '2023-08-10T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-007',
+    name: 'Minimalist Hoodie',
+    category: 'tops',
+    subcategory: 'Hoodies',
+    price: 35000,
+    description: 'A clean, logo-free hoodie with a double-lined hood and hidden side-seam pockets for a streamlined silhouette.',
+    material: '100% French Terry Cotton',
+    fit: 'Relaxed fit.',
+    care: 'Machine wash cold. Tumble dry low.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/hoodie-1.jpg',
+      gallery: ['/images/products/hoodie-2.jpg']
+    },
+    colors: ['Charcoal', 'Beige', 'Black'],
+    availableSizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+    featured: false,
+    createdAt: '2023-11-01T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-008',
+    name: 'Crewneck Sweatshirt',
+    category: 'tops',
+    subcategory: 'Sweatshirts',
+    price: 32000,
+    description: 'A vintage-inspired sweatshirt with modern proportions. Features ribbed cuffs and a sturdy V-stitch at the neckline.',
+    material: '100% Heavyweight Cotton',
+    fit: 'Slightly oversized.',
+    care: 'Machine wash cold.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/sweatshirt-1.jpg',
+      gallery: ['/images/products/sweatshirt-2.jpg']
+    },
+    colors: ['Grey', 'Navy', 'Olive'],
+    availableSizes: ['S', 'M', 'L', 'XL'],
+    featured: false,
+    createdAt: '2023-10-15T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-009',
+    name: 'Ribbed Quarter-Zip',
+    category: 'tops',
+    subcategory: 'Quarter-Zips',
+    price: 42000,
+    description: 'A sophisticated layering piece featuring a chunky zipper and a textured ribbed knit.',
+    material: '80% Cotton, 20% Wool',
+    fit: 'Regular fit. Great for layering over tees.',
+    care: 'Hand wash or delicate cycle.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/quarterzip-1.jpg',
+      gallery: ['/images/products/quarterzip-2.jpg']
+    },
+    colors: ['Cream', 'Navy', 'Charcoal'],
+    availableSizes: ['M', 'L', 'XL'],
+    featured: true,
+    createdAt: '2023-11-05T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-010',
+    name: 'Cashmere-Blend Sweater',
+    category: 'tops',
+    subcategory: 'Sweaters',
+    price: 65000,
+    description: 'Incredibly soft and lightweight. This sweater provides exceptional warmth without the bulk.',
+    material: '90% Merino Wool, 10% Cashmere',
+    fit: 'Tailored fit.',
+    care: 'Dry clean only.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/sweater-1.jpg',
+      gallery: ['/images/products/sweater-2.jpg']
+    },
+    colors: ['Taupe', 'Black', 'Grey'],
+    availableSizes: ['S', 'M', 'L', 'XL'],
+    featured: true,
+    createdAt: '2023-11-10T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-011',
+    name: 'Utilitarian Overshirt',
+    category: 'tops',
+    subcategory: 'Overshirts',
+    price: 48000,
+    description: 'A rugged yet refined overshirt with twin chest pockets. Functions as a shirt or a lightweight jacket.',
+    material: '100% Cotton Twill',
+    fit: 'Boxy fit. Designed to be worn over another layer.',
+    care: 'Machine wash cold.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/overshirt-1.jpg',
+      gallery: ['/images/products/overshirt-2.jpg']
+    },
+    colors: ['Olive', 'Navy', 'Sand'],
+    availableSizes: ['S', 'M', 'L', 'XL', 'XXL'],
+    featured: false,
+    createdAt: '2023-09-05T00:00:00Z',
+    inStock: true,
+  },
+
+  // --- BOTTOMS ---
+  {
+    id: 'p-012',
+    name: 'Tailored Trousers',
+    category: 'bottoms',
+    subcategory: 'Trousers',
+    price: 38000,
+    description: 'Sharp enough for the office, relaxed enough for the weekend. Features a single pleat and a slight taper.',
+    material: '65% Polyester, 35% Viscose',
+    fit: 'Tapered fit. Mid-rise.',
+    care: 'Dry clean recommended.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/trousers-1.jpg',
+      gallery: ['/images/products/trousers-2.jpg']
+    },
+    colors: ['Charcoal', 'Navy', 'Black'],
+    availableSizes: ['S', 'M', 'L', 'XL'],
+    featured: true,
+    createdAt: '2023-08-20T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-013',
+    name: 'Everyday Chinos',
+    category: 'bottoms',
+    subcategory: 'Chinos',
+    price: 32000,
+    description: 'A modern classic. Made with a hint of stretch for all-day comfort without losing their shape.',
+    material: '98% Cotton, 2% Elastane',
+    fit: 'Slim-straight fit.',
+    care: 'Machine wash cold.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/chinos-1.jpg',
+      gallery: ['/images/products/chinos-2.jpg']
+    },
+    colors: ['Beige', 'Navy', 'Olive'],
+    availableSizes: ['S', 'M', 'L', 'XL', 'XXL'],
+    featured: false,
+    createdAt: '2023-08-25T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-014',
+    name: 'Selvedge Denim Jeans',
+    category: 'bottoms',
+    subcategory: 'Jeans',
+    price: 55000,
+    description: 'Premium raw selvedge denim that will uniquely fade and mold to your body over time.',
+    material: '100% Japanese Selvedge Cotton',
+    fit: 'Straight fit.',
+    care: 'Wash sparingly inside out. Indigo may bleed initially.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/jeans-1.jpg',
+      gallery: ['/images/products/jeans-2.jpg']
+    },
+    colors: ['Raw Indigo'],
+    availableSizes: ['M', 'L', 'XL'], // Limited stock
+    featured: true,
+    createdAt: '2023-07-15T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-015',
+    name: 'Washed Black Jeans',
+    category: 'bottoms',
+    subcategory: 'Jeans',
+    price: 45000,
+    description: 'A versatile black jean with a subtle wash for a broken-in feel from day one.',
+    material: '99% Cotton, 1% Elastane',
+    fit: 'Slim fit.',
+    care: 'Machine wash cold inside out.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/jeans-black-1.jpg',
+      gallery: ['/images/products/jeans-black-2.jpg']
+    },
+    colors: ['Washed Black'],
+    availableSizes: ['S', 'M', 'L', 'XL', 'XXL'],
+    featured: false,
+    createdAt: '2023-09-10T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-016',
+    name: 'Tailored Shorts',
+    category: 'bottoms',
+    subcategory: 'Shorts',
+    price: 24000,
+    description: 'Clean lines and a refined length make these shorts suitable for casual outings and warm-weather dining.',
+    material: '100% Cotton Twill',
+    fit: '7-inch inseam. Hits just above the knee.',
+    care: 'Machine wash cold.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/shorts-1.jpg',
+      gallery: ['/images/products/shorts-2.jpg']
+    },
+    colors: ['Sand', 'Navy', 'Olive'],
+    availableSizes: ['S', 'M', 'L', 'XL'],
+    featured: false,
+    createdAt: '2023-05-10T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-017',
+    name: 'Premium Joggers',
+    category: 'bottoms',
+    subcategory: 'Joggers',
+    price: 29000,
+    description: 'Upgraded loungewear. These joggers feature a tailored silhouette that doesn\'t look sloppy.',
+    material: '100% French Terry Cotton',
+    fit: 'Tapered fit with cuffed hems.',
+    care: 'Machine wash cold.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/joggers-1.jpg',
+      gallery: ['/images/products/joggers-2.jpg']
+    },
+    colors: ['Grey', 'Black', 'Navy'],
+    availableSizes: ['XS', 'S', 'M', 'L', 'XL'],
+    featured: false,
+    createdAt: '2023-10-02T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-018',
+    name: 'Modern Cargo Pants',
+    category: 'bottoms',
+    subcategory: 'Cargo Pants',
+    price: 42000,
+    description: 'A streamlined take on the utilitarian classic. Pockets lie flat to maintain a clean profile.',
+    material: '100% Ripstop Cotton',
+    fit: 'Relaxed straight fit.',
+    care: 'Machine wash cold.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/cargo-1.jpg',
+      gallery: ['/images/products/cargo-2.jpg']
+    },
+    colors: ['Olive', 'Black', 'Taupe'],
+    availableSizes: ['S', 'M', 'L', 'XL', 'XXL'],
+    featured: false,
+    createdAt: '2023-09-25T00:00:00Z',
+    inStock: true,
+  },
+  
+  // --- ADDITIONAL TOPS TO REACH ~20 ---
+  {
+    id: 'p-019',
+    name: 'Heavyweight Pocket Tee',
+    category: 'tops',
+    subcategory: 'T-Shirts',
+    price: 18000,
+    description: 'A sturdier alternative to our Essential Tee, featuring a relaxed drape and a single chest pocket.',
+    material: '100% Heavyweight Cotton',
+    fit: 'Boxy, relaxed fit.',
+    care: 'Machine wash cold.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/pocket-tee-1.jpg',
+      gallery: ['/images/products/pocket-tee-2.jpg']
+    },
+    colors: ['White', 'Olive', 'Charcoal'],
+    availableSizes: ['S', 'M', 'L', 'XL'],
+    featured: false,
+    createdAt: '2023-10-20T00:00:00Z',
+    inStock: true,
+  },
+  {
+    id: 'p-020',
+    name: 'Chunky Knit Sweater',
+    category: 'tops',
+    subcategory: 'Sweaters',
+    price: 58000,
+    description: 'A textural masterpiece. This chunky knit provides deep warmth and striking visual interest.',
+    material: '100% Wool',
+    fit: 'Relaxed fit.',
+    care: 'Hand wash only. Dry flat.',
+    shipping: 'Free delivery on orders above ₦75,000.',
+    images: {
+      primary: '/images/products/chunky-sweater-1.jpg',
+      gallery: ['/images/products/chunky-sweater-2.jpg']
+    },
+    colors: ['Cream', 'Navy'],
+    availableSizes: ['M', 'L', 'XL'],
+    featured: true,
+    createdAt: '2023-11-20T00:00:00Z',
+    inStock: true,
+  }
 ];
+
