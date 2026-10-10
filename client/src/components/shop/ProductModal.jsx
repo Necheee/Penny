@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { products, sizes as globalSizes } from '../../data/mockCatalogue';
+import { getProductById, getSizes } from '../../services/api';
 import { Plus, Minus, X, ShoppingBag, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -49,23 +49,55 @@ import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 
 export default function ProductModal({ productId, closeModal }) {
-  const product = products.find(p => p.id === productId);
+  const [product, setProduct] = useState(null);
+  const [globalSizes, setGlobalSizes] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const { addToCart, openCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
 
-  const [activeImage, setActiveImage] = useState(product?.images.primary || '');
+  const [activeImage, setActiveImage] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
-    if (product && product.colors.length > 0) {
-      setSelectedColor(product.colors[0]);
+    const fetchProduct = async () => {
+      setIsLoading(true);
+      try {
+        const [fetchedProduct, fetchedSizes] = await Promise.all([
+          getProductById(productId),
+          getSizes()
+        ]);
+        setProduct(fetchedProduct);
+        setGlobalSizes(fetchedSizes);
+      } catch (error) {
+        console.error("Error fetching product", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    if (productId) fetchProduct();
+  }, [productId]);
+
+  useEffect(() => {
+    if (product) {
+      setActiveImage(product.images.primary);
+      if (product.colors.length > 0) setSelectedColor(product.colors[0]);
     }
   }, [product]);
 
-  if (!product) return null;
+  if (isLoading || !product) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="bg-white p-8 shadow-2xl flex flex-col items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal mb-4"></div>
+          <p className="text-xs tracking-widest uppercase text-brand-charcoal">Loading</p>
+        </div>
+      </div>
+    );
+  }
 
   const allImages = [product.images.primary, ...(product.images.gallery || [])];
 
