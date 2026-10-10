@@ -33,24 +33,24 @@ PENNY focuses on modern men's essentials designed to work together naturally. Th
 - Create responsive foundations and the routing base.
 - Define mock data structure and reusable component architecture.
 
-### Phase 2 — Catalogue and Assets (Up Next)
+### Phase 2 — Catalogue and Assets (Completed)
 - Create a realistic 20–30 product mock catalogue.
 - Source and download high-quality, menswear-focused product imagery into the project folder.
 - Define products with categories, subcategories, sizes, colors, availability, and featured status (Must include the signature "Linen Two-Piece Set").
 
-### Phase 3 — Global Layout
+### Phase 3 — Global Layout (Completed)
 - Implement the Announcement Bar (with free shipping messaging).
 - Build Desktop and Mobile Headers, including the mobile navigation drawer.
 - Build the Footer and establish responsive layout behaviors across the application.
 
-### Phase 4 — Homepage
+### Phase 4 — Homepage (Completed)
 - Implement the complete editorial homepage: Hero, Brand Intro, Shop by Category, Featured Collection, Capsule Philosophy, Two-Piece Set Feature, and Newsletter signup.
 
-### Phase 5 — Shop
+### Phase 5 — Shop (Completed)
 - Implement Shop categories (Tops, Bottoms, Sets) and subcategories grids.
 - Add the responsive product grid, filters (Size, Color, Price, Availability), sorting, search capabilities, and empty states.
 
-### Phase 6 — Product Experience
+### Phase 6 — Product Experience (Up Next)
 - Implement the Product Card and the primary purchasing interface: the Product Modal.
 - Build out the gallery, color selection (including a "custom color request" feature), size selection (with disabled states), quantity adjustments, and expandable info sections.
 
