@@ -26,6 +26,7 @@ export default function CartDrawer() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeCart}
+            aria-hidden="true"
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
           />
 
@@ -35,12 +36,15 @@ export default function CartDrawer() {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'tween', duration: 0.4, ease: 'easeOut' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Your Bag"
             className="fixed top-0 right-0 h-full w-full sm:w-[450px] bg-white z-50 shadow-2xl flex flex-col"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-brand-charcoal/10">
               <h2 className="text-sm font-bold tracking-[0.2em] uppercase text-brand-charcoal">Your Bag</h2>
-              <button onClick={closeCart} className="p-2 hover:bg-brand-beige/30 rounded-full transition-colors">
+              <button onClick={closeCart} aria-label="Close cart" className="p-2 hover:bg-brand-beige/30 rounded-full transition-colors">
                 <X className="w-5 h-5 text-brand-charcoal" />
               </button>
             </div>
@@ -83,18 +87,18 @@ export default function CartDrawer() {
                           <h3 className="text-xs font-bold tracking-wider uppercase text-brand-charcoal leading-tight pr-4">{item.name}</h3>
                           <p className="text-xs text-brand-taupe mt-1">{item.color} / Size {item.size}</p>
                         </div>
-                        <button onClick={() => removeFromCart(item.cartId)} className="text-brand-charcoal/40 hover:text-brand-charcoal transition-colors">
+                        <button onClick={() => removeFromCart(item.cartId)} aria-label={`Remove ${item.name} from cart`} className="text-brand-charcoal/40 hover:text-brand-charcoal transition-colors">
                           <X className="w-4 h-4" />
                         </button>
                       </div>
                       
                       <div className="mt-auto flex justify-between items-end">
                         <div className="flex items-center border border-brand-charcoal/20 px-2 py-1.5">
-                          <button onClick={() => updateQuantity(item.cartId, item.quantity - 1)} className="text-brand-charcoal/60 hover:text-brand-charcoal px-1">
+                          <button onClick={() => updateQuantity(item.cartId, item.quantity - 1)} aria-label="Decrease quantity" className="text-brand-charcoal/60 hover:text-brand-charcoal px-1">
                             <Minus className="w-3 h-3" />
                           </button>
-                          <span className="text-xs font-bold w-6 text-center">{item.quantity}</span>
-                          <button onClick={() => updateQuantity(item.cartId, item.quantity + 1)} className="text-brand-charcoal/60 hover:text-brand-charcoal px-1">
+                          <span className="text-xs font-bold w-6 text-center" aria-label="Quantity">{item.quantity}</span>
+                          <button onClick={() => updateQuantity(item.cartId, item.quantity + 1)} aria-label="Increase quantity" className="text-brand-charcoal/60 hover:text-brand-charcoal px-1">
                             <Plus className="w-3 h-3" />
                           </button>
                         </div>
