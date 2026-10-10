@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { products } from '../data/mockCatalogue';
+import { getProducts } from '../services/api';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProductCard from '../components/shop/ProductCard';
@@ -12,6 +12,23 @@ const heroImages = [
 ];
 
 export default function Home() {
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const data = await getProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error("Failed to load products", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
   const featuredProducts = products.filter(p => p.featured).slice(0, 4);
   const linenSet = products.find(p => p.id === 'p-001');
 
