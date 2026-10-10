@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { products, categories as mockCategories } from '../data/mockCatalogue';
+import { getProducts, getCategories } from '../services/api';
 import { SlidersHorizontal, ChevronDown, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProductCard from '../components/shop/ProductCard';
@@ -9,10 +9,33 @@ export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialCategory = searchParams.get('category') || 'all';
 
+  const [products, setProducts] = useState([]);
+  const [categoriesList, setCategoriesList] = useState([{ id: 'all', name: 'All Products' }]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [sortOption, setSortOption] = useState('featured'); // featured, price-asc, price-desc
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [fetchedProducts, fetchedCategories] = await Promise.all([
+          getProducts(),
+          getCategories()
+        ]);
+        setProducts(fetchedProducts);
+        setCategoriesList([{ id: 'all', name: 'All Products' }, ...fetchedCategories]);
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   // Sync state with URL params
   useEffect(() => {
@@ -56,12 +79,7 @@ export default function Shop() {
     }
 
     return result;
-  }, [activeCategory, sortOption]);
-
-  const categoriesList = [
-    { id: 'all', name: 'All Products' },
-    ...mockCategories
-  ];
+  }, [activeCategory, sortOption, products]);
 
   const sortOptions = [
     { id: 'featured', label: 'Featured' },
@@ -167,7 +185,11 @@ export default function Shop() {
 
         {/* Product Grid */}
         <div className="flex-grow">
-          {filteredAndSortedProducts.length === 0 ? (
+          {isLoading ? (
+            <div className="py-20 flex justify-center items-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal"></div>
+            </div>
+          ) : filteredAndSortedProducts.length === 0 ? (
             <div className="py-20 text-center text-brand-taupe text-lg font-serif">
               No products found in this category.
             </div>
