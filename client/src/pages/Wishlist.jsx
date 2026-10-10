@@ -8,31 +8,39 @@ export default function Wishlist() {
   const { user } = useAuth();
 
   return (
-    <div className="pt-32 pb-24 px-4 md:px-8 max-w-7xl mx-auto min-h-[70vh]">
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
-        <div>
-          <h1 className="text-3xl font-light tracking-wide font-serif mb-2">Wishlist</h1>
-          <p className="text-sm text-neutral-500">
-            {wishlist.length} {wishlist.length === 1 ? 'item' : 'items'}
+    <div className="pt-24 pb-24 px-4 md:px-8 max-w-7xl mx-auto min-h-[70vh]">
+      
+      {/* Refined Guest Prompt */}
+      {!user && wishlist.length > 0 && (
+        <div className="mb-12 py-3 border-b border-brand-charcoal/10 text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-[12px] uppercase tracking-widest text-brand-charcoal/60">
+            Guest Wishlist
+          </p>
+          <p className="text-[12px] text-brand-charcoal/60">
+            <Link to="/account/login" className="text-brand-charcoal underline underline-offset-4 font-medium hover:text-brand-taupe transition-colors">
+              Sign in
+            </Link> to save these items across your devices.
           </p>
         </div>
-        
-        {!user && (
-          <div className="bg-neutral-50 p-4 border border-neutral-200 text-[13px] md:max-w-xs">
-            <p className="mb-2"><strong>You are browsing as a guest.</strong></p>
-            <p className="text-neutral-600 mb-3">Sign in to save your wishlist across all your devices.</p>
-            <Link to="/account/login" className="underline underline-offset-4 font-medium hover:text-neutral-600">
-              Sign In / Register
-            </Link>
-          </div>
-        )}
+      )}
+
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-4">
+        <div>
+          <h1 className="text-4xl font-serif text-brand-charcoal mb-2">Wishlist</h1>
+          <p className="text-xs uppercase tracking-widest text-brand-charcoal/50">
+            {wishlist.length} {wishlist.length === 1 ? 'Item' : 'Items'}
+          </p>
+        </div>
       </div>
 
       {wishlist.length === 0 ? (
-        <div className="text-center py-24 bg-neutral-50 border border-neutral-100">
-          <p className="text-neutral-500 mb-6">Your wishlist is currently empty.</p>
-          <Link to="/shop" className="bg-black text-white px-8 py-3 text-[13px] font-medium hover:bg-neutral-800 transition-colors">
-            Continue Shopping
+        <div className="flex flex-col items-center justify-center py-32">
+          <h2 className="text-2xl font-serif text-brand-charcoal mb-4">Nothing saved yet</h2>
+          <p className="text-[13px] text-brand-charcoal/60 mb-8 max-w-md text-center">
+            Keep track of your favorite pieces. Explore our collection and click the heart icon to save items here.
+          </p>
+          <Link to="/shop" className="border border-brand-charcoal text-brand-charcoal px-10 py-3 text-[11px] uppercase tracking-widest font-bold hover:bg-brand-charcoal hover:text-white transition-colors">
+            Explore Collection
           </Link>
         </div>
       ) : (
