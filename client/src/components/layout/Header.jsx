@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { Search, Heart, ShoppingBag, Menu, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
+import { useWishlist } from '../../context/WishlistContext';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -14,6 +16,10 @@ export default function Header() {
   
   const location = useLocation();
   const { openCart, cartCount } = useCart();
+  const { user } = useAuth();
+  const { wishlist } = useWishlist();
+  
+  const wishlistCount = wishlist.length;
 
   const closeMenu = () => {
     setIsMobileMenuOpen(false);
@@ -109,13 +115,18 @@ export default function Header() {
             <Search className="w-5 h-5" />
           </button>
           
-          <Link to="/account/login" className="hidden md:block text-sm font-medium tracking-wide hover:text-brand-taupe transition-colors uppercase font-sans">
-            Login
+          <Link to={user ? "/account" : "/account/login"} className="hidden md:block text-sm font-medium tracking-wide hover:text-brand-taupe transition-colors uppercase font-sans">
+            {user ? "Account" : "Login"}
           </Link>
           
-          <button className="hover:text-brand-taupe transition-colors">
+          <Link to="/wishlist" className="hover:text-brand-taupe transition-colors flex items-center relative">
             <Heart className="w-5 h-5" />
-          </button>
+            {wishlistCount > 0 && (
+              <span className="absolute -top-1.5 -right-2 bg-brand-charcoal text-brand-offwhite text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold font-sans">
+                {wishlistCount}
+              </span>
+            )}
+          </Link>
           
           <button onClick={openCart} className="hover:text-brand-taupe transition-colors flex items-center relative">
             <ShoppingBag className="w-5 h-5" />
@@ -207,7 +218,8 @@ export default function Header() {
                 </div>
                 
                 <div className="h-px w-full bg-brand-border my-4"></div>
-                <Link to="/account/login" className="text-lg uppercase tracking-wider text-sm font-medium" onClick={closeMenu}>Login / Register</Link>
+                <Link to={user ? "/account" : "/account/login"} className="text-lg uppercase tracking-wider text-sm font-medium" onClick={closeMenu}>{user ? "Account" : "Login / Register"}</Link>
+                <Link to="/wishlist" className="text-lg uppercase tracking-wider text-sm font-medium" onClick={closeMenu}>Wishlist {wishlistCount > 0 ? `(${wishlistCount})` : ''}</Link>
               </nav>
             </motion.div>
           </div>
