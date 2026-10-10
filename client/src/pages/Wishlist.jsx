@@ -8,16 +8,18 @@ export default function Wishlist() {
   const { user } = useAuth();
 
   return (
-    <div className="pt-24 pb-24 px-4 md:px-8 max-w-7xl mx-auto min-h-[70vh]">
+    <div className="pt-8 pb-24 px-4 md:px-8 max-w-7xl mx-auto min-h-[70vh]">
       
       {/* Refined Guest Prompt */}
       {!user && wishlist.length > 0 && (
-        <div className="mb-12 py-3 border-b border-brand-charcoal/10 text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="mb-8 py-3 border-b border-brand-charcoal/10 text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-[12px] uppercase tracking-widest text-brand-charcoal/60">
             Guest Wishlist
           </p>
           <p className="text-[12px] text-brand-charcoal/60">
-            <Link to="/account/login" className="text-brand-charcoal underline underline-offset-4 font-medium hover:text-brand-taupe transition-colors">Sign in</Link> to save these items across your devices.
+            <Link to="/account/login" className="text-brand-charcoal underline underline-offset-4 font-medium hover:text-brand-taupe transition-colors">
+              Sign in
+            </Link> to save these items across your devices.
           </p>
         </div>
       )}
