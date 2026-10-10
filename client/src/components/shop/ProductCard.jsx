@@ -32,10 +32,12 @@ export default function ProductCard({ product }) {
         <img 
           src={product.images.primary} 
           alt={product.name} 
+          loading="lazy"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 ease-out" 
         />
         <button 
           onClick={handleWishlistClick}
+          aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
           className="absolute top-3 right-3 p-2 bg-white/50 hover:bg-white rounded-full backdrop-blur-sm transition-colors z-10"
         >
           <Heart className={`w-4 h-4 ${isLiked ? 'fill-black text-black' : 'text-black'}`} />
