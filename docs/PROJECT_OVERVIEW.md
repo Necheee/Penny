@@ -64,10 +64,10 @@ PENNY focuses on modern men's essentials designed to work together naturally. Th
 - Implement Account dashboard (Profile, Orders, Settings).
 - Build the authentication-aware Wishlist (showing prompts for guests).
 
-### Phase 9 — Supporting Pages (Up Next)
+### Phase 9 — Supporting Pages (Completed)
 - Implement editorial and informational pages: About, Contact, Care Guide, Shipping & Returns, Privacy Policy, and Terms.
 
-### Phase 10 — Refinement
+### Phase 10 — Refinement (Up Next)
 - Comprehensive testing across Mobile, Tablet, and Desktop.
 - Accessibility audits (Semantic HTML, keyboard navigation, focus management, ARIA labels, color contrast).
 - Polish animations, image loading performance, form validation feedback, and overall visual consistency.
