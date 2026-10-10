@@ -111,27 +111,27 @@ export default function Header() {
 
         {/* Icons & Actions */}
         <div className="flex items-center space-x-5">
-          <button className="hidden md:block hover:text-brand-taupe transition-colors">
+          <button aria-label="Search" className="hidden md:block hover:text-brand-taupe transition-colors">
             <Search className="w-5 h-5" />
           </button>
           
-          <Link to={user ? "/account" : "/account/login"} className="hidden md:block text-sm font-medium tracking-wide hover:text-brand-taupe transition-colors uppercase font-sans">
+          <Link to={user ? "/account" : "/account/login"} aria-label={user ? "Go to Account" : "Log in to Account"} className="hidden md:block text-sm font-medium tracking-wide hover:text-brand-taupe transition-colors uppercase font-sans">
             {user ? "Account" : "Login"}
           </Link>
           
-          <Link to="/wishlist" className="hover:text-brand-taupe transition-colors flex items-center relative">
+          <Link to="/wishlist" aria-label="View Wishlist" className="hover:text-brand-taupe transition-colors flex items-center relative">
             <Heart className="w-5 h-5" />
             {wishlistCount > 0 && (
-              <span className="absolute -top-1.5 -right-2 bg-brand-charcoal text-brand-offwhite text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold font-sans">
+              <span className="absolute -top-1.5 -right-2 bg-brand-charcoal text-brand-offwhite text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold font-sans" aria-label={`${wishlistCount} items in wishlist`}>
                 {wishlistCount}
               </span>
             )}
           </Link>
           
-          <button onClick={openCart} className="hover:text-brand-taupe transition-colors flex items-center relative">
+          <button onClick={openCart} aria-label="Open Shopping Bag" className="hover:text-brand-taupe transition-colors flex items-center relative">
             <ShoppingBag className="w-5 h-5" />
             {cartCount > 0 && (
-              <span className="absolute -top-1.5 -right-2 bg-brand-charcoal text-brand-offwhite text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold font-sans">
+              <span className="absolute -top-1.5 -right-2 bg-brand-charcoal text-brand-offwhite text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold font-sans" aria-label={`${cartCount} items in bag`}>
                 {cartCount}
               </span>
             )}
@@ -142,13 +142,14 @@ export default function Header() {
       {/* Animated Mobile Menu Drawer */}
       <AnimatePresence>
         {isMobileMenuOpen && (
-          <div className="fixed inset-0 z-50 flex md:hidden font-sans">
+          <div className="fixed inset-0 z-50 flex md:hidden font-sans" aria-modal="true" role="dialog">
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-brand-charcoal/50 backdrop-blur-sm" 
               onClick={closeMenu}
+              aria-hidden="true"
             />
             <motion.div 
               initial={{ x: '-100%' }}
@@ -157,7 +158,7 @@ export default function Header() {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="relative w-4/5 max-w-sm h-full bg-brand-offwhite shadow-2xl flex flex-col pt-6 px-6 overflow-y-auto"
             >
-              <button className="absolute top-6 right-6 text-brand-charcoal" onClick={closeMenu}>
+              <button aria-label="Close menu" className="absolute top-6 right-6 text-brand-charcoal" onClick={closeMenu}>
                 <X className="w-6 h-6" />
               </button>
               
@@ -170,10 +171,14 @@ export default function Header() {
                 
                 {/* Mobile Shop Accordion */}
                 <div className="flex flex-col">
-                  <div className="flex items-center justify-between cursor-pointer" onClick={() => setMobileShopOpen(!mobileShopOpen)}>
+                  <button 
+                    className="flex items-center justify-between w-full text-left" 
+                    onClick={() => setMobileShopOpen(!mobileShopOpen)}
+                    aria-expanded={mobileShopOpen}
+                  >
                     <span>Shop</span>
                     <ChevronDown className={`w-5 h-5 transition-transform ${mobileShopOpen ? 'rotate-180' : ''}`} />
-                  </div>
+                  </button>
                   <AnimatePresence>
                     {mobileShopOpen && (
                       <motion.div 
@@ -195,10 +200,14 @@ export default function Header() {
                 
                 {/* Mobile Info Accordion */}
                 <div className="flex flex-col">
-                  <div className="flex items-center justify-between cursor-pointer" onClick={() => setMobileInfoOpen(!mobileInfoOpen)}>
+                  <button 
+                    className="flex items-center justify-between w-full text-left" 
+                    onClick={() => setMobileInfoOpen(!mobileInfoOpen)}
+                    aria-expanded={mobileInfoOpen}
+                  >
                     <span>Info</span>
                     <ChevronDown className={`w-5 h-5 transition-transform ${mobileInfoOpen ? 'rotate-180' : ''}`} />
-                  </div>
+                  </button>
                   <AnimatePresence>
                     {mobileInfoOpen && (
                       <motion.div 
@@ -217,7 +226,7 @@ export default function Header() {
                   </AnimatePresence>
                 </div>
                 
-                <div className="h-px w-full bg-brand-border my-4"></div>
+                <div className="h-px w-full bg-brand-border my-4" aria-hidden="true"></div>
                 <Link to={user ? "/account" : "/account/login"} className="text-lg uppercase tracking-wider text-sm font-medium" onClick={closeMenu}>{user ? "Account" : "Login / Register"}</Link>
                 <Link to="/wishlist" className="text-lg uppercase tracking-wider text-sm font-medium" onClick={closeMenu}>Wishlist {wishlistCount > 0 ? `(${wishlistCount})` : ''}</Link>
               </nav>
