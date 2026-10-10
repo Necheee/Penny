@@ -17,9 +17,7 @@ export default function Wishlist() {
             Guest Wishlist
           </p>
           <p className="text-[12px] text-brand-charcoal/60">
-            <Link to="/account/login" className="text-brand-charcoal underline underline-offset-4 font-medium hover:text-brand-taupe transition-colors">
-              Sign in
-            </Link> to save these items across your devices.
+            <Link to="/account/login" className="text-brand-charcoal underline underline-offset-4 font-medium hover:text-brand-taupe transition-colors">Sign in</Link> to save these items across your devices.
           </p>
         </div>
       )}
