@@ -8,6 +8,12 @@ import CreateAccount from './pages/CreateAccount';
 import ForgotPassword from './pages/ForgotPassword';
 import Account from './pages/Account';
 import Wishlist from './pages/Wishlist';
+import About from './pages/About';
+import Contact from './pages/Contact';
+import CareGuide from './pages/CareGuide';
+import Shipping from './pages/Shipping';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
 import { ModalProvider } from './context/ModalContext';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
@@ -36,6 +42,14 @@ function App() {
                   
                   {/* Wishlist Route */}
                   <Route path="/wishlist" element={<Wishlist />} />
+
+                  {/* Informational / Supporting Pages */}
+                  <Route path="/about" element={<About />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/care-guide" element={<CareGuide />} />
+                  <Route path="/shipping" element={<Shipping />} />
+                  <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/terms" element={<Terms />} />
 
                   {/* Temporary catch-all to prevent 404s while clicking header links */}
                   <Route path="*" element={<Home />} />
