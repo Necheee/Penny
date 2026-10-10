@@ -45,8 +45,11 @@ const Accordion = ({ title, content, defaultOpen = false }) => {
   );
 };
 
+import { useCart } from '../../context/CartContext';
+
 export default function ProductModal({ productId, closeModal }) {
   const product = products.find(p => p.id === productId);
+  const { addToCart, openCart } = useCart();
 
   const [activeImage, setActiveImage] = useState(product?.images.primary || '');
   const [selectedColor, setSelectedColor] = useState('');
@@ -77,9 +80,10 @@ export default function ProductModal({ productId, closeModal }) {
     
     setIsAdding(true);
     setTimeout(() => {
+      addToCart(product, selectedSize, selectedColor, quantity);
       setIsAdding(false);
-      alert(`Added to Bag: ${product.name} | ${selectedColor} | Size: ${selectedSize} | Qty: ${quantity}`);
       closeModal();
+      openCart();
     }, 600);
   };
 
