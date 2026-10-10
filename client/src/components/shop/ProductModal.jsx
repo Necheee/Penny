@@ -97,6 +97,7 @@ export default function ProductModal({ productId, closeModal }) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={closeModal}
+        aria-hidden="true"
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
       />
 
@@ -105,11 +106,15 @@ export default function ProductModal({ productId, closeModal }) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={product.name}
         className="relative bg-white w-full max-w-6xl max-h-[90vh] overflow-y-auto hide-scrollbar shadow-2xl flex flex-col md:flex-row"
       >
         {/* Close Button */}
         <button 
           onClick={closeModal}
+          aria-label="Close modal"
           className="absolute top-4 right-4 z-20 p-2 bg-white/80 hover:bg-white text-brand-charcoal transition-colors rounded-full"
         >
           <X className="w-5 h-5" />
@@ -154,6 +159,7 @@ export default function ProductModal({ productId, closeModal }) {
             </div>
             <button 
               onClick={() => toggleWishlist(product)}
+              aria-label={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
               className="p-2 border border-neutral-200 rounded-full hover:bg-neutral-50 transition-colors"
             >
               <Heart className={`w-5 h-5 ${isInWishlist(product.id) ? 'fill-black text-black' : 'text-black'}`} />
@@ -176,7 +182,8 @@ export default function ProductModal({ productId, closeModal }) {
                   onClick={() => setSelectedColor(color)}
                   className={`w-7 h-7 rounded-full shadow-sm transition-transform ${selectedColor === color ? 'ring-2 ring-offset-2 ring-brand-charcoal scale-110' : 'border border-black/10 hover:scale-110'}`}
                   style={{ backgroundColor: getColorHex(color) }}
-                  aria-label={`Select ${color}`}
+                  aria-label={`Select color ${color}`}
+                  aria-pressed={selectedColor === color}
                 />
               ))}
             </div>
@@ -201,6 +208,8 @@ export default function ProductModal({ productId, closeModal }) {
                     key={size}
                     disabled={!isAvailable}
                     onClick={() => setSelectedSize(size)}
+                    aria-label={`Select size ${size}`}
+                    aria-pressed={selectedSize === size}
                     className={`py-2 text-xs font-bold tracking-wider transition-all border
                       ${!isAvailable ? 'border-brand-charcoal/10 text-brand-charcoal/20 cursor-not-allowed line-through' : ''}
                       ${isAvailable && selectedSize !== size ? 'border-brand-charcoal/20 text-brand-charcoal hover:border-brand-charcoal' : ''}
@@ -218,11 +227,11 @@ export default function ProductModal({ productId, closeModal }) {
           {/* Add to Bag */}
           <div className="flex gap-3 mb-8">
             <div className="flex items-center justify-between border border-brand-charcoal/20 w-28 px-3 py-3">
-              <button onClick={() => handleQuantity('dec')} className="text-brand-charcoal/60 hover:text-brand-charcoal">
+              <button onClick={() => handleQuantity('dec')} aria-label="Decrease quantity" className="text-brand-charcoal/60 hover:text-brand-charcoal">
                 <Minus className="w-4 h-4" />
               </button>
-              <span className="text-sm font-bold">{quantity}</span>
-              <button onClick={() => handleQuantity('inc')} className="text-brand-charcoal/60 hover:text-brand-charcoal">
+              <span className="text-sm font-bold" aria-label="Quantity">{quantity}</span>
+              <button onClick={() => handleQuantity('inc')} aria-label="Increase quantity" className="text-brand-charcoal/60 hover:text-brand-charcoal">
                 <Plus className="w-4 h-4" />
               </button>
             </div>
