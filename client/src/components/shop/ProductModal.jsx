@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { products, sizes as globalSizes } from '../../data/mockCatalogue';
-import { Plus, Minus, X, ShoppingBag } from 'lucide-react';
+import { Plus, Minus, X, ShoppingBag, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const getColorHex = (colorName) => {
@@ -46,10 +46,12 @@ const Accordion = ({ title, content, defaultOpen = false }) => {
 };
 
 import { useCart } from '../../context/CartContext';
+import { useWishlist } from '../../context/WishlistContext';
 
 export default function ProductModal({ productId, closeModal }) {
   const product = products.find(p => p.id === productId);
   const { addToCart, openCart } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
 
   const [activeImage, setActiveImage] = useState(product?.images.primary || '');
   const [selectedColor, setSelectedColor] = useState('');
@@ -145,9 +147,17 @@ export default function ProductModal({ productId, closeModal }) {
 
         {/* Right Column: Product Details */}
         <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col">
-          <div className="mb-6">
-            <h1 className="text-2xl font-serif text-brand-charcoal mb-2">{product.name}</h1>
-            <p className="text-lg font-serif text-brand-charcoal/80">₦ {product.price.toLocaleString()}</p>
+          <div className="mb-6 flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-serif text-brand-charcoal mb-2">{product.name}</h1>
+              <p className="text-lg font-serif text-brand-charcoal/80">₦ {product.price.toLocaleString()}</p>
+            </div>
+            <button 
+              onClick={() => toggleWishlist(product)}
+              className="p-2 border border-neutral-200 rounded-full hover:bg-neutral-50 transition-colors"
+            >
+              <Heart className={`w-5 h-5 ${isInWishlist(product.id) ? 'fill-black text-black' : 'text-black'}`} />
+            </button>
           </div>
 
           <div className="h-px w-full bg-brand-charcoal/10 mb-6" />

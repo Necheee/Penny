@@ -12,8 +12,19 @@ const getColorHex = (colorName) => {
   return map[colorName] || '#cccccc'; // fallback gray
 };
 
+import { Heart } from 'lucide-react';
+import { useWishlist } from '../../context/WishlistContext';
+
 export default function ProductCard({ product }) {
   const { openModal } = useModal();
+  const { isInWishlist, toggleWishlist } = useWishlist();
+
+  const isLiked = isInWishlist(product.id);
+
+  const handleWishlistClick = (e) => {
+    e.stopPropagation(); // prevent modal from opening
+    toggleWishlist(product);
+  };
 
   return (
     <div onClick={() => openModal(product.id)} className="group flex flex-col cursor-pointer">
@@ -23,6 +34,12 @@ export default function ProductCard({ product }) {
           alt={product.name} 
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 ease-out" 
         />
+        <button 
+          onClick={handleWishlistClick}
+          className="absolute top-3 right-3 p-2 bg-white/50 hover:bg-white rounded-full backdrop-blur-sm transition-colors z-10"
+        >
+          <Heart className={`w-4 h-4 ${isLiked ? 'fill-black text-black' : 'text-black'}`} />
+        </button>
         {/* Optional: A subtle border that appears on hover for framing */}
         <div className="absolute inset-0 border border-brand-charcoal/0 group-hover:border-brand-charcoal/10 transition-colors duration-500 pointer-events-none" />
       </div>
