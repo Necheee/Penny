@@ -54,12 +54,12 @@ PENNY focuses on modern men's essentials designed to work together naturally. Th
 - Implement the Product Card and the primary purchasing interface: the Product Modal.
 - Build out the gallery, color selection (including a "custom color request" feature), size selection (with disabled states), quantity adjustments, and expandable info sections.
 
-### Phase 7 — Cart and Checkout (Up Next)
+### Phase 7 — Cart and Checkout (Completed)
 - Build Cart drawer and dedicated Cart review page.
 - Implement subtotal calculations and free shipping threshold logic (Free shipping unlocks at ₦75,000).
 - Build the Checkout interface to collect Customer details, Delivery information, Order Summary, and display Payment UI states.
 
-### Phase 8 — Account and Wishlist
+### Phase 8 — Account and Wishlist (Up Next)
 - Build Authentication screens (Sign In, Create Account, Forgot Password).
 - Implement Account dashboard (Profile, Orders, Settings).
 - Build the authentication-aware Wishlist (showing prompts for guests).
