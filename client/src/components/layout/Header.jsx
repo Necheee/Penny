@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Search, Heart, ShoppingBag, Menu, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useCart } from '../../context/CartContext';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -12,6 +13,7 @@ export default function Header() {
   const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
   
   const location = useLocation();
+  const { openCart, cartCount } = useCart();
 
   const closeMenu = () => {
     setIsMobileMenuOpen(false);
@@ -115,11 +117,13 @@ export default function Header() {
             <Heart className="w-5 h-5" />
           </button>
           
-          <button className="hover:text-brand-taupe transition-colors flex items-center relative">
+          <button onClick={openCart} className="hover:text-brand-taupe transition-colors flex items-center relative">
             <ShoppingBag className="w-5 h-5" />
-            <span className="absolute -top-1.5 -right-2 bg-brand-charcoal text-brand-offwhite text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold font-sans">
-              0
-            </span>
+            {cartCount > 0 && (
+              <span className="absolute -top-1.5 -right-2 bg-brand-charcoal text-brand-offwhite text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold font-sans">
+                {cartCount}
+              </span>
+            )}
           </button>
         </div>
       </div>
