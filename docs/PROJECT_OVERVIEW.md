@@ -59,12 +59,12 @@ PENNY focuses on modern men's essentials designed to work together naturally. Th
 - Implement subtotal calculations and free shipping threshold logic (Free shipping unlocks at ₦75,000).
 - Build the Checkout interface to collect Customer details, Delivery information, Order Summary, and display Payment UI states.
 
-### Phase 8 — Account and Wishlist (Up Next)
+### Phase 8 — Account and Wishlist (Completed)
 - Build Authentication screens (Sign In, Create Account, Forgot Password).
 - Implement Account dashboard (Profile, Orders, Settings).
 - Build the authentication-aware Wishlist (showing prompts for guests).
 
-### Phase 9 — Supporting Pages
+### Phase 9 — Supporting Pages (Up Next)
 - Implement editorial and informational pages: About, Contact, Care Guide, Shipping & Returns, Privacy Policy, and Terms.
 
 ### Phase 10 — Refinement
