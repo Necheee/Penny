@@ -4,23 +4,32 @@ Welcome to PENNY! This guide will help you get familiar with the project, set it
 
 ## 1. Project Overview
 
-PENNY is a minimal men's capsule wardrobe e-commerce website. Currently, the project consists of a complete frontend implementation. The application showcases products, allows users to manage a cart and wishlist, supports user authentication flows (simulated), and provides a checkout process.
+PENNY is a minimal men's capsule wardrobe e-commerce platform. The project features a complete storefront and administrative dashboard, currently backed by a client-side reactive state engine (`ProductContext` + `localStorage`). Full-stack backend integration with PostgreSQL, Prisma, and Cloudinary is underway in Phase 12.
 
 **Current Development Status:**
-- The frontend (Phases 1-10) is fully implemented.
-- The project currently uses simulated asynchronous API calls with mock data. There is no real backend connected yet (Backend integration is planned for the next phase).
+- **Storefront (Phases 1–10):** Fully implemented with responsive product catalogues, filtering, bag drawer, size guides, and checkout flows.
+- **Admin Dashboard (Phase 11):** Fully implemented at `/admin` with live state synchronization, drag-and-drop image uploader, category manager, size guide editor, and order fulfillment drawer.
+- **Backend & Database (Phase 12 — Current Target):** Node.js/Express REST API, PostgreSQL database with Prisma ORM, and Cloudinary media storage.
 
 ## 2. Technology Stack
 
-The project uses the following technologies:
+### Frontend:
 - **Framework:** [React 19](https://react.dev/)
 - **Build Tool:** [Vite](https://vitejs.dev/)
 - **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
 - **Routing:** [React Router DOM](https://reactrouter.com/)
 - **Animations:** [Framer Motion](https://www.framer.com/motion/)
 - **Icons:** [Lucide React](https://lucide.dev/)
-- **Forms & Validation:** [React Hook Form](https://react-hook-form.com/) with [Zod](https://zod.dev/)
+- **State Management:** React Context API with LocalStorage caching
 - **Linting:** [oxlint](https://oxc-project.github.io/docs/guide/usage/linter.html)
+
+### Backend & Database (Phase 12+):
+- **Server Runtime:** [Node.js](https://nodejs.org/) & [Express.js](https://expressjs.com/)
+- **Database:** [PostgreSQL](https://www.postgresql.org/) (hosted on Neon or Render)
+- **ORM:** [Prisma](https://www.prisma.io/) (type-safe relational modeling & migrations)
+- **Media CDN:** [Cloudinary](https://cloudinary.com/) (automated image optimization & responsive delivery)
+- **Authentication:** JWT (JSON Web Tokens), HTTP-Only Cookies, and `bcryptjs` password hashing
+- **Security:** Helmet headers, CORS policies, and strictly private single-owner administrative access
 
 ## 3. Getting Started
 
@@ -53,9 +62,10 @@ All application code is located in the `client/` directory. Here is the breakdow
 - `client/src/`: Main source code.
   - `assets/`: Global CSS and other assets.
   - `components/`: Reusable React components, organized by domain:
+    - `admin/`: Administrative components (AdminLayout, Sidebar, Navigation).
     - `cart/`: Cart-related components (CartDrawer, etc.).
-    - `layout/`: Main layout components (Navbar, Footer, etc.).
-    - `shop/`: Shop-related components (ProductCard, etc.).
+    - `layout/`: Main storefront layout components (Navbar, Footer, etc.).
+    - `shop/`: Shop-related components (ProductCard, SearchModal, ProductModal, SizeGuideModal).
     - `ui/`: Generic, reusable UI elements (Buttons, Inputs, etc.).
   - `context/`: React Context providers for global state (CartContext, WishlistContext, AuthContext, ModalContext).
   - `data/`: Mock data used by the simulated API (`mockCatalogue.js`).

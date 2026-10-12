@@ -112,44 +112,62 @@ The objective of Phase 11 was to build the complete management interface for sto
 
 ---
 
-## Phase 12: Backend Architecture & Database Setup
+## Phase 12: Backend Architecture & Database Setup (Current Target)
 
-The objective of Phase 12 is to establish the secure server runtime and persistent database to replace mock datasets.
+The objective of Phase 12 is to establish the secure production server runtime, relational database models, and single-owner administration security.
 
-### Phase 12.1: Server Runtime & Security
+### Confirmed Architectural Decisions:
+- **Runtime & Server Framework:** **Node.js** with **Express.js**.
+- **Database & ORM:** **PostgreSQL** paired with **Prisma ORM** (type-safe relational modeling, migrations, and academic defense documentation).
+- **Authentication & Security:** **JWT (JSON Web Tokens)** + **HTTP-Only Cookies** + **bcryptjs** (password hashing) + **Helmet** (security headers) + **CORS**.
+- **Admin Access Model:** **Strict Single-Owner Business Access**.
+  - **Zero Public Registration:** No public registration or sign-up endpoint will ever exist for administrators.
+  - **Owner Account Seeding:** The single business owner admin account is initialized via private server environment variables (`ADMIN_EMAIL`, `ADMIN_PASSWORD`) upon initial database migration/boot.
+  - **Role-Based Guards (RBAC):** Middleware intercepts all administrative endpoints and guarantees that only authenticated tokens carrying `role: 'admin'` can access administrative APIs or routes. Normal customer accounts can never escalate privileges.
 
-- **Task 12.1.1:** Initialize server environment (Node.js/Express or Supabase/PostgreSQL backend).
-- **Task 12.1.2:** Configure environment variables, CORS policies, rate limiting, and request validation middleware (Zod).
-- **Task 12.1.3:** Implement JWT / Session authentication with bcrypt password hashing.
-- **Task 12.1.4:** Establish Role-Based Access Control (`role: 'customer' | 'admin'`).
+### Phase 12.1: Server Runtime, Configuration & Security
+- **Task 12.1.1:** Initialize the isolated `server/` workspace with `package.json`, Express application, and npm scripts.
+- **Task 12.1.2:** Configure environment variable handling (`dotenv`), security headers (`helmet`), request parsing (`express.json`), and cross-origin resource sharing (`cors`).
+- **Task 12.1.3:** Build password hashing utility with `bcryptjs` and token signing/verification utilities using `jsonwebtoken`.
+- **Task 12.1.4:** Implement Role-Based Access Control middleware (`requireAuth`, `requireAdmin`).
+- **Task 12.1.5:** Implement single-owner database seeding script (`prisma/seed.js`) ensuring the owner's credentials exist securely on first boot.
+- **Task 12.1.6:** Implement authentication controllers (`POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`).
 
-### Phase 12.2: Relational Database Modeling
-
-- **Task 12.2.1:** Create `Users` and `Addresses` tables.
-- **Task 12.2.2:** Create `Categories`, `Subcategories`, and `Products` tables.
-- **Task 12.2.3:** Create `ProductVariants` (sizes, colors, inventory counts) and `ProductImages` tables.
-- **Task 12.2.4:** Create `SizeGuides` table for dynamic measurements.
-- **Task 12.2.5:** Create `Orders` and `OrderItems` tables with status history.
-- **Task 12.2.6:** Seed database with PENNY's initial menswear collection.
+### Phase 12.2: Relational Database Modeling (Prisma + PostgreSQL)
+- **Task 12.2.1:** Initialize Prisma with PostgreSQL datasource (`npx prisma init`).
+- **Task 12.2.2:** Define relational models in `schema.prisma`:
+  - `User`: Unique email, hashed password, role (`admin` | `customer`), timestamps.
+  - `Category`: Unique slug, display name, display order.
+  - `Product`: Title, slug, price, description, material, fit, care, featured toggle, in-stock status, category relation.
+  - `ProductImage`: Media URL, public ID, primary flag, relation to product.
+  - `ProductVariant`: Garment size (`XS` to `XXL`), color name, color hex code, stock quantity.
+  - `SizeGuide`: Garment category, measurement values in Centimeters (CM).
+  - `Order` & `OrderItem`: Customer contact, shipping address, fulfillment status history, line item pricing, and totals.
+- **Task 12.2.3:** Execute initial database migration to generate tables.
+- **Task 12.2.4:** Seed the database with PENNY’s complete 20+ piece menswear catalogue and default CM size guides.
 
 ---
 
 ## Phase 13: Full-Stack Integration & Cloud Media Storage
 
-The objective of Phase 13 is to connect the React storefront and Admin dashboard to the live database API.
+The objective of Phase 13 is to connect the React storefront and Admin dashboard to the live server API and integrate high-performance cloud media management.
 
-### Phase 13.1: API Service Layer Refactoring
+### Confirmed Architectural Decisions:
+- **Cloud Media Provider:** **Cloudinary** (automated web format conversion, responsive image compression, high-availability CDN delivery).
+- **Single-Source Image Reflection:** Product images uploaded via the Admin dashboard upload directly to Cloudinary and store the CDN URL in the PostgreSQL database. This URL automatically feeds the Shop collection, Product modal, and the Homepage **"Featured Essentials"** grid without manual code edits.
 
-- **Task 13.1.1:** Replace simulated functions in `client/src/services/api.js` with real `fetch` / `axios` calls.
-- **Task 13.1.2:** Implement loading spinners, network error boundaries, and optimistic UI updates.
-- **Task 13.1.3:** Connect Storefront filters, categories, search, and product modal to database endpoints.
+### Phase 13.1: Cloud Media Upload Service (Cloudinary)
+- **Task 13.1.1:** Configure Cloudinary SDK and credentials (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`).
+- **Task 13.1.2:** Build secure server upload endpoint (`POST /api/admin/media/upload`) using `multer` memory storage streaming directly to Cloudinary.
+- **Task 13.1.3:** Connect Admin Product Modal file dropzone to the upload endpoint, displaying Cloudinary CDN URLs and thumbnails in real time.
+- **Task 13.1.4:** Configure delivery transformation parameters (e.g. `f_auto`, `q_auto`, responsive widths) for fast image loading.
 
-### Phase 13.2: Cloud Media Upload Service
+### Phase 13.2: API Service Layer Refactoring (Storefront & Admin)
+- **Task 13.2.1:** Refactor `client/src/services/api.js` to replace mock delay functions with live `fetch`/`axios` calls to the Express API.
+- **Task 13.2.2:** Implement React error boundaries, loading skeletons, and fallback states.
+- **Task 13.2.3:** Connect Storefront filters, categories, search, and product modal to database endpoints.
+- **Task 13.2.4:** Implement protected `/admin/login` page with automatic redirection for unauthenticated visitors and secure session logout.
 
-- **Task 13.2.1:** Integrate Cloudinary, Supabase Storage, or AWS S3 for media uploads.
-- **Task 13.2.2:** Connect Admin Product Form to upload images directly to cloud storage and store URLs in the database.
-- **Task 13.2.3:** **Single-Point Image Reflection:** Ensure that when an admin uploads actual product photos, the new images instantly reflect across both the storefront collection and the homepage's **"Featured Essentials"** section without requiring manual updates to code or assets.
-- **Task 13.2.4:** Replace mock hero carousel slides with an admin-configurable banner media system.
 
 ---
 

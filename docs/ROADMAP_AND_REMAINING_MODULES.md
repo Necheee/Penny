@@ -24,9 +24,11 @@ This document outlines the remaining architectural modules, features, and produc
 
 The Admin Dashboard provides store managers with full administrative control through a web UI without editing code.
 
-### 2.1 Access & Security
-- **Protected Route:** Restricted `/admin` routes accessible only by authenticated users with an `admin` role.
-- **Admin Authentication:** Separate secure login screen with multi-factor authentication (MFA) option.
+### 2.1 Access & Security (Single-Owner Model)
+- **Strict Single-Owner Model:** Access is exclusively reserved for the business owner. No public admin registration or sign-up option exists anywhere on the platform.
+- **Protected Route:** Client-side `/admin` paths are intercepted by `<ProtectedRoute requiredRole="admin">`. Unauthenticated requests or non-admin users are automatically redirected to `/admin/login`.
+- **Private Credential Provisioning:** The owner's initial administrator account is seeded securely through server environment variables (`ADMIN_EMAIL`, `ADMIN_PASSWORD`) with `bcrypt` salt hashing.
+- **Session Termination:** An authenticated administrator can terminate their session via the sidebar "Log Out" action, invalidating the session cookie/token and returning to the storefront.
 
 ### 2.2 Product Management (CRUD)
 - **Product Catalog Table:** Searchable, filterable list of all products with stock indicators and pricing.
@@ -36,10 +38,10 @@ The Admin Dashboard provides store managers with full administrative control thr
   - Available sizes (`XS` through `XXL`) and custom size toggles.
   - Color swatches with hex color picker and label assignment.
   - Featured product flag: Automatically feeds the storefront's **"Featured Essentials"** section on the homepage in real time.
-- **Image Upload & Media Manager:**
-  - Drag-and-drop image uploader.
+- **Image Upload & Media Manager (Cloudinary):**
+  - Drag-and-drop image uploader with instantaneous local thumbnail preview and CDN upload pipeline.
   - Primary photo selection and gallery re-ordering.
-  - Integration with Cloud Storage (Cloudinary, AWS S3, or Firebase Storage).
+  - Integration with Cloudinary for automated WebP compression and responsive CDN delivery.
   - **Single-Source Reflection:** Replacing or uploading photos via the admin automatically synchronizes across the entire website—including the shop collection, product modals, and homepage showcase pieces.
   - **Hero & Promotional Asset Replacement:** Interface or configuration to replace mock editorial carousel slides on the homepage with high-resolution brand campaign imagery.
 
@@ -49,12 +51,12 @@ The Admin Dashboard provides store managers with full administrative control thr
 - **Menu Hierarchy:** Control which categories appear in the customer navigation bar.
 
 ### 2.4 Dynamic Size Guide Editor
-- **Measurement Tables:** Editable grid for chest, waist, shoulder, hips, and inseam numbers in both **CM** and **IN**.
+- **Measurement Tables:** Editable grid for chest, waist, shoulder, hips, and inseam numbers in Centimeters (**CM**).
 - **Category-Specific Guides:** Capability to create custom size guides for specific garment fits (e.g., Slim vs. Oversized).
 
 ### 2.5 Order & Fulfillment Management
 - **Live Orders Feed:** View incoming customer purchases in real time.
-- **Order Status Workflow:** Update status (*Pending Payment*, *Confirmed*, *Processing / Packaging*, *Shipped / Out for Delivery*, *Delivered*, *Cancelled / Refunded*).
+- **Order Status Workflow:** Update status (*Pending Payment*, *Processing*, *Shipped*, *Delivered*, *Cancelled*).
 - **Customer Information:** View shipping address, phone number, and dispatch notes.
 - **Invoice & Packing Slip:** Printable receipt and packing slip generation.
 
@@ -66,11 +68,14 @@ The Admin Dashboard provides store managers with full administrative control thr
 
 ## 3. Backend & Database Architecture
 
-The backend replaces the current mock data (`mockCatalogue.js`) and simulated delays with a resilient, persistent server infrastructure.
+The backend replaces mock in-memory data with a resilient, persistent server infrastructure.
 
-### 3.1 Recommended Technology Stack Options
-- **Option A (Full Custom Stack):** Node.js / Express.js + PostgreSQL (Prisma ORM) or MongoDB (Mongoose).
-- **Option B (BaaS / Rapid Prototyping):** Supabase (PostgreSQL + Auth + Storage) or Firebase (Firestore + Auth + Storage).
+### 3.1 Confirmed Technology Stack Decisions
+- **Server Runtime:** **Node.js** with **Express.js** (clean REST API architecture, middleware pipeline, robust error handling).
+- **Database & ORM:** **PostgreSQL** paired with **Prisma ORM** (strict relational integrity, declarative schema definition, automated type generation, and streamlined database migrations).
+- **Media Asset Storage:** **Cloudinary** (enterprise-grade e-commerce CDN offering automatic image optimization, format adaptation, and high-speed global delivery).
+- **Authentication & Authorization:** **JSON Web Tokens (JWT)** with HTTP-Only cookie storage and **bcryptjs** password hashing.
+- **Security & Integrity:** **Helmet** HTTP header protection, **CORS** origin restriction, and server-side request schema validation.
 
 ### 3.2 Database Schema (Entity-Relationship Model)
 1. **Users Table / Collection:**
