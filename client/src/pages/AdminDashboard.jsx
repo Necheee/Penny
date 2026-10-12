@@ -12,7 +12,9 @@ import {
   Upload, 
   Printer, 
   X, 
-  CheckCircle2 
+  CheckCircle2,
+  Loader2,
+  Cloud
 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 
@@ -139,6 +141,8 @@ export default function AdminDashboard() {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState('');
   const fileInputRef = useRef(null);
 
   const [productForm, setProductForm] = useState({
@@ -233,13 +237,15 @@ export default function AdminDashboard() {
     setIsProductModalOpen(true);
   };
 
-  // Handle Image File Selection (converts to DataURL for immediate browser preview & persistent localStorage)
-  const processImageFile = (file) => {
+  // Handle Image File Selection (streams directly to Cloudinary via Express API with fallback)
+  const processImageFile = async (file) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       alert('Please upload an image file (PNG, JPG, or WEBP).');
       return;
     }
+
+    // 1. Immediate local thumbnail preview for instant UX responsiveness
     const reader = new FileReader();
     reader.onload = (e) => {
       setProductForm(prev => ({
@@ -248,6 +254,42 @@ export default function AdminDashboard() {
       }));
     };
     reader.readAsDataURL(file);
+
+    // 2. Stream to Backend Cloud Media Endpoint
+    setIsUploadingImage(true);
+    setUploadMessage('Streaming image to Cloudinary CDN...');
+
+    try {
+      const token = localStorage.getItem('penny_admin_token');
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch('/api/admin/media/upload', {
+        method: 'POST',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success && data.url) {
+        setProductForm(prev => ({
+          ...prev,
+          imageUrl: data.url
+        }));
+        setUploadMessage(data.isFallback ? 'Image saved locally (Cloudinary credentials pending in .env).' : 'Image uploaded to Cloudinary CDN successfully.');
+      } else {
+        console.warn('Backend upload returned error, retained local preview:', data.message);
+        setUploadMessage('Retained high-quality local image preview.');
+      }
+    } catch (err) {
+      console.warn('Could not connect to media upload endpoint, retained local preview:', err);
+      setUploadMessage('Retained local image preview.');
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleFileInputChange = (e) => {
@@ -946,9 +988,20 @@ export default function AdminDashboard() {
                   </p>
                 </div>
 
+                {/* Upload in Progress Indicator */}
+                {isUploadingImage && (
+                  <div className="mt-3 p-3 bg-neutral-100 border border-neutral-300 flex items-center gap-3 animate-pulse rounded-xs">
+                    <Loader2 className="w-4 h-4 animate-spin text-brand-charcoal shrink-0" />
+                    <div className="text-left text-xs">
+                      <p className="font-bold text-brand-charcoal">Streaming to Cloudinary CDN...</p>
+                      <p className="text-[10px] text-neutral-500">{uploadMessage || 'Optimizing format and generating high-performance WebP delivery URLs...'}</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Thumbnail Preview Card */}
-                {productForm.imageUrl && (
-                  <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 flex items-center justify-between gap-4">
+                {productForm.imageUrl && !isUploadingImage && (
+                  <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 flex items-center justify-between gap-4 rounded-xs">
                     <div className="flex items-center gap-3">
                       <img 
                         src={productForm.imageUrl} 
@@ -956,12 +1009,22 @@ export default function AdminDashboard() {
                         className="w-14 h-16 object-cover bg-white border border-neutral-200 rounded-xs shrink-0" 
                       />
                       <div className="text-left overflow-hidden">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
-                          <CheckCircle2 className="w-3 h-3" /> Image Ready
-                        </span>
-                        <p className="text-xs text-neutral-600 font-mono truncate max-w-xs">
-                          {productForm.imageUrl.startsWith('data:') ? 'Custom local uploaded image' : productForm.imageUrl}
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
+                            <CheckCircle2 className="w-3 h-3" /> Image Ready
+                          </span>
+                          {productForm.imageUrl.includes('cloudinary.com') && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 text-[9px] font-bold uppercase rounded-xs">
+                              <Cloud className="w-2.5 h-2.5" /> Cloudinary CDN
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-neutral-600 font-mono truncate max-w-xs mt-0.5" title={productForm.imageUrl}>
+                          {productForm.imageUrl.startsWith('data:') ? 'Local High-Res Image Preview' : productForm.imageUrl}
                         </p>
+                        {uploadMessage && (
+                          <p className="text-[10px] text-neutral-400 mt-0.5">{uploadMessage}</p>
+                        )}
                       </div>
                     </div>
                     <button
@@ -969,8 +1032,9 @@ export default function AdminDashboard() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setProductForm(prev => ({ ...prev, imageUrl: '' }));
+                        setUploadMessage('');
                       }}
-                      className="text-neutral-400 hover:text-red-600 p-1 rounded-xs"
+                      className="text-neutral-400 hover:text-red-600 p-1.5 rounded-xs transition-colors cursor-pointer"
                       title="Clear image"
                     >
                       <X className="w-4 h-4" />

@@ -91,8 +91,38 @@ async function runTests() {
     }
     console.log(`   ✅ Fetched ${catData.count} categories:`, catData.data.map(c => c.name).join(', '));
 
+    // -----------------------------------------------------------------
+    // TEST 6: Cloud Media Upload Service (/api/admin/media/upload)
+    // -----------------------------------------------------------------
+    console.log('\n6. Testing Media Upload Service (/api/admin/media/upload)...');
+    const fakeImageBuffer = Buffer.from('RIFF....WEBPVP8 ...fake-image-bytes');
+    const boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW';
+    const multipartBody = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="test.webp"\r\nContent-Type: image/webp\r\n\r\n`),
+      fakeImageBuffer,
+      Buffer.from(`\r\n--${boundary}--\r\n`)
+    ]);
+
+    const uploadRes = await fetch(`${SERVER_URL}/api/admin/media/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+      body: multipartBody,
+    });
+
+    const uploadData = await uploadRes.json();
+    if (!uploadRes.ok || !uploadData.success) {
+      console.error('   ❌ Media upload test failed:', uploadData.message);
+      return;
+    }
+    console.log('   ✅ Media Upload Endpoint Succeeded!');
+    console.log('   Result Status:', uploadData.message);
+    console.log('   Public Image URL preview:', uploadData.url.substring(0, 45) + '...');
+
     console.log('\n======================================================');
-    console.log('   🎉 ALL TESTS PASSED! BACKEND & CATALOGUE ARE LIVE.');
+    console.log('   🎉 ALL TESTS PASSED! BACKEND, CATALOGUE & MEDIA LIVE.');
     console.log('======================================================\n');
 
   } catch (err) {
