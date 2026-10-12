@@ -47,11 +47,13 @@ const Accordion = ({ title, content, defaultOpen = false }) => {
 
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
+import SizeGuideModal from './SizeGuideModal';
 
 export default function ProductModal({ productId, closeModal }) {
   const [product, setProduct] = useState(null);
   const [globalSizes, setGlobalSizes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
 
   const { addToCart, openCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
@@ -228,7 +230,11 @@ export default function ProductModal({ productId, closeModal }) {
           <div className="mb-8">
             <div className="flex justify-between items-end mb-3">
               <span className="text-xs font-bold tracking-[0.15em] uppercase text-brand-charcoal">Size</span>
-              <button className="text-[10px] font-bold tracking-[0.1em] uppercase text-brand-taupe underline underline-offset-4 hover:text-brand-charcoal">
+              <button 
+                type="button"
+                onClick={() => setIsSizeGuideOpen(true)}
+                className="text-[10px] font-bold tracking-[0.1em] uppercase text-brand-taupe underline underline-offset-4 hover:text-brand-charcoal transition-colors cursor-pointer"
+              >
                 Size Guide
               </button>
             </div>
@@ -292,6 +298,13 @@ export default function ProductModal({ productId, closeModal }) {
             <Accordion title="Shipping & Returns" content={product.shipping} />
           </div>
         </div>
+
+        {/* Size Guide Modal */}
+        <SizeGuideModal 
+          isOpen={isSizeGuideOpen} 
+          onClose={() => setIsSizeGuideOpen(false)} 
+          initialCategory={product.category}
+        />
       </motion.div>
     </div>
   );
