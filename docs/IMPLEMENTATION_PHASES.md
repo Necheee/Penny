@@ -144,7 +144,7 @@ The objective of Phase 12 is to establish the secure production server runtime, 
   - `SizeGuide`: Garment category, measurement values in Centimeters (CM).
   - `Order` & `OrderItem`: Customer contact, shipping address, fulfillment status history, line item pricing, and totals.
 - **Task 12.2.3:** Execute initial database migration to generate tables.
-- **Task 12.2.4:** Seed the database with PENNY’s complete 20+ piece menswear catalogue and default CM size guides.
+- **Task 12.2.4:** Seed the database with PENNY’s complete 20+ piece ready-to-wear catalogue and default CM size guides.
 
 ---
 
