@@ -97,8 +97,20 @@ export function AuthProvider({ children }) {
     updateProfile({ addresses: newAddresses });
   };
 
+  const deleteAccount = () => {
+    if (!user) return;
+    // Remove from local registered users
+    const savedAccounts = JSON.parse(localStorage.getItem('penny_registered_users') || '[]');
+    const remaining = savedAccounts.filter(a => a.id !== user.id && a.email?.toLowerCase() !== user.email?.toLowerCase());
+    localStorage.setItem('penny_registered_users', JSON.stringify(remaining));
+
+    // Clear active session
+    setUser(null);
+    localStorage.removeItem('penny_user');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthLoading, login, logout, createAccount, updateProfile, updateAddresses }}>
+    <AuthContext.Provider value={{ user, isAuthLoading, login, logout, createAccount, updateProfile, updateAddresses, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

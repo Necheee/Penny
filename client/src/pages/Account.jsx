@@ -23,7 +23,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Account() {
-  const { user, logout, updateProfile, updateAddresses } = useAuth();
+  const { user, logout, updateProfile, updateAddresses, deleteAccount } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
 
@@ -860,6 +860,28 @@ export default function Account() {
                     </button>
                   </div>
                 </form>
+
+                {/* Danger Zone: Delete Account */}
+                <div className="mt-12 pt-8 border-t border-red-200">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-red-700 mb-1">
+                    Danger Zone
+                  </h3>
+                  <p className="text-xs text-brand-charcoal/60 font-serif mb-4">
+                    Permanently delete your PENNY client account, saved delivery addresses, and profile details. This action is irreversible.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to permanently delete your account? All saved addresses and details will be erased.')) {
+                        deleteAccount();
+                        navigate('/');
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold uppercase tracking-wider border border-red-200 rounded-xs transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete Account
+                  </button>
+                </div>
               </div>
             )}
 
