@@ -143,7 +143,7 @@ export default function AdminLayout({ children, activeTab, setActiveTab }) {
               </div>
               <div className="hidden md:block text-left text-xs leading-tight">
                 <p className="font-bold text-brand-charcoal">Store Admin</p>
-                <p className="text-[10px] text-neutral-500">PENNY Menswear</p>
+                <p className="text-[10px] text-neutral-500">PENNY</p>
               </div>
             </div>
           </div>

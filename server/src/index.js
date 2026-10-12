@@ -31,7 +31,7 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    service: 'PENNY Menswear API',
+    service: 'PENNY API',
   });
 });
 
@@ -65,3 +65,4 @@ app.listen(PORT, () => {
 });
 
 export default app;
+
