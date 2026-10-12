@@ -121,8 +121,62 @@ async function runTests() {
     console.log('   Result Status:', uploadData.message);
     console.log('   Public Image URL preview:', uploadData.url.substring(0, 45) + '...');
 
+    // -----------------------------------------------------------------
+    // TEST 7: Paystack Payments API (/api/payments/initialize & /verify)
+    // -----------------------------------------------------------------
+    console.log('\n7. Testing Paystack Payments Gateway Endpoints...');
+    const payInitRes = await fetch(`${SERVER_URL}/api/payments/initialize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'customer@test.com',
+        amount: 45000,
+        shippingDetails: { state: 'Lagos', city: 'Lekki' },
+        cartItems: [{ id: 'p-001', name: 'The Linen Two-Piece Set', price: 45000, quantity: 1 }]
+      })
+    });
+
+    const payInitData = await payInitRes.json();
+    if (!payInitRes.ok || !payInitData.success) {
+      console.error('   ❌ Payment initialization failed:', payInitData.message);
+      return;
+    }
+    console.log('   ✅ Payment Initialized! Reference:', payInitData.reference);
+
+    // Verify Payment & Register Order
+    const payVerifyRes = await fetch(`${SERVER_URL}/api/payments/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reference: payInitData.reference,
+        orderData: {
+          orderRef: payInitData.orderRef,
+          firstName: 'Chidi',
+          lastName: 'Okafor',
+          email: 'customer@test.com',
+          phone: '+2348012345678',
+          state: 'Lagos',
+          city: 'Lekki Phase 1',
+          address: 'Admiralty Way',
+          cartSubtotal: 45000,
+          shippingCost: 3000,
+          grandTotal: 48000,
+          cartItems: [{ id: 'p-001', name: 'The Linen Two-Piece Set', price: 45000, quantity: 1 }]
+        }
+      })
+    });
+
+    const payVerifyData = await payVerifyRes.json();
+    if (!payVerifyRes.ok || !payVerifyData.success) {
+      console.error('   ❌ Payment verification failed:', payVerifyData.message);
+      return;
+    }
+    console.log('   ✅ Payment Verified & Order Registered!');
+    console.log('   Created Order ID:', payVerifyData.order.id);
+    console.log('   Total Paid:', `₦ ${payVerifyData.order.total.toLocaleString()}`);
+
     console.log('\n======================================================');
-    console.log('   🎉 ALL TESTS PASSED! BACKEND, CATALOGUE & MEDIA LIVE.');
+    console.log('   🎉 ALL TESTS PASSED! BACKEND, CATALOGUE, MEDIA & PAYMENTS LIVE.');
     console.log('======================================================\n');
 
   } catch (err) {

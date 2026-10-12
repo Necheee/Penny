@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import productRoutes from './routes/products.js';
 import categoryRoutes from './routes/categories.js';
 import mediaRoutes from './routes/media.js';
+import paymentRoutes from './routes/payments.js';
 
 // Load environment variables
 dotenv.config();
@@ -43,6 +44,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/admin/media', mediaRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // 404 Handler for Unmatched API Endpoints
 app.use((req, res) => {

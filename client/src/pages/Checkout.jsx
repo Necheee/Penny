@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard } from 'lucide-react';
+import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const NIGERIAN_STATES = [
@@ -99,18 +99,167 @@ const Checkout = () => {
     if (validateStep2()) setStep(3);
   };
 
-  const handlePlaceOrder = (e) => {
+  const [paymentError, setPaymentError] = useState('');
+
+  // Load Paystack Inline JS script dynamically
+  const loadPaystackScript = () => {
+    return new Promise((resolve) => {
+      if (window.PaystackPop) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handlePlaceOrder = async (e) => {
     e.preventDefault();
+    setPaymentError('');
     setIsProcessing(true);
 
-    // Simulate payment and order creation
-    setTimeout(() => {
-      const generatedOrderId = `PNY-${Math.floor(100000 + Math.random() * 900000)}`;
-      setOrderId(generatedOrderId);
+    const orderPayload = {
+      ...formData,
+      cartItems,
+      cartSubtotal,
+      shippingCost,
+      grandTotal,
+    };
+
+    try {
+      // 1. Initialize Transaction with Express Backend
+      const initResponse = await fetch('/api/payments/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          amount: grandTotal,
+          shippingDetails: formData,
+          cartItems,
+        }),
+      });
+
+      const initData = await initResponse.json();
+
+      if (!initResponse.ok || !initData.success) {
+        throw new Error(initData.message || 'Failed to initialize payment gateway.');
+      }
+
+      const generatedOrderRef = initData.orderRef || `PNY-${Date.now().toString().slice(-6)}`;
+      const transactionRef = initData.reference;
+
+      // Handle Direct Bank Transfer Option
+      if (formData.paymentMethod === 'bank_transfer') {
+        const verifyRes = await fetch('/api/payments/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reference: `transfer_${generatedOrderRef}`,
+            orderData: {
+              ...orderPayload,
+              orderRef: generatedOrderRef,
+              paymentMethod: 'bank_transfer',
+            },
+          }),
+        });
+
+        const verifyData = await verifyRes.json();
+        setOrderId(generatedOrderRef);
+        setIsProcessing(false);
+        setOrderComplete(true);
+        clearCart();
+        return;
+      }
+
+      // Handle Paystack Payment Option
+      const scriptLoaded = await loadPaystackScript();
+
+      if (scriptLoaded && window.PaystackPop && initData.publicKey && !initData.publicKey.includes('mock')) {
+        // Trigger Official Paystack Inline Popup
+        const handler = window.PaystackPop.setup({
+          key: initData.publicKey,
+          email: formData.email,
+          amount: Math.round(grandTotal * 100), // in kobo
+          currency: 'NGN',
+          ref: transactionRef,
+          metadata: {
+            custom_fields: [
+              {
+                display_name: 'Customer Name',
+                variable_name: 'customer_name',
+                value: `${formData.firstName} ${formData.lastName}`
+              },
+              {
+                display_name: 'Delivery Address',
+                variable_name: 'delivery_address',
+                value: `${formData.address}, ${formData.city}, ${formData.state}`
+              }
+            ]
+          },
+          callback: async (response) => {
+            // Verify Transaction with Backend
+            try {
+              const verifyRes = await fetch('/api/payments/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  reference: response.reference || transactionRef,
+                  orderData: {
+                    ...orderPayload,
+                    orderRef: generatedOrderRef,
+                  },
+                }),
+              });
+
+              const verifyData = await verifyRes.json();
+              setOrderId(generatedOrderRef);
+              setIsProcessing(false);
+              setOrderComplete(true);
+              clearCart();
+            } catch (verErr) {
+              console.error('Order verification error:', verErr);
+              setOrderId(generatedOrderRef);
+              setIsProcessing(false);
+              setOrderComplete(true);
+              clearCart();
+            }
+          },
+          onClose: () => {
+            setIsProcessing(false);
+            setPaymentError('Payment window was closed before completing the order.');
+          }
+        });
+
+        handler.openIframe();
+      } else {
+        // Test / Development Mode (Simulate instant card charge authorization)
+        const verifyRes = await fetch('/api/payments/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reference: transactionRef,
+            orderData: {
+              ...orderPayload,
+              orderRef: generatedOrderRef,
+            },
+          }),
+        });
+
+        const verifyData = await verifyRes.json();
+        setOrderId(generatedOrderRef);
+        setIsProcessing(false);
+        setOrderComplete(true);
+        clearCart();
+      }
+    } catch (err) {
+      console.error('Payment checkout processing error:', err);
       setIsProcessing(false);
-      setOrderComplete(true);
-      clearCart();
-    }, 1500);
+      setPaymentError(err.message || 'Payment could not be processed. Please try again.');
+    }
   };
 
   if (orderComplete) {
@@ -532,6 +681,13 @@ const Checkout = () => {
                     </div>
                   </label>
                 </div>
+
+                {paymentError && (
+                  <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2.5 rounded-xs animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                    <span>{paymentError}</span>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2 text-xs text-brand-charcoal/60 bg-neutral-50 p-3 border border-brand-charcoal/10">
                   <ShieldCheck className="w-4 h-4 text-neutral-800 shrink-0" />
