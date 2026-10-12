@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock } from 'lucide-react';
+import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const NIGERIAN_STATES = [
@@ -14,12 +15,16 @@ const NIGERIAN_STATES = [
 
 const Checkout = () => {
   const { cartItems, cartSubtotal, clearCart } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderId, setOrderId] = useState('');
+  
+  // Checkout mode: 'member' if user is signed in, or 'guest'
+  const [checkoutMode, setCheckoutMode] = useState(user ? 'member' : 'guest');
 
   // Live Bank Transfer Account Details from Backend
   const [bankDetails, setBankDetails] = useState({
@@ -46,6 +51,23 @@ const Checkout = () => {
     loadBankConfig();
   }, []);
 
+  // Sync logged in user profile with checkout fields
+  useEffect(() => {
+    if (user && checkoutMode === 'member') {
+      const defaultAddr = user.addresses?.find(a => a.isDefault) || user.addresses?.[0];
+      setFormData(prev => ({
+        ...prev,
+        email: user.email || prev.email,
+        phone: user.phone || prev.phone,
+        firstName: user.firstName || prev.firstName,
+        lastName: user.lastName || prev.lastName,
+        address: defaultAddr?.street || prev.address,
+        city: defaultAddr?.city || prev.city,
+        state: defaultAddr?.state || prev.state,
+      }));
+    }
+  }, [user, checkoutMode]);
+
   // Form State
   const [formData, setFormData] = useState({
     email: '',
@@ -58,6 +80,7 @@ const Checkout = () => {
     postalCode: '',
     shippingMethod: 'standard', // 'standard' or 'express'
     paymentMethod: 'bank_transfer', // direct bank transfer active by default
+    transferAccountName: '', // Name on the transferring bank account
     notes: ''
   });
 
@@ -193,6 +216,13 @@ const Checkout = () => {
         });
 
         const verifyData = await verifyRes.json();
+        if (verifyData?.order) {
+          try {
+            const existing = JSON.parse(localStorage.getItem('penny_orders') || '[]');
+            const filtered = existing.filter(o => o.id !== verifyData.order.id);
+            localStorage.setItem('penny_orders', JSON.stringify([verifyData.order, ...filtered]));
+          } catch {}
+        }
         setOrderId(generatedOrderRef);
         setIsProcessing(false);
         setOrderComplete(true);
@@ -241,6 +271,13 @@ const Checkout = () => {
               });
 
               const verifyData = await verifyRes.json();
+              if (verifyData?.order) {
+                try {
+                  const existing = JSON.parse(localStorage.getItem('penny_orders') || '[]');
+                  const filtered = existing.filter(o => o.id !== verifyData.order.id);
+                  localStorage.setItem('penny_orders', JSON.stringify([verifyData.order, ...filtered]));
+                } catch {}
+              }
               setOrderId(generatedOrderRef);
               setIsProcessing(false);
               setOrderComplete(true);
@@ -275,6 +312,13 @@ const Checkout = () => {
         });
 
         const verifyData = await verifyRes.json();
+        if (verifyData?.order) {
+          try {
+            const existing = JSON.parse(localStorage.getItem('penny_orders') || '[]');
+            const filtered = existing.filter(o => o.id !== verifyData.order.id);
+            localStorage.setItem('penny_orders', JSON.stringify([verifyData.order, ...filtered]));
+          } catch {}
+        }
         setOrderId(generatedOrderRef);
         setIsProcessing(false);
         setOrderComplete(true);
@@ -355,6 +399,12 @@ const Checkout = () => {
             <span className="text-brand-charcoal/60 uppercase tracking-wider">Payment Method</span>
             <span className="font-medium">{formData.paymentMethod === 'paystack' ? 'Paystack / Card' : 'Direct Bank Transfer'}</span>
           </div>
+          {isBankTransfer && formData.transferAccountName && (
+            <div className="flex justify-between border-b border-brand-charcoal/10 pb-2">
+              <span className="text-brand-charcoal/60 uppercase tracking-wider">Transfer Account</span>
+              <span className="font-medium text-brand-charcoal">{formData.transferAccountName}</span>
+            </div>
+          )}
           <div className="flex justify-between border-b border-brand-charcoal/10 pb-2">
             <span className="text-brand-charcoal/60 uppercase tracking-wider">Status</span>
             <span className={`font-bold uppercase tracking-wider text-[10px] px-2 py-0.5 rounded-xs ${
@@ -451,6 +501,55 @@ const Checkout = () => {
                 </button>
               )}
             </div>
+
+            {/* Member Sign-In vs Guest Option Banner */}
+            {step === 1 && (
+              <div className="mb-6 p-4 bg-brand-offwhite border border-brand-charcoal/15 rounded-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                {user ? (
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-brand-charcoal text-white flex items-center justify-center text-xs font-bold font-sans">
+                      {user.firstName?.charAt(0) || 'U'}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-brand-charcoal">
+                        Signed in as {user.firstName} {user.lastName}
+                      </p>
+                      <p className="text-[11px] text-brand-charcoal/60 font-serif">
+                        {user.email} • Your saved profile and address are active.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-xs font-bold text-brand-charcoal">
+                      Already have an account?
+                    </p>
+                    <p className="text-[11px] text-brand-charcoal/60 font-serif">
+                      Sign in for faster checkout with your saved addresses.
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  {user ? (
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutMode(checkoutMode === 'member' ? 'guest' : 'member')}
+                      className="text-xs font-bold uppercase tracking-wider text-brand-charcoal underline underline-offset-4 hover:text-black"
+                    >
+                      {checkoutMode === 'member' ? 'Switch to Guest' : 'Use Saved Profile'}
+                    </button>
+                  ) : (
+                    <Link
+                      to="/account/login?redirect=/checkout"
+                      className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-brand-charcoal underline underline-offset-4 hover:text-black"
+                    >
+                      Sign In to Account
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
 
             {step === 1 ? (
               <form onSubmit={handleNextStep1} className="space-y-4">
@@ -796,10 +895,29 @@ const Checkout = () => {
                         </div>
                       </div>
 
+                      {/* Sender Account Name Input */}
+                      <div className="pt-2 border-t border-brand-charcoal/10">
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                          Name on Transferring Bank Account *
+                        </label>
+                        <input
+                          type="text"
+                          name="transferAccountName"
+                          value={formData.transferAccountName}
+                          onChange={handleChange}
+                          placeholder="e.g. Chinedu Okeke (or Company Account Name)"
+                          required={formData.paymentMethod === 'bank_transfer'}
+                          className="w-full bg-white border border-brand-charcoal/20 px-3 py-2.5 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
+                        />
+                        <p className="text-[10px] text-brand-charcoal/60 mt-1 font-serif">
+                          Helps the business owner identify your transfer if you are paying from a different account name, company account, or partner's account.
+                        </p>
+                      </div>
+
                       <div className="p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xs text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
                         <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                         <span>
-                          <strong>Instructions:</strong> Please transfer the exact order total of <strong>₦ {grandTotal.toLocaleString()}</strong>. After placing the order, your order status will be <strong>"Awaiting Payment"</strong>. Once the store confirms the transfer, an official payment receipt will be dispatched to your email.
+                          <strong>Instructions:</strong> Please transfer the exact order total of <strong>₦ {grandTotal.toLocaleString()}</strong>. In your bank app transfer narration/remark, enter your name or order reference. Once confirmed by store admin, your receipt and dispatch email will be sent automatically.
                         </span>
                       </div>
                     </div>

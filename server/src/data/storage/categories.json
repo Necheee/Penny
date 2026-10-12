@@ -1,0 +1,26 @@
+[
+  {
+    "id": "sets",
+    "name": "Two-Piece Sets",
+    "slug": "two-piece-sets",
+    "displayOrder": 1
+  },
+  {
+    "id": "tops",
+    "name": "Tops",
+    "slug": "tops",
+    "displayOrder": 2
+  },
+  {
+    "id": "bottoms",
+    "name": "Bottoms",
+    "slug": "bottoms",
+    "displayOrder": 3
+  },
+  {
+    "id": "outerwear",
+    "name": "Outerwear",
+    "slug": "outerwear",
+    "displayOrder": 4
+  }
+]

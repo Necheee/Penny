@@ -122,8 +122,19 @@ export default function Header() {
             <Search className="w-5 h-5" />
           </button>
           
-          <Link to={user ? "/account" : "/account/login"} aria-label={user ? "Go to Account" : "Log in to Account"} className="hidden md:block text-sm font-medium tracking-wide hover:text-brand-taupe transition-colors uppercase font-sans">
-            {user ? "Account" : "Login"}
+          <Link 
+            to={user ? "/account" : "/account/login"} 
+            aria-label={user ? `Logged in as ${user.firstName || 'User'}` : "Log in to Account"} 
+            className="hidden md:flex items-center gap-1.5 text-xs font-bold tracking-[0.15em] hover:text-brand-taupe transition-colors uppercase font-sans py-1 px-2.5 rounded-xs hover:bg-black/5"
+          >
+            {user ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 inline-block"></span>
+                <span>{user.firstName || 'Account'}</span>
+              </>
+            ) : (
+              "Login"
+            )}
           </Link>
           
           <Link to="/wishlist" aria-label="View Wishlist" className="hover:text-brand-taupe transition-colors flex items-center relative">
@@ -242,7 +253,10 @@ export default function Header() {
                   <Search className="w-5 h-5 text-brand-charcoal" />
                   <span>Search</span>
                 </button>
-                <Link to={user ? "/account" : "/account/login"} className="text-lg uppercase tracking-wider text-sm font-medium" onClick={closeMenu}>{user ? "Account" : "Login / Register"}</Link>
+                <Link to={user ? "/account" : "/account/login"} className="text-lg uppercase tracking-wider text-sm font-medium flex items-center justify-between" onClick={closeMenu}>
+                  <span>{user ? `Account (${user.firstName})` : "Login / Register"}</span>
+                  {user && <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Active</span>}
+                </Link>
                 <Link to="/wishlist" className="text-lg uppercase tracking-wider text-sm font-medium" onClick={closeMenu}>Wishlist {wishlistCount > 0 ? `(${wishlistCount})` : ''}</Link>
               </nav>
             </motion.div>

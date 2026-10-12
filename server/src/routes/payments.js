@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { sendOrderConfirmationEmail } from '../utils/receiptEmail.js';
+import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 
 dotenv.config();
 
@@ -9,8 +10,7 @@ const router = express.Router();
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || '';
 const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY || '';
 
-// In-Memory store for registered orders (persisted across requests)
-export const ordersStore = [
+const defaultOrders = [
   {
     id: 'PNY-892140',
     reference: 'ref_pny_892140',
@@ -53,13 +53,16 @@ export const ordersStore = [
   }
 ];
 
-// In-Memory store for official bank account details (editable by admin)
-export let bankDetailsStore = {
+const defaultBankDetails = {
   bankName: 'Zenith Bank Plc',
   accountName: 'PENNY CLOTHING CO',
   accountNumber: '1018924560',
   instructions: 'Please transfer the exact total amount and use your Order Number as payment reference/narration. Once verified by store admin, your receipt and confirmation will be emailed.',
 };
+
+// Persistent stores backed by server/src/data/storage/
+export let ordersStore = readJsonFile('orders.json', defaultOrders) || defaultOrders;
+export let bankDetailsStore = readJsonFile('bankDetails.json', defaultBankDetails) || defaultBankDetails;
 
 /**
  * GET /api/payments/config
@@ -96,6 +99,8 @@ router.put('/config/bank', (req, res) => {
       accountNumber: accountNumber.trim(),
       instructions: instructions ? instructions.trim() : bankDetailsStore.instructions,
     };
+
+    writeJsonFile('bankDetails.json', bankDetailsStore);
 
     return res.status(200).json({
       success: true,
@@ -268,6 +273,7 @@ router.post('/verify', async (req, res) => {
       address: orderData?.address || '',
       shippingMethod: orderData?.shippingMethod || 'standard',
       paymentMethod: isBankTransfer ? 'bank_transfer' : 'paystack',
+      transferAccountName: orderData?.transferAccountName || '',
       paymentConfirmed: !isBankTransfer,
       itemsCount: Array.isArray(orderData?.cartItems) ? orderData.cartItems.reduce((s, i) => s + (i.quantity || 1), 0) : 1,
       subtotal: Number(orderData?.cartSubtotal || 0),
@@ -289,6 +295,7 @@ router.post('/verify', async (req, res) => {
 
     // Store in order store
     ordersStore.unshift(newOrder);
+    writeJsonFile('orders.json', ordersStore);
 
     return res.status(200).json({
       success: true,
@@ -321,6 +328,7 @@ router.patch('/orders/:id/status', (req, res) => {
 
   if (status) {
     order.status = status;
+    writeJsonFile('orders.json', ordersStore);
   }
 
   return res.status(200).json({
@@ -346,6 +354,7 @@ router.post('/orders/:id/confirm-payment', async (req, res) => {
     order.paymentConfirmed = true;
     order.status = 'Processing';
     order.paidAt = new Date().toISOString();
+    writeJsonFile('orders.json', ordersStore);
 
     // Trigger transactional digital receipt and confirmation email
     const emailResult = await sendOrderConfirmationEmail(order);

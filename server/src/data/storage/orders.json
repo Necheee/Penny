@@ -1,0 +1,42 @@
+[
+  {
+    "id": "PNY-892140",
+    "reference": "ref_pny_892140",
+    "customer": "Alex Balogun",
+    "email": "alex.balogun@gmail.com",
+    "phone": "+234 803 456 7890",
+    "state": "Lagos",
+    "city": "Victoria Island",
+    "address": "14 Victoria Island Crescent, Apt 4B",
+    "shippingMethod": "standard",
+    "paymentMethod": "bank_transfer",
+    "paymentConfirmed": true,
+    "itemsCount": 2,
+    "subtotal": 92000,
+    "deliveryFee": 5000,
+    "total": 97000,
+    "status": "Processing",
+    "paidAt": "2026-10-12T17:05:55.688Z",
+    "createdAt": "2026-10-12T17:05:55.689Z",
+    "items": [
+      {
+        "id": "p-001",
+        "name": "The Linen Two-Piece Set",
+        "size": "L",
+        "color": "Cream",
+        "price": 45000,
+        "quantity": 1,
+        "image": "/images/products/linen-set-1.jpg"
+      },
+      {
+        "id": "p-002",
+        "name": "Heavyweight Cotton Lounge Set",
+        "size": "M",
+        "color": "Charcoal",
+        "price": 52000,
+        "quantity": 1,
+        "image": "/images/products/lounge-set-1.jpg"
+      }
+    ]
+  }
+]

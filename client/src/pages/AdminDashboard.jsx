@@ -972,6 +972,11 @@ export default function AdminDashboard() {
                     <td className="py-4 px-4 font-bold font-mono text-brand-charcoal">{ord.id}</td>
                     <td className="py-4 px-4">
                       <p className="font-bold">{ord.customer}</p>
+                      {ord.transferAccountName && (
+                        <p className="text-[10px] text-amber-800 font-medium">
+                          From: <span className="font-bold">{ord.transferAccountName}</span>
+                        </p>
+                      )}
                       <p className="text-[10px] text-neutral-400">{ord.phone}</p>
                     </td>
                     <td className="py-4 px-4 text-neutral-600 max-w-xs truncate">
@@ -1465,6 +1470,16 @@ export default function AdminDashboard() {
                   <p className="font-bold text-brand-charcoal text-sm">{selectedOrder.customer}</p>
                   <p className="text-neutral-600 mt-0.5">{selectedOrder.email}</p>
                   <p className="text-neutral-600 font-mono mt-0.5">{selectedOrder.phone}</p>
+                  {selectedOrder.transferAccountName && (
+                    <div className="mt-2.5 pt-2 border-t border-neutral-200">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block">
+                        Bank Transfer Account (Sender)
+                      </span>
+                      <p className="font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-xs border border-amber-200 mt-0.5 inline-block text-[11px]">
+                        {selectedOrder.transferAccountName}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h4 className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">
