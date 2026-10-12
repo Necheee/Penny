@@ -7,9 +7,19 @@ import productRoutes from './routes/products.js';
 import categoryRoutes from './routes/categories.js';
 import mediaRoutes from './routes/media.js';
 import paymentRoutes from './routes/payments.js';
+import { initCloudDatabase } from './utils/cloudDb.js';
 
-// Load environment variables
-dotenv.config();
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables explicitly from server/.env
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+// Connect & synchronize Neon Cloud Database
+initCloudDatabase().catch(err => console.warn('Cloud DB init notice:', err.message));
 
 const app = express();
 const PORT = process.env.PORT || 5000;
