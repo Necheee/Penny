@@ -8,4 +8,13 @@ export default defineConfig({
     tailwindcss(),
     react()
   ],
+
+  server: {
+    host: true,
+    port: 5173,
+    allowedHosts: ['.loca.lt', 'unwanted-reapprove-reproach.ngrok-free.dev'],
+    hmr: {
+      clientPort: 443,
+    },
+  },
 })
