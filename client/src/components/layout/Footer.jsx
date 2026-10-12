@@ -7,7 +7,7 @@ export default function Footer() {
         
         {/* Brand Column */}
         <div className="flex flex-col space-y-4">
-          <img src="/logo.png" alt="PENNY" className="h-8 w-auto object-contain object-left mb-2" />
+          <img src="/logo.png" alt="PENNY" className="h-8 w-auto object-contain object-left mb-2 brightness-0 invert" />
           <p className="text-sm font-serif italic text-brand-beige">Effortless dressing by design.</p>
           <p className="text-xs text-brand-border leading-relaxed max-w-xs mt-4">
             Modern men's essentials built around the capsule wardrobe. 

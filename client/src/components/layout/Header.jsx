@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useWishlist } from '../../context/WishlistContext';
+import SearchModal from '../shop/SearchModal';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isShopHovered, setIsShopHovered] = useState(false);
   const [isInfoHovered, setIsInfoHovered] = useState(false);
   
@@ -37,7 +39,7 @@ export default function Header() {
 
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center">
-          <img src="/logo.png" alt="PENNY" className="h-7 md:h-8 w-auto invert" /> 
+          <img src="/logo.png" alt="PENNY" className="h-7 md:h-8 w-auto" /> 
         </Link>
 
         {/* Desktop Navigation */}
@@ -111,7 +113,12 @@ export default function Header() {
 
         {/* Icons & Actions */}
         <div className="flex items-center space-x-5">
-          <button aria-label="Search" className="hidden md:block hover:text-brand-taupe transition-colors">
+          <button 
+            type="button"
+            onClick={() => setIsSearchOpen(true)}
+            aria-label="Search" 
+            className="hover:text-brand-taupe transition-colors cursor-pointer"
+          >
             <Search className="w-5 h-5" />
           </button>
           
@@ -163,7 +170,7 @@ export default function Header() {
               </button>
               
               <div className="mt-6 mb-10">
-                <img src="/logo.png" alt="PENNY" className="h-6 w-auto invert" />
+                <img src="/logo.png" alt="PENNY" className="h-6 w-auto" />
               </div>
               
               <nav className="flex flex-col space-y-6 text-xl font-medium text-brand-charcoal pb-12 font-sans tracking-wide">
@@ -227,6 +234,14 @@ export default function Header() {
                 </div>
                 
                 <div className="h-px w-full bg-brand-border my-4" aria-hidden="true"></div>
+                <button 
+                  type="button"
+                  onClick={() => { closeMenu(); setIsSearchOpen(true); }} 
+                  className="flex items-center space-x-3 text-lg font-medium text-left"
+                >
+                  <Search className="w-5 h-5 text-brand-charcoal" />
+                  <span>Search</span>
+                </button>
                 <Link to={user ? "/account" : "/account/login"} className="text-lg uppercase tracking-wider text-sm font-medium" onClick={closeMenu}>{user ? "Account" : "Login / Register"}</Link>
                 <Link to="/wishlist" className="text-lg uppercase tracking-wider text-sm font-medium" onClick={closeMenu}>Wishlist {wishlistCount > 0 ? `(${wishlistCount})` : ''}</Link>
               </nav>
@@ -234,6 +249,9 @@ export default function Header() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Global Search Modal */}
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </header>
   );
 }
