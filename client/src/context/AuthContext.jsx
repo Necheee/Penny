@@ -3,15 +3,15 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-
-  // Check local storage for mock session
-  useEffect(() => {
-    const savedUser = localStorage.getItem('penny_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('penny_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
     }
-  }, []);
+  });
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   const login = (email, password) => {
     // Check if user account was created locally or fallback
@@ -98,7 +98,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, createAccount, updateProfile, updateAddresses }}>
+    <AuthContext.Provider value={{ user, isAuthLoading, login, logout, createAccount, updateProfile, updateAddresses }}>
       {children}
     </AuthContext.Provider>
   );

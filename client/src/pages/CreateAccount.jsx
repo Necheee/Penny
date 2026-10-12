@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function CreateAccount() {
@@ -8,8 +8,13 @@ export default function CreateAccount() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  const { createAccount } = useAuth();
+  const { user, createAccount } = useAuth();
   const navigate = useNavigate();
+
+  // If already logged in, never show the create account form
+  if (user) {
+    return <Navigate to="/account" replace />;
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault();

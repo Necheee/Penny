@@ -1,9 +1,16 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const { user } = useAuth();
+
+  // If already logged in, redirect to account security
+  if (user) {
+    return <Navigate to="/account" replace />;
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault();
