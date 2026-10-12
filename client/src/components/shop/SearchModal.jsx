@@ -1,33 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, ArrowRight, Loader2 } from 'lucide-react';
+import { Search, X, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getProducts } from '../../services/api';
+import { useProducts } from '../../context/ProductContext';
 import { useModal } from '../../context/ModalContext';
 
 export default function SearchModal({ isOpen, onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [allProducts, setAllProducts] = useState([]);
+  const { products: allProducts = [] } = useProducts();
   const [filteredProducts, setFilteredProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef(null);
   const navigate = useNavigate();
   const { openModal } = useModal();
 
-  // Load products when modal is opened
+  // Focus input automatically when opened
   useEffect(() => {
     if (isOpen) {
-      setIsLoading(true);
-      getProducts()
-        .then(data => {
-          setAllProducts(data);
-          setIsLoading(false);
-        })
-        .catch(err => {
-          console.error("Failed to load products for search", err);
-          setIsLoading(false);
-        });
-      // Focus input automatically
       setTimeout(() => inputRef.current?.focus(), 100);
     } else {
       setSearchTerm('');

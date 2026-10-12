@@ -14,18 +14,21 @@ import CareGuide from './pages/CareGuide';
 import Shipping from './pages/Shipping';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import AdminDashboard from './pages/AdminDashboard';
 import { ModalProvider } from './context/ModalContext';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
+import { ProductProvider } from './context/ProductContext';
 import CartDrawer from './components/cart/CartDrawer';
 
 function App() {
   return (
     <AuthProvider>
-      <WishlistProvider>
-        <CartProvider>
-          <ModalProvider>
+      <ProductProvider>
+        <WishlistProvider>
+          <CartProvider>
+            <ModalProvider>
             <Router>
               <CartDrawer />
               <Layout>
@@ -51,6 +54,9 @@ function App() {
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
 
+                  {/* Admin Management Dashboard */}
+                  <Route path="/admin" element={<AdminDashboard />} />
+
                   {/* Temporary catch-all to prevent 404s while clicking header links */}
                   <Route path="*" element={<Home />} />
                 </Routes>
@@ -59,7 +65,8 @@ function App() {
           </ModalProvider>
         </CartProvider>
       </WishlistProvider>
-    </AuthProvider>
+    </ProductProvider>
+  </AuthProvider>
   );
 }
 

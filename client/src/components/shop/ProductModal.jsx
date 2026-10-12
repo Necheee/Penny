@@ -47,9 +47,11 @@ const Accordion = ({ title, content, defaultOpen = false }) => {
 
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
+import { useProducts } from '../../context/ProductContext';
 import SizeGuideModal from './SizeGuideModal';
 
 export default function ProductModal({ productId, closeModal }) {
+  const { getProductById: getContextProductById } = useProducts();
   const [product, setProduct] = useState(null);
   const [globalSizes, setGlobalSizes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,10 +70,9 @@ export default function ProductModal({ productId, closeModal }) {
     const fetchProduct = async () => {
       setIsLoading(true);
       try {
-        const [fetchedProduct, fetchedSizes] = await Promise.all([
-          getProductById(productId),
-          getSizes()
-        ]);
+        const found = getContextProductById ? getContextProductById(productId) : null;
+        const fetchedProduct = found || await getProductById(productId);
+        const fetchedSizes = await getSizes();
         setProduct(fetchedProduct);
         setGlobalSizes(fetchedSizes);
       } catch (error) {
@@ -81,7 +82,8 @@ export default function ProductModal({ productId, closeModal }) {
       }
     };
     if (productId) fetchProduct();
-  }, [productId]);
+  }, [productId, getContextProductById]);
+
 
   useEffect(() => {
     if (product) {

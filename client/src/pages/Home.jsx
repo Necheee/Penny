@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getProducts } from '../services/api';
+import { useProducts } from '../context/ProductContext';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProductCard from '../components/shop/ProductCard';
@@ -12,25 +12,9 @@ const heroImages = [
 ];
 
 export default function Home() {
-  const [products, setProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const data = await getProducts();
-        setProducts(data);
-      } catch (error) {
-        console.error("Failed to load products", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchProducts();
-  }, []);
-
-  const featuredProducts = products.filter(p => p.featured).slice(0, 4);
-  const linenSet = products.find(p => p.id === 'p-001');
+  const { products, featuredProducts } = useProducts();
+  const linenSet = products.find(p => p.id === 'p-001') || products[0];
+  const displayedFeatured = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : products.slice(0, 4);
 
   // Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -138,7 +122,7 @@ export default function Home() {
         </div>
         
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-12 md:gap-x-8">
-          {featuredProducts.map((product) => (
+          {displayedFeatured.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>

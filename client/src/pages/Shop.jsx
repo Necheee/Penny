@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { getProducts, getCategories } from '../services/api';
+import { useSearchParams } from 'react-router-dom';
+import { useProducts } from '../context/ProductContext';
 import { SlidersHorizontal, ChevronDown, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProductCard from '../components/shop/ProductCard';
@@ -9,33 +9,16 @@ export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialCategory = searchParams.get('category') || 'all';
 
-  const [products, setProducts] = useState([]);
-  const [categoriesList, setCategoriesList] = useState([{ id: 'all', name: 'All Products' }]);
-  const [isLoading, setIsLoading] = useState(true);
-
+  const { products, categories } = useProducts();
   const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [sortOption, setSortOption] = useState('featured'); // featured, price-asc, price-desc
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const [fetchedProducts, fetchedCategories] = await Promise.all([
-          getProducts(),
-          getCategories()
-        ]);
-        setProducts(fetchedProducts);
-        setCategoriesList([{ id: 'all', name: 'All Products' }, ...fetchedCategories]);
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+  const categoriesList = useMemo(() => {
+    return [{ id: 'all', name: 'All Products' }, ...(categories || [])];
+  }, [categories]);
+
 
   // Sync state with URL params
   useEffect(() => {
@@ -146,7 +129,7 @@ export default function Shop() {
               onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
               className="flex items-center space-x-2 text-sm font-medium tracking-wide uppercase text-brand-charcoal"
             >
-              <span>Sort</span>
+              <span>Sort: {currentSortLabel}</span>
               <ChevronDown className="w-4 h-4" />
             </button>
             
@@ -212,7 +195,7 @@ export default function Shop() {
 
         {/* Product Grid */}
         <div className="flex-grow">
-          {isLoading ? (
+          {!products ? (
             <div className="py-20 flex justify-center items-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal"></div>
             </div>
