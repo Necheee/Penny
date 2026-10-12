@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
+import productRoutes from './routes/products.js';
+import categoryRoutes from './routes/categories.js';
 
 // Load environment variables
 dotenv.config();
@@ -37,6 +39,8 @@ app.get('/api/health', (req, res) => {
 
 // Route Registrations
 app.use('/api/auth', authRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // 404 Handler for Unmatched API Endpoints
 app.use((req, res) => {

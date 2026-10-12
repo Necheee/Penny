@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { products as initialProducts, categories as initialCategories, sizes as initialSizes } from '../data/mockCatalogue';
+import { getProducts, getCategories } from '../services/api';
 
 const ProductContext = createContext();
 
@@ -31,6 +32,31 @@ export function ProductProvider({ children }) {
   });
 
   const [sizes] = useState(initialSizes);
+
+  // Sync with live backend API on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function syncBackendCatalogue() {
+      try {
+        const [liveProducts, liveCategories] = await Promise.all([
+          getProducts(),
+          getCategories()
+        ]);
+        if (isMounted) {
+          if (Array.isArray(liveProducts) && liveProducts.length > 0) {
+            setProducts(liveProducts);
+          }
+          if (Array.isArray(liveCategories) && liveCategories.length > 0) {
+            setCategories(liveCategories);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not sync with live backend catalogue, using local cached data.", err);
+      }
+    }
+    syncBackendCatalogue();
+    return () => { isMounted = false; };
+  }, []);
 
   // Sync products to localStorage whenever updated
   useEffect(() => {

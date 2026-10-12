@@ -28,41 +28,75 @@ const getStoredCategories = () => {
   return defaultCategories;
 };
 
-// Simulate network delay to mimic real API calls
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const API_BASE = '/api';
 
+// Fetch catalogue from backend API with fallback to localStorage / mock
 export const getProducts = async () => {
-  await delay(200);
+  try {
+    const res = await fetch(`${API_BASE}/products`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('penny_products', JSON.stringify(data.data));
+        }
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("Backend API unavailable, falling back to local storage.", err.message);
+  }
   return getStoredProducts();
 };
 
 export const getProductById = async (id) => {
-  await delay(150);
+  try {
+    const res = await fetch(`${API_BASE}/products/${id}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data) {
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn(`Backend API unavailable for product ${id}, falling back.`, err.message);
+  }
   const products = getStoredProducts();
-  const product = products.find(p => p.id === id);
+  const product = products.find(p => p.id === id || p.slug === id);
   if (!product) throw new Error("Product not found");
   return product;
 };
 
 export const getCategories = async () => {
-  await delay(100);
+  try {
+    const res = await fetch(`${API_BASE}/categories`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('penny_categories', JSON.stringify(data.data));
+        }
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("Backend API unavailable, falling back to local categories.", err.message);
+  }
   return getStoredCategories();
 };
 
 export const getSizes = async () => {
-  await delay(100);
   return defaultSizes;
 };
 
 export const getFeaturedProducts = async () => {
-  await delay(150);
-  return getStoredProducts().filter(p => p.featured);
+  const products = await getProducts();
+  return products.filter(p => p.featured);
 };
 
 export const getProductsByCategory = async (categoryId) => {
-  await delay(150);
-  const products = getStoredProducts();
+  const products = await getProducts();
   if (categoryId === 'all') return products;
-  return products.filter(p => p.category === categoryId);
+  return products.filter(p => p.category?.toLowerCase() === categoryId?.toLowerCase());
 };
 

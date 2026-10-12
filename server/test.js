@@ -66,8 +66,33 @@ async function runTests() {
     console.log('   ✅ Protected Access Succeeded!');
     console.log('   Verified Profile ID:', meData.user.id);
     console.log('   Verified Role:', meData.user.role);
+
+    // -----------------------------------------------------------------
+    // TEST 4: Fetch Catalogue (Public Storefront)
+    // -----------------------------------------------------------------
+    console.log('\n4. Testing Catalogue API (/api/products)...');
+    const prodRes = await fetch(`${SERVER_URL}/api/products`);
+    const prodData = await prodRes.json();
+    if (!prodRes.ok) {
+      console.error('   ❌ Products fetch failed:', prodData.message);
+      return;
+    }
+    console.log(`   ✅ Fetched ${prodData.count} products from PENNY catalogue.`);
+
+    // -----------------------------------------------------------------
+    // TEST 5: Fetch Categories & Size Guides
+    // -----------------------------------------------------------------
+    console.log('\n5. Testing Categories API (/api/categories)...');
+    const catRes = await fetch(`${SERVER_URL}/api/categories`);
+    const catData = await catRes.json();
+    if (!catRes.ok) {
+      console.error('   ❌ Categories fetch failed:', catData.message);
+      return;
+    }
+    console.log(`   ✅ Fetched ${catData.count} categories:`, catData.data.map(c => c.name).join(', '));
+
     console.log('\n======================================================');
-    console.log('   🎉 ALL TESTS PASSED! YOUR BACKEND IS FULLY WORKING.');
+    console.log('   🎉 ALL TESTS PASSED! BACKEND & CATALOGUE ARE LIVE.');
     console.log('======================================================\n');
 
   } catch (err) {
