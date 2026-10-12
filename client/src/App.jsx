@@ -15,6 +15,8 @@ import Shipping from './pages/Shipping';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminLogin from './pages/AdminLogin';
+import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
 import { ModalProvider } from './context/ModalContext';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
@@ -54,8 +56,16 @@ function App() {
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
 
-                  {/* Admin Management Dashboard */}
-                  <Route path="/admin" element={<AdminDashboard />} />
+                  {/* Admin Management Dashboard & Security Gate */}
+                  <Route path="/admin/login" element={<AdminLogin />} />
+                  <Route 
+                    path="/admin" 
+                    element={
+                      <AdminProtectedRoute>
+                        <AdminDashboard />
+                      </AdminProtectedRoute>
+                    } 
+                  />
 
                   {/* Temporary catch-all to prevent 404s while clicking header links */}
                   <Route path="*" element={<Home />} />
