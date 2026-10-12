@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock } from 'lucide-react';
@@ -21,6 +21,31 @@ const Checkout = () => {
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderId, setOrderId] = useState('');
 
+  // Live Bank Transfer Account Details from Backend
+  const [bankDetails, setBankDetails] = useState({
+    bankName: 'Zenith Bank Plc',
+    accountName: 'PENNY CLOTHING CO',
+    accountNumber: '1018924560',
+    instructions: 'Please transfer the exact total amount and use your Order Number as payment reference/narration.',
+  });
+
+  useEffect(() => {
+    async function loadBankConfig() {
+      try {
+        const res = await fetch('/api/payments/config');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.bankDetails) {
+            setBankDetails(data.bankDetails);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load dynamic bank details, using fallback:', err);
+      }
+    }
+    loadBankConfig();
+  }, []);
+
   // Form State
   const [formData, setFormData] = useState({
     email: '',
@@ -32,7 +57,7 @@ const Checkout = () => {
     state: 'Lagos',
     postalCode: '',
     shippingMethod: 'standard', // 'standard' or 'express'
-    paymentMethod: 'paystack', // 'paystack' or 'bank_transfer'
+    paymentMethod: 'bank_transfer', // direct bank transfer active by default
     notes: ''
   });
 
@@ -300,15 +325,15 @@ const Checkout = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
               <div className="bg-white p-2.5 border border-amber-200/50 rounded-xs">
                 <span className="text-[10px] text-neutral-400 uppercase font-bold">Bank</span>
-                <p className="font-bold text-brand-charcoal text-xs mt-0.5">Zenith Bank</p>
+                <p className="font-bold text-brand-charcoal text-xs mt-0.5">{bankDetails.bankName}</p>
               </div>
               <div className="bg-white p-2.5 border border-amber-200/50 rounded-xs">
                 <span className="text-[10px] text-neutral-400 uppercase font-bold">Account Name</span>
-                <p className="font-bold text-brand-charcoal text-xs mt-0.5">PENNY CLOTHING CO</p>
+                <p className="font-bold text-brand-charcoal text-xs mt-0.5">{bankDetails.accountName}</p>
               </div>
               <div className="bg-white p-2.5 border border-amber-200/50 rounded-xs">
                 <span className="text-[10px] text-neutral-400 uppercase font-bold">Account Number</span>
-                <p className="font-mono font-bold text-brand-charcoal text-xs mt-0.5">1018924560</p>
+                <p className="font-mono font-bold text-brand-charcoal text-xs mt-0.5">{bankDetails.accountNumber}</p>
               </div>
             </div>
             <p className="text-[11px] text-amber-800/90 leading-relaxed">
@@ -681,29 +706,8 @@ const Checkout = () => {
             {step === 3 && (
               <form onSubmit={handlePlaceOrder} className="space-y-6">
                 <div className="space-y-3">
-                  <label className={`flex items-start p-4 border cursor-pointer transition-all ${formData.paymentMethod === 'paystack' ? 'border-brand-charcoal bg-brand-offwhite/40' : 'border-brand-charcoal/20'}`}>
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="paystack"
-                      checked={formData.paymentMethod === 'paystack'}
-                      onChange={handleChange}
-                      className="mt-0.5 mr-3 accent-black"
-                    />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wider text-brand-charcoal">
-                          Paystack Online Payment
-                        </span>
-                        <CreditCard className="w-4 h-4 text-brand-taupe" />
-                      </div>
-                      <p className="text-xs text-brand-charcoal/60 mt-1 font-serif">
-                        Pay securely with your Debit Card, Bank Transfer, or USSD via Paystack.
-                      </p>
-                    </div>
-                  </label>
-
-                  <label className={`flex items-start p-4 border cursor-pointer transition-all ${formData.paymentMethod === 'bank_transfer' ? 'border-brand-charcoal bg-brand-offwhite/40' : 'border-brand-charcoal/20'}`}>
+                  {/* Direct Bank Transfer (Primary Active Payment Method) */}
+                  <label className={`flex items-start p-4 border cursor-pointer transition-all ${formData.paymentMethod === 'bank_transfer' ? 'border-brand-charcoal bg-brand-offwhite/40 ring-1 ring-brand-charcoal' : 'border-brand-charcoal/20'}`}>
                     <input
                       type="radio"
                       name="paymentMethod"
@@ -712,17 +716,50 @@ const Checkout = () => {
                       onChange={handleChange}
                       className="mt-0.5 mr-3 accent-black"
                     />
-                    <div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-brand-charcoal">
-                        Direct Bank Transfer
-                      </span>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-brand-charcoal">
+                          Direct Bank Transfer
+                        </span>
+                        <span className="text-[10px] bg-neutral-900 text-white font-bold uppercase tracking-wider px-2 py-0.5 rounded-xs">
+                          Active
+                        </span>
+                      </div>
                       <p className="text-xs text-brand-charcoal/60 mt-1 font-serif">
-                        Make your payment directly into our official business bank account. Order confirmed once payment is verified by the store.
+                        Make your payment directly into our official business bank account. Order is confirmed once payment is verified by the store.
                       </p>
                     </div>
                   </label>
 
-                  {/* PENNY Official Bank Details Card */}
+                  {/* Paystack Online Payment (Inactive For Now) */}
+                  <div className="flex items-start p-4 border border-dashed border-neutral-300 bg-neutral-50/70 opacity-60 cursor-not-allowed select-none rounded-xs">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="paystack"
+                      disabled
+                      checked={false}
+                      className="mt-0.5 mr-3 accent-neutral-400 cursor-not-allowed"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+                            Paystack Online Payment
+                          </span>
+                          <CreditCard className="w-4 h-4 text-neutral-400" />
+                        </div>
+                        <span className="text-[9px] bg-neutral-200 text-neutral-600 font-bold uppercase tracking-wider px-2 py-0.5 rounded-xs">
+                          Temporarily Inactive
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-400 mt-1 font-serif">
+                        Card, USSD & QR checkout is temporarily paused. Please use Direct Bank Transfer above.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* PENNY Official Bank Details Card (Driven dynamically by Admin Settings) */}
                   {formData.paymentMethod === 'bank_transfer' && (
                     <div className="p-4 bg-brand-offwhite border border-brand-charcoal/20 rounded-xs space-y-3 animate-in fade-in">
                       <div className="flex items-center gap-2 border-b border-brand-charcoal/10 pb-2">
@@ -735,22 +772,22 @@ const Checkout = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                         <div className="bg-white p-3 border border-brand-charcoal/10 rounded-xs">
                           <p className="text-[10px] text-brand-charcoal/50 uppercase font-bold tracking-wider">Bank Name</p>
-                          <p className="font-bold text-brand-charcoal text-sm mt-0.5">Zenith Bank Plc</p>
+                          <p className="font-bold text-brand-charcoal text-sm mt-0.5">{bankDetails.bankName}</p>
                         </div>
                         <div className="bg-white p-3 border border-brand-charcoal/10 rounded-xs">
                           <p className="text-[10px] text-brand-charcoal/50 uppercase font-bold tracking-wider">Account Name</p>
-                          <p className="font-bold text-brand-charcoal text-sm mt-0.5">PENNY CLOTHING CO</p>
+                          <p className="font-bold text-brand-charcoal text-sm mt-0.5">{bankDetails.accountName}</p>
                         </div>
                         <div className="bg-white p-3 border border-brand-charcoal/10 rounded-xs sm:col-span-2 flex items-center justify-between">
                           <div>
                             <p className="text-[10px] text-brand-charcoal/50 uppercase font-bold tracking-wider">Account Number</p>
-                            <p className="font-mono font-bold text-brand-charcoal text-base mt-0.5 tracking-wider">1018924560</p>
+                            <p className="font-mono font-bold text-brand-charcoal text-base mt-0.5 tracking-wider">{bankDetails.accountNumber}</p>
                           </div>
                           <button
                             type="button"
                             onClick={() => {
-                              navigator.clipboard?.writeText('1018924560');
-                              alert('Account number 1018924560 copied to clipboard!');
+                              navigator.clipboard?.writeText(bankDetails.accountNumber);
+                              alert(`Account number ${bankDetails.accountNumber} copied to clipboard!`);
                             }}
                             className="px-2.5 py-1.5 border border-brand-charcoal/20 hover:border-brand-charcoal text-[10px] font-bold uppercase tracking-wider text-brand-charcoal inline-flex items-center gap-1 rounded-xs bg-brand-offwhite cursor-pointer"
                           >

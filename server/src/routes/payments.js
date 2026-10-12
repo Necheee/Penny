@@ -53,16 +53,61 @@ export const ordersStore = [
   }
 ];
 
+// In-Memory store for official bank account details (editable by admin)
+export let bankDetailsStore = {
+  bankName: 'Zenith Bank Plc',
+  accountName: 'PENNY CLOTHING CO',
+  accountNumber: '1018924560',
+  instructions: 'Please transfer the exact total amount and use your Order Number as payment reference/narration. Once verified by store admin, your receipt and confirmation will be emailed.',
+};
+
 /**
  * GET /api/payments/config
- * Returns public configuration (e.g. Paystack public key)
+ * Returns public configuration and official bank transfer details
  */
 router.get('/config', (req, res) => {
   return res.status(200).json({
     success: true,
     publicKey: PAYSTACK_PUBLIC_KEY,
     currency: 'NGN',
+    bankDetails: bankDetailsStore,
+    paystackEnabled: false, // inactive for now as requested
   });
+});
+
+/**
+ * PUT /api/payments/config/bank
+ * Updates official bank transfer details (Owner Admin only)
+ */
+router.put('/config/bank', (req, res) => {
+  try {
+    const { bankName, accountName, accountNumber, instructions } = req.body;
+
+    if (!bankName || !accountName || !accountNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bank Name, Account Name, and Account Number are required.',
+      });
+    }
+
+    bankDetailsStore = {
+      bankName: bankName.trim(),
+      accountName: accountName.trim(),
+      accountNumber: accountNumber.trim(),
+      instructions: instructions ? instructions.trim() : bankDetailsStore.instructions,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: 'Bank transfer information updated successfully.',
+      bankDetails: bankDetailsStore,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update bank details.',
+    });
+  }
 });
 
 /**

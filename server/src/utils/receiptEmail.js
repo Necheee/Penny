@@ -118,3 +118,4 @@ export const sendOrderConfirmationEmail = async (order) => {
     receiptPreview: receiptHtml,
   };
 };
+

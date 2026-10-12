@@ -16,7 +16,10 @@ import {
   Loader2,
   Cloud,
   Mail,
-  Check
+  Check,
+  Landmark,
+  Building2,
+  Save
 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 
@@ -96,23 +99,71 @@ export default function AdminDashboard() {
     localStorage.setItem('penny_orders', JSON.stringify(orders));
   }, [orders]);
 
-  // Fetch registered orders from backend API
+  // Fetch registered orders and dynamic bank details from backend API
   useEffect(() => {
-    async function loadBackendOrders() {
+    async function loadBackendData() {
       try {
-        const res = await fetch('/api/payments/orders');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-            setOrders(data.data);
+        const [ordersRes, configRes] = await Promise.all([
+          fetch('/api/payments/orders'),
+          fetch('/api/payments/config'),
+        ]);
+
+        if (ordersRes.ok) {
+          const ordersData = await ordersRes.json();
+          if (ordersData.success && Array.isArray(ordersData.data) && ordersData.data.length > 0) {
+            setOrders(ordersData.data);
+          }
+        }
+
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          if (configData.bankDetails) {
+            setBankForm(configData.bankDetails);
           }
         }
       } catch (err) {
-        console.warn('Could not fetch backend orders, using cached orders store.', err);
+        console.warn('Could not fetch backend initial data, using local fallback.', err);
       }
     }
-    loadBackendOrders();
+    loadBackendData();
   }, []);
+
+  // Bank Account Information Management (Admin Config)
+  const [bankForm, setBankForm] = useState({
+    bankName: 'Zenith Bank Plc',
+    accountName: 'PENNY CLOTHING CO',
+    accountNumber: '1018924560',
+    instructions: 'Please transfer the exact total amount and use your Order Number as payment reference/narration. Once verified by store admin, your receipt and confirmation will be emailed.',
+  });
+  const [isSavingBank, setIsSavingBank] = useState(false);
+  const [bankFeedbackMsg, setBankFeedbackMsg] = useState({ type: '', text: '' });
+
+  const handleSaveBankDetails = async (e) => {
+    e.preventDefault();
+    setIsSavingBank(true);
+    setBankFeedbackMsg({ type: '', text: '' });
+
+    try {
+      const res = await fetch('/api/payments/config/bank', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bankForm),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBankForm(data.bankDetails);
+        setBankFeedbackMsg({ type: 'success', text: 'Bank transfer details successfully updated and live on storefront checkout.' });
+      } else {
+        setBankFeedbackMsg({ type: 'error', text: data.message || 'Could not update bank details.' });
+      }
+    } catch (err) {
+      setBankFeedbackMsg({ type: 'error', text: 'Network connection issue while saving bank details.' });
+    } finally {
+      setIsSavingBank(false);
+      setTimeout(() => setBankFeedbackMsg({ type: '', text: '' }), 5000);
+    }
+  };
 
   // Selected Order for Inspection Drawer / Modal
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -952,6 +1003,172 @@ export default function AdminDashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: BANK & PAYMENT SETTINGS */}
+      {activeTab === 'bank-settings' && (
+        <div className="space-y-6 max-w-4xl">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h1 className="text-xl font-bold font-serif text-brand-charcoal">Official Bank Transfer & Payment Settings</h1>
+              <p className="text-xs text-neutral-500 mt-1">
+                Configure your business bank account credentials displayed to customers during checkout. Changes reflect immediately across all devices.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold uppercase rounded-xs">
+              <Landmark className="w-3.5 h-3.5" /> Direct Bank Transfer Active
+            </span>
+          </div>
+
+          {/* Feedback notification banner */}
+          {bankFeedbackMsg.text && (
+            <div className={`p-4 rounded-xs text-xs font-medium border flex items-center justify-between ${
+              bankFeedbackMsg.type === 'success' 
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
+                : 'bg-red-50 text-red-900 border-red-200'
+            }`}>
+              <span>{bankFeedbackMsg.text}</span>
+              <button 
+                type="button" 
+                onClick={() => setBankFeedbackMsg({ type: '', text: '' })}
+                className="text-neutral-400 hover:text-black font-bold uppercase text-[10px]"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Bank Form */}
+            <div className="md:col-span-2 bg-white p-6 border border-neutral-200 rounded-sm shadow-xs">
+              <form onSubmit={handleSaveBankDetails} className="space-y-4 text-xs font-sans">
+                <div className="border-b border-neutral-100 pb-3 mb-4">
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-brand-charcoal">
+                    Receiving Bank Account Details
+                  </h2>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Customers will transfer order totals directly into this registered account.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    Bank Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={bankForm.bankName}
+                    onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
+                    placeholder="e.g. Zenith Bank Plc"
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                      Account Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={bankForm.accountName}
+                      onChange={(e) => setBankForm({ ...bankForm, accountName: e.target.value })}
+                      placeholder="e.g. PENNY CLOTHING CO"
+                      className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                      Account Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={bankForm.accountNumber}
+                      onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+                      placeholder="e.g. 1018924560"
+                      className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal font-mono"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    Transfer Instructions & Narration Advice
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={bankForm.instructions}
+                    onChange={(e) => setBankForm({ ...bankForm, instructions: e.target.value })}
+                    placeholder="Provide specific notes or advice for customers when making bank transfers..."
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal text-xs leading-relaxed"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-neutral-100 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isSavingBank}
+                    className="px-6 py-2.5 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingBank ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving Changes...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" /> Save Account Details
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Live Customer Preview Card */}
+            <div className="space-y-4">
+              <div className="bg-white p-5 border border-neutral-200 rounded-sm shadow-xs text-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-3">
+                  Live Customer Checkout Preview
+                </span>
+
+                <div className="p-4 bg-brand-offwhite border border-brand-charcoal/20 rounded-xs space-y-3">
+                  <div className="flex items-center gap-2 border-b border-brand-charcoal/10 pb-2">
+                    <Building2 className="w-4 h-4 text-brand-charcoal" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-brand-charcoal">
+                      Official PENNY Account Details
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="bg-white p-2.5 border border-brand-charcoal/10 rounded-xs">
+                      <p className="text-[9px] text-neutral-400 uppercase font-bold">Bank Name</p>
+                      <p className="font-bold text-brand-charcoal text-xs mt-0.5">{bankForm.bankName || 'Not Set'}</p>
+                    </div>
+                    <div className="bg-white p-2.5 border border-brand-charcoal/10 rounded-xs">
+                      <p className="text-[9px] text-neutral-400 uppercase font-bold">Account Name</p>
+                      <p className="font-bold text-brand-charcoal text-xs mt-0.5">{bankForm.accountName || 'Not Set'}</p>
+                    </div>
+                    <div className="bg-white p-2.5 border border-brand-charcoal/10 rounded-xs">
+                      <p className="text-[9px] text-neutral-400 uppercase font-bold">Account Number</p>
+                      <p className="font-mono font-bold text-brand-charcoal text-sm mt-0.5">{bankForm.accountNumber || 'Not Set'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-neutral-50 border border-neutral-200 rounded-xs text-[11px] text-neutral-600">
+                  <p className="font-bold uppercase tracking-wider text-[10px] text-neutral-700 mb-1">
+                    Gateway Status:
+                  </p>
+                  <p>• <strong>Direct Bank Transfer:</strong> Active & Enabled</p>
+                  <p>• <strong>Paystack:</strong> Inactive / Paused</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import {
   FolderTree, 
   Ruler, 
   ShoppingBag, 
+  Landmark,
   ExternalLink, 
   LogOut,
   Menu,
@@ -22,6 +23,7 @@ export default function AdminLayout({ children, activeTab, setActiveTab }) {
     { id: 'categories', label: 'Categories', icon: FolderTree },
     { id: 'size-guide', label: 'Size Guide', icon: Ruler },
     { id: 'orders', label: 'Orders', icon: ShoppingBag },
+    { id: 'bank-settings', label: 'Bank & Payments', icon: Landmark },
   ];
 
   return (
