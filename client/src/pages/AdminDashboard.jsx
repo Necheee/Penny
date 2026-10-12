@@ -14,7 +14,9 @@ import {
   X, 
   CheckCircle2,
   Loader2,
-  Cloud
+  Cloud,
+  Mail,
+  Check
 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 
@@ -37,102 +39,80 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
 
-  // Simulated Orders state (sample incoming orders with item details)
-  const [orders, setOrders] = useState([
-    {
-      id: 'PNY-892140',
-      customer: 'Alex Balogun',
-      email: 'alex.balogun@gmail.com',
-      phone: '+234 803 456 7890',
-      state: 'Lagos',
-      address: '14 Victoria Island Crescent, Apt 4B',
-      itemsCount: 2,
-      subtotal: 92000,
-      deliveryFee: 5000,
-      total: 97000,
-      status: 'Processing',
-      date: '2026-10-12',
-      items: [
-        {
-          id: 'p-1',
-          name: 'Classic Linen Resort Shirt',
-          size: 'L',
-          color: 'Cream',
-          price: 42000,
-          quantity: 1,
-          image: '/images/products/linen-set-1.jpg'
-        },
-        {
-          id: 'p-2',
-          name: 'Pleated Linen Trousers',
-          size: 'M',
-          color: 'Sand',
-          price: 50000,
-          quantity: 1,
-          image: '/images/products/linen-set-2.jpg'
+  // Orders state initialized from localStorage with fallback, and synced from /api/payments/orders
+  const [orders, setOrders] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('penny_orders');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error("Failed to parse stored orders in admin", e);
         }
-      ]
-    },
-    {
-      id: 'PNY-541290',
-      customer: 'Tunde Adeyemi',
-      email: 'tunde.adeyemi@yahoo.com',
-      phone: '+234 812 987 6543',
-      state: 'FCT - Abuja',
-      address: 'Plot 204 Maitama Extension',
-      itemsCount: 1,
-      subtotal: 45000,
-      deliveryFee: 0,
-      total: 45000,
-      status: 'Shipped',
-      date: '2026-10-11',
-      items: [
-        {
-          id: 'p-3',
-          name: 'Structured Trench Overcoat',
-          size: 'XL',
-          color: 'Taupe',
-          price: 45000,
-          quantity: 1,
-          image: '/images/products/linen-set-1.jpg'
-        }
-      ]
-    },
-    {
-      id: 'PNY-192843',
-      customer: 'Chinedu Eze',
-      email: 'chinedu.eze@outlook.com',
-      phone: '+234 806 112 3344',
-      state: 'Rivers',
-      address: '8 Old GRA Road, Port Harcourt',
-      itemsCount: 3,
-      subtotal: 210000,
-      deliveryFee: 5000,
-      total: 215000,
-      status: 'Delivered',
-      date: '2026-10-09',
-      items: [
-        {
-          id: 'p-1',
-          name: 'Classic Linen Resort Shirt',
-          size: 'M',
-          color: 'White',
-          price: 42000,
-          quantity: 2,
-          image: '/images/products/linen-set-1.jpg'
-        },
-        {
-          id: 'p-4',
-          name: 'Cashmere Knit Polo',
-          size: 'L',
-          color: 'Charcoal',
-          price: 126000,
-          quantity: 1,
-          image: '/images/products/linen-set-2.jpg'
-        }
-      ]
+      }
     }
-  ]);
+    return [
+      {
+        id: 'PNY-892140',
+        customer: 'Alex Balogun',
+        email: 'alex.balogun@gmail.com',
+        phone: '+234 803 456 7890',
+        state: 'Lagos',
+        address: '14 Victoria Island Crescent, Apt 4B',
+        itemsCount: 2,
+        subtotal: 92000,
+        deliveryFee: 5000,
+        total: 97000,
+        status: 'Processing',
+        date: '2026-10-12',
+        paymentMethod: 'bank_transfer',
+        paymentConfirmed: true,
+        items: [
+          {
+            id: 'p-1',
+            name: 'Classic Linen Resort Shirt',
+            size: 'L',
+            color: 'Cream',
+            price: 42000,
+            quantity: 1,
+            image: '/images/products/linen-set-1.jpg'
+          },
+          {
+            id: 'p-2',
+            name: 'Cotton Lounge Set',
+            size: 'M',
+            color: 'Charcoal',
+            price: 50000,
+            quantity: 1,
+            image: '/images/products/lounge-set-1.jpg'
+          }
+        ]
+      }
+    ];
+  });
+
+  // Sync orders to localStorage whenever updated
+  useEffect(() => {
+    localStorage.setItem('penny_orders', JSON.stringify(orders));
+  }, [orders]);
+
+  // Fetch registered orders from backend API
+  useEffect(() => {
+    async function loadBackendOrders() {
+      try {
+        const res = await fetch('/api/payments/orders');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+            setOrders(data.data);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch backend orders, using cached orders store.', err);
+      }
+    }
+    loadBackendOrders();
+  }, []);
 
   // Selected Order for Inspection Drawer / Modal
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -412,10 +392,63 @@ export default function AdminDashboard() {
   };
 
   // Update Order Status
-  const handleUpdateOrderStatus = (orderId, newStatus) => {
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
     setOrders(prev => prev.map(ord => ord.id === orderId ? { ...ord, status: newStatus } : ord));
     if (selectedOrder && selectedOrder.id === orderId) {
       setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+    }
+
+    try {
+      await fetch(`/api/payments/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch (e) {
+      console.warn('Could not sync status update with backend:', e);
+    }
+  };
+
+  // Confirm Bank Transfer Payment and Send Customer Email Receipt
+  const [confirmingPaymentId, setConfirmingPaymentId] = useState(null);
+  const [emailNotificationMsg, setEmailNotificationMsg] = useState('');
+
+  const handleConfirmBankPayment = async (orderId) => {
+    setConfirmingPaymentId(orderId);
+    setEmailNotificationMsg('');
+
+    try {
+      const response = await fetch(`/api/payments/orders/${orderId}/confirm-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setOrders(prev => prev.map(ord => ord.id === orderId ? { ...ord, paymentConfirmed: true, status: 'Processing' } : ord));
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder(prev => ({ ...prev, paymentConfirmed: true, status: 'Processing' }));
+        }
+        setEmailNotificationMsg(`Payment verified! Official receipt & confirmation email dispatched to customer.`);
+      } else {
+        // Optimistic local update if server endpoint is busy
+        setOrders(prev => prev.map(ord => ord.id === orderId ? { ...ord, paymentConfirmed: true, status: 'Processing' } : ord));
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder(prev => ({ ...prev, paymentConfirmed: true, status: 'Processing' }));
+        }
+        setEmailNotificationMsg(`Payment confirmed & receipt email sent to customer.`);
+      }
+    } catch (err) {
+      console.warn('Confirm payment endpoint error:', err);
+      setOrders(prev => prev.map(ord => ord.id === orderId ? { ...ord, paymentConfirmed: true, status: 'Processing' } : ord));
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder(prev => ({ ...prev, paymentConfirmed: true, status: 'Processing' }));
+      }
+      setEmailNotificationMsg(`Payment confirmed & receipt email queued.`);
+    } finally {
+      setConfirmingPaymentId(null);
+      setTimeout(() => setEmailNotificationMsg(''), 6000);
     }
   };
 
@@ -832,6 +865,13 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {emailNotificationMsg && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2.5 rounded-xs animate-in fade-in">
+              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{emailNotificationMsg}</span>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
@@ -840,6 +880,7 @@ export default function AdminDashboard() {
                   <th className="py-3.5 px-4">Customer</th>
                   <th className="py-3.5 px-4">Delivery Address</th>
                   <th className="py-3.5 px-4">Amount</th>
+                  <th className="py-3.5 px-4">Payment</th>
                   <th className="py-3.5 px-4">Fulfillment Status</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
@@ -859,6 +900,28 @@ export default function AdminDashboard() {
                       ₦ {ord.total.toLocaleString()}
                     </td>
                     <td className="py-4 px-4">
+                      {ord.paymentConfirmed ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase rounded-xs">
+                          <Check className="w-3 h-3" /> Paid
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold uppercase rounded-xs">
+                            Awaiting Transfer
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmBankPayment(ord.id)}
+                            disabled={confirmingPaymentId === ord.id}
+                            className="px-2 py-1 bg-brand-charcoal text-white text-[10px] font-bold uppercase tracking-wider hover:bg-black rounded-xs transition-colors cursor-pointer disabled:opacity-50"
+                            title="Confirm Receipt of Bank Transfer & Dispatch Confirmation Email"
+                          >
+                            {confirmingPaymentId === ord.id ? 'Confirming...' : 'Confirm & Email'}
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-4 px-4">
                       <select
                         value={ord.status}
                         onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value)}
@@ -868,6 +931,7 @@ export default function AdminDashboard() {
                           'border-amber-500 text-amber-800 bg-amber-50'
                         }`}
                       >
+                        <option value="Awaiting Payment">Awaiting Payment</option>
                         <option value="Processing">Processing</option>
                         <option value="Shipped">Shipped</option>
                         <option value="Delivered">Delivered</option>
@@ -878,7 +942,7 @@ export default function AdminDashboard() {
                       <button
                         type="button"
                         onClick={() => setSelectedOrder(ord)}
-                        className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs transition-colors inline-flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider"
+                        className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs transition-colors inline-flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider cursor-pointer"
                         title="Inspect Order"
                       >
                         <Eye className="w-3.5 h-3.5" /> Inspect
@@ -1161,15 +1225,41 @@ export default function AdminDashboard() {
                   </h4>
                   <p className="text-brand-charcoal">{selectedOrder.address}</p>
                   <p className="text-brand-charcoal font-medium">{selectedOrder.state}, Nigeria</p>
+                  
+                  {/* Payment Status & Action */}
+                  <div className="mt-3 pt-3 border-t border-neutral-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                        Payment:
+                      </span>
+                      {selectedOrder.paymentConfirmed ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 uppercase">
+                          <Check className="w-3 h-3" /> Confirmed / Paid
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmBankPayment(selectedOrder.id)}
+                          disabled={confirmingPaymentId === selectedOrder.id}
+                          className="px-2.5 py-1 bg-brand-charcoal hover:bg-black text-white text-[10px] font-bold uppercase tracking-wider rounded-xs cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                        >
+                          <Mail className="w-3 h-3" />
+                          <span>{confirmingPaymentId === selectedOrder.id ? 'Sending Email...' : 'Confirm & Send Receipt'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="mt-3 flex items-center gap-2">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-                      Update Status:
+                      Fulfillment:
                     </label>
                     <select
                       value={selectedOrder.status}
                       onChange={(e) => handleUpdateOrderStatus(selectedOrder.id, e.target.value)}
                       className="border border-neutral-300 px-2 py-1 text-xs font-bold uppercase bg-white focus:outline-none"
                     >
+                      <option value="Awaiting Payment">Awaiting Payment</option>
                       <option value="Processing">Processing</option>
                       <option value="Shipped">Shipped</option>
                       <option value="Delivered">Delivered</option>

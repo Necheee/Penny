@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import { sendOrderConfirmationEmail } from '../utils/receiptEmail.js';
 
 dotenv.config();
 
@@ -20,7 +21,8 @@ export const ordersStore = [
     city: 'Victoria Island',
     address: '14 Victoria Island Crescent, Apt 4B',
     shippingMethod: 'standard',
-    paymentMethod: 'paystack',
+    paymentMethod: 'bank_transfer',
+    paymentConfirmed: true,
     itemsCount: 2,
     subtotal: 92000,
     deliveryFee: 5000,
@@ -142,7 +144,9 @@ router.post('/initialize', async (req, res) => {
 
 /**
  * POST /api/payments/verify
- * Verifies Paystack transaction and registers confirmed order in orders store
+ * Registers placed order.
+ * If bank_transfer: status is set to 'Awaiting Payment' and paymentConfirmed is false.
+ * If card: status is set to 'Processing' and paymentConfirmed is true.
  */
 router.post('/verify', async (req, res) => {
   try {
@@ -155,41 +159,47 @@ router.post('/verify', async (req, res) => {
       });
     }
 
+    const isBankTransfer = orderData?.paymentMethod === 'bank_transfer' || reference.startsWith('transfer_');
+
     let isVerified = false;
     let paymentDetails = {
       reference,
-      channel: 'card',
+      channel: isBankTransfer ? 'bank_transfer' : 'card',
       currency: 'NGN',
-      status: 'success',
-      paidAt: new Date().toISOString(),
+      status: isBankTransfer ? 'pending_confirmation' : 'success',
+      paidAt: isBankTransfer ? null : new Date().toISOString(),
     };
 
-    const isRealPaystack = PAYSTACK_SECRET_KEY && !PAYSTACK_SECRET_KEY.includes('mock') && !PAYSTACK_SECRET_KEY.includes('your_');
-
-    if (isRealPaystack) {
-      try {
-        const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-          headers: {
-            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-          },
-        });
-        const verifyJson = await verifyRes.json();
-
-        if (verifyJson.status && verifyJson.data?.status === 'success') {
-          isVerified = true;
-          paymentDetails = {
-            ...paymentDetails,
-            channel: verifyJson.data.channel || 'card',
-            paidAt: verifyJson.data.paid_at || new Date().toISOString(),
-            gatewayResponse: verifyJson.data.gateway_response,
-          };
-        }
-      } catch (verErr) {
-        console.warn('Paystack live verification call failed, evaluating test runner:', verErr.message);
-      }
-    } else {
-      // In Test/Development environment, references matching format are automatically verified
+    if (isBankTransfer) {
+      // Bank transfers are acknowledged and stored in pending state
       isVerified = true;
+    } else {
+      const isRealPaystack = PAYSTACK_SECRET_KEY && !PAYSTACK_SECRET_KEY.includes('mock') && !PAYSTACK_SECRET_KEY.includes('your_');
+
+      if (isRealPaystack) {
+        try {
+          const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+            headers: {
+              Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            },
+          });
+          const verifyJson = await verifyRes.json();
+
+          if (verifyJson.status && verifyJson.data?.status === 'success') {
+            isVerified = true;
+            paymentDetails = {
+              ...paymentDetails,
+              channel: verifyJson.data.channel || 'card',
+              paidAt: verifyJson.data.paid_at || new Date().toISOString(),
+              gatewayResponse: verifyJson.data.gateway_response,
+            };
+          }
+        } catch (verErr) {
+          console.warn('Paystack live verification call failed, evaluating test runner:', verErr.message);
+        }
+      } else {
+        isVerified = true;
+      }
     }
 
     if (!isVerified) {
@@ -199,7 +209,7 @@ router.post('/verify', async (req, res) => {
       });
     }
 
-    // Register official order in the system
+    // Register order in the system
     const orderId = orderData?.orderRef || `PNY-${Math.floor(100000 + Math.random() * 900000)}`;
     
     const newOrder = {
@@ -212,12 +222,13 @@ router.post('/verify', async (req, res) => {
       city: orderData?.city || 'Lagos',
       address: orderData?.address || '',
       shippingMethod: orderData?.shippingMethod || 'standard',
-      paymentMethod: 'paystack',
+      paymentMethod: isBankTransfer ? 'bank_transfer' : 'paystack',
+      paymentConfirmed: !isBankTransfer,
       itemsCount: Array.isArray(orderData?.cartItems) ? orderData.cartItems.reduce((s, i) => s + (i.quantity || 1), 0) : 1,
       subtotal: Number(orderData?.cartSubtotal || 0),
       deliveryFee: Number(orderData?.shippingCost || 0),
       total: Number(orderData?.grandTotal || (Number(orderData?.cartSubtotal || 0) + Number(orderData?.shippingCost || 0))),
-      status: 'Processing',
+      status: isBankTransfer ? 'Awaiting Payment' : 'Processing',
       paidAt: paymentDetails.paidAt,
       createdAt: new Date().toISOString(),
       items: Array.isArray(orderData?.cartItems) ? orderData.cartItems.map(item => ({
@@ -236,7 +247,9 @@ router.post('/verify', async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Payment verified and order confirmed successfully.',
+      message: isBankTransfer 
+        ? 'Order registered successfully, awaiting bank transfer confirmation.' 
+        : 'Payment verified and order confirmed successfully.',
       order: newOrder,
     });
   } catch (error) {
@@ -244,6 +257,65 @@ router.post('/verify', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to verify transaction and confirm order.',
+    });
+  }
+});
+
+/**
+ * PATCH /api/payments/orders/:id/status
+ * Updates the fulfillment status of an order
+ */
+router.patch('/orders/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  const order = ordersStore.find(o => o.id === id);
+  if (!order) {
+    return res.status(404).json({ success: false, message: 'Order not found.' });
+  }
+
+  if (status) {
+    order.status = status;
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: `Order status updated to ${status}.`,
+    order,
+  });
+});
+
+/**
+ * POST /api/payments/orders/:id/confirm-payment
+ * Confirms bank transfer receipt for an order and dispatches confirmation receipt email to the customer
+ */
+router.post('/orders/:id/confirm-payment', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = ordersStore.find(o => o.id === id);
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found.' });
+    }
+
+    order.paymentConfirmed = true;
+    order.status = 'Processing';
+    order.paidAt = new Date().toISOString();
+
+    // Trigger transactional digital receipt and confirmation email
+    const emailResult = await sendOrderConfirmationEmail(order);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Bank transfer confirmed successfully and receipt email sent to customer.',
+      order,
+      emailDispatch: emailResult,
+    });
+  } catch (error) {
+    console.error('Failed to confirm payment and dispatch email:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while confirming payment.',
     });
   }
 });
@@ -261,3 +333,4 @@ router.get('/orders', (req, res) => {
 });
 
 export default router;
+

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
+import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const NIGERIAN_STATES = [
@@ -263,26 +263,59 @@ const Checkout = () => {
   };
 
   if (orderComplete) {
+    const isBankTransfer = formData.paymentMethod === 'bank_transfer';
+
     return (
       <div className="pt-28 pb-24 px-4 md:px-8 max-w-2xl mx-auto min-h-[70vh] flex flex-col items-center justify-center text-center text-brand-charcoal">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.4 }}
-          className="w-16 h-16 bg-neutral-900 text-white rounded-full flex items-center justify-center mb-6 shadow-md"
+          className={`w-16 h-16 ${isBankTransfer ? 'bg-amber-600' : 'bg-neutral-900'} text-white rounded-full flex items-center justify-center mb-6 shadow-md`}
         >
-          <Check className="w-8 h-8" />
+          {isBankTransfer ? <Clock className="w-8 h-8" /> : <Check className="w-8 h-8" />}
         </motion.div>
 
         <span className="text-xs font-bold tracking-[0.2em] uppercase text-brand-taupe mb-2 font-sans">
-          Order Confirmed
+          {isBankTransfer ? 'Order Placed • Awaiting Transfer' : 'Order Confirmed'}
         </span>
         <h1 className="text-3xl md:text-4xl font-serif font-light mb-3">
-          Thank you for your order
+          {isBankTransfer ? 'Your Order Has Been Placed' : 'Thank you for your order'}
         </h1>
         <p className="text-sm text-brand-charcoal/70 font-serif max-w-md mb-6">
-          Your order number is <strong className="font-sans font-bold text-brand-charcoal">{orderId}</strong>. A confirmation and receipt has been sent to <span className="font-sans font-medium text-brand-charcoal">{formData.email}</span>.
+          Your order number is <strong className="font-sans font-bold text-brand-charcoal">{orderId}</strong>.
+          {isBankTransfer 
+            ? ' Please complete your bank transfer using the details below. Once confirmed by the store owner, a digital receipt and dispatch notification will be sent to ' 
+            : ' A confirmation and receipt has been sent to '}
+          <span className="font-sans font-medium text-brand-charcoal">{formData.email}</span>.
         </p>
+
+        {/* Bank Transfer Instructions Card on Receipt Screen */}
+        {isBankTransfer && (
+          <div className="w-full mb-6 p-5 bg-amber-50/70 border border-amber-200/80 rounded-xs text-left text-xs space-y-3 font-sans">
+            <div className="flex items-center gap-2 text-amber-900 font-bold uppercase tracking-wider text-[11px]">
+              <Building2 className="w-4 h-4 text-amber-800" />
+              <span>Complete Payment to Process Your Order</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div className="bg-white p-2.5 border border-amber-200/50 rounded-xs">
+                <span className="text-[10px] text-neutral-400 uppercase font-bold">Bank</span>
+                <p className="font-bold text-brand-charcoal text-xs mt-0.5">Zenith Bank</p>
+              </div>
+              <div className="bg-white p-2.5 border border-amber-200/50 rounded-xs">
+                <span className="text-[10px] text-neutral-400 uppercase font-bold">Account Name</span>
+                <p className="font-bold text-brand-charcoal text-xs mt-0.5">PENNY CLOTHING CO</p>
+              </div>
+              <div className="bg-white p-2.5 border border-amber-200/50 rounded-xs">
+                <span className="text-[10px] text-neutral-400 uppercase font-bold">Account Number</span>
+                <p className="font-mono font-bold text-brand-charcoal text-xs mt-0.5">1018924560</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-amber-800/90 leading-relaxed">
+              * Use order reference <strong>{orderId}</strong> as your payment narration. Once the transfer is received and verified by the admin, your order will transition to <strong>Processing</strong> and your official receipt will be emailed immediately.
+            </p>
+          </div>
+        )}
 
         <div className="bg-brand-offwhite border border-brand-charcoal/10 p-6 w-full text-left space-y-3 mb-8 text-xs font-sans">
           <div className="flex justify-between border-b border-brand-charcoal/10 pb-2">
@@ -297,8 +330,16 @@ const Checkout = () => {
             <span className="text-brand-charcoal/60 uppercase tracking-wider">Payment Method</span>
             <span className="font-medium">{formData.paymentMethod === 'paystack' ? 'Paystack / Card' : 'Direct Bank Transfer'}</span>
           </div>
+          <div className="flex justify-between border-b border-brand-charcoal/10 pb-2">
+            <span className="text-brand-charcoal/60 uppercase tracking-wider">Status</span>
+            <span className={`font-bold uppercase tracking-wider text-[10px] px-2 py-0.5 rounded-xs ${
+              isBankTransfer ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-emerald-100 text-emerald-900'
+            }`}>
+              {isBankTransfer ? 'Awaiting Bank Transfer Confirmation' : 'Paid & Confirmed'}
+            </span>
+          </div>
           <div className="flex justify-between pt-1">
-            <span className="text-brand-charcoal/60 uppercase tracking-wider font-bold">Total Paid</span>
+            <span className="text-brand-charcoal/60 uppercase tracking-wider font-bold">Total Amount</span>
             <span className="font-bold text-sm">₦ {grandTotal.toLocaleString()}</span>
           </div>
         </div>
@@ -676,10 +717,56 @@ const Checkout = () => {
                         Direct Bank Transfer
                       </span>
                       <p className="text-xs text-brand-charcoal/60 mt-1 font-serif">
-                        Make your payment directly into our official bank account. Order processed upon proof of payment.
+                        Make your payment directly into our official business bank account. Order confirmed once payment is verified by the store.
                       </p>
                     </div>
                   </label>
+
+                  {/* PENNY Official Bank Details Card */}
+                  {formData.paymentMethod === 'bank_transfer' && (
+                    <div className="p-4 bg-brand-offwhite border border-brand-charcoal/20 rounded-xs space-y-3 animate-in fade-in">
+                      <div className="flex items-center gap-2 border-b border-brand-charcoal/10 pb-2">
+                        <Building2 className="w-4 h-4 text-brand-charcoal" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-brand-charcoal">
+                          Official PENNY Account Details
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="bg-white p-3 border border-brand-charcoal/10 rounded-xs">
+                          <p className="text-[10px] text-brand-charcoal/50 uppercase font-bold tracking-wider">Bank Name</p>
+                          <p className="font-bold text-brand-charcoal text-sm mt-0.5">Zenith Bank Plc</p>
+                        </div>
+                        <div className="bg-white p-3 border border-brand-charcoal/10 rounded-xs">
+                          <p className="text-[10px] text-brand-charcoal/50 uppercase font-bold tracking-wider">Account Name</p>
+                          <p className="font-bold text-brand-charcoal text-sm mt-0.5">PENNY CLOTHING CO</p>
+                        </div>
+                        <div className="bg-white p-3 border border-brand-charcoal/10 rounded-xs sm:col-span-2 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] text-brand-charcoal/50 uppercase font-bold tracking-wider">Account Number</p>
+                            <p className="font-mono font-bold text-brand-charcoal text-base mt-0.5 tracking-wider">1018924560</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard?.writeText('1018924560');
+                              alert('Account number 1018924560 copied to clipboard!');
+                            }}
+                            className="px-2.5 py-1.5 border border-brand-charcoal/20 hover:border-brand-charcoal text-[10px] font-bold uppercase tracking-wider text-brand-charcoal inline-flex items-center gap-1 rounded-xs bg-brand-offwhite cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3" /> Copy
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xs text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
+                        <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <span>
+                          <strong>Instructions:</strong> Please transfer the exact order total of <strong>₦ {grandTotal.toLocaleString()}</strong>. After placing the order, your order status will be <strong>"Awaiting Payment"</strong>. Once the store confirms the transfer, an official payment receipt will be dispatched to your email.
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {paymentError && (
