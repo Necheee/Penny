@@ -56,12 +56,26 @@ export default function Shop() {
   };
 
   // Filter and Sort Logic
+  const searchQuery = searchParams.get('search') || '';
+
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
 
-    // Filter
+    // Filter by Category
     if (activeCategory !== 'all') {
       result = result.filter(p => p.category === activeCategory);
+    }
+
+    // Filter by Search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(p => 
+        p.name?.toLowerCase().includes(q) ||
+        p.category?.toLowerCase().includes(q) ||
+        p.subcategory?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.colors?.some(c => c.toLowerCase().includes(q))
+      );
     }
 
     // Sort
@@ -70,16 +84,13 @@ export default function Shop() {
     } else if (sortOption === 'price-desc') {
       result.sort((a, b) => b.price - a.price);
     } else if (sortOption === 'newest') {
-      // Simplistic sort assuming newer items have later dates or just by ID roughly
       result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    }
-    // "featured" doesn't strictly sort unless we prioritize featured=true
-    else {
+    } else {
       result.sort((a, b) => (b.featured === a.featured) ? 0 : b.featured ? 1 : -1);
     }
 
     return result;
-  }, [activeCategory, sortOption, products]);
+  }, [activeCategory, sortOption, products, searchQuery]);
 
   const sortOptions = [
     { id: 'featured', label: 'Featured' },
@@ -95,10 +106,26 @@ export default function Shop() {
       {/* Page Header */}
       <div className="bg-brand-beige/20 py-12 md:py-20 px-6">
         <h1 className="text-3xl md:text-5xl font-serif text-brand-charcoal text-center tracking-wide">
-          {activeCategory === 'all' 
-            ? 'The Collection' 
-            : categoriesList.find(c => c.id === activeCategory)?.name || 'The Collection'}
+          {searchQuery 
+            ? `Search: "${searchQuery}"`
+            : activeCategory === 'all' 
+              ? 'The Collection' 
+              : categoriesList.find(c => c.id === activeCategory)?.name || 'The Collection'}
         </h1>
+        {searchQuery && (
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                params.delete('search');
+                setSearchParams(params);
+              }}
+              className="text-xs uppercase font-bold tracking-widest text-brand-charcoal underline underline-offset-4 hover:text-brand-taupe transition-colors"
+            >
+              Clear Search Filter
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Shop Container */}
