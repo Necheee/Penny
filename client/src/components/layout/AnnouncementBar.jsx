@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const messages = [
-  "Enjoy free shipping on orders above ₦75,000",
+  "Enjoy free shipping on orders above ₦200,000",
   "Lagos delivery in 1 to 3 days",
   "Pieces designed to work perfectly together"
 ];

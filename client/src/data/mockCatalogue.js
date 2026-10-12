@@ -24,7 +24,7 @@ export const products = [
     material: '100% Premium European Linen',
     fit: 'Relaxed fit. We recommend your usual size.',
     care: 'Machine wash cold on gentle cycle. Hang to dry. Warm iron if needed.',
-    shipping: 'Free delivery on orders above ₦75,000. Ships within 1-3 days in Lagos.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 days in Lagos.',
     images: {
       primary: '/images/products/linen-set-1.jpg',
       gallery: ['/images/products/linen-set-2.jpg', '/images/products/linen-set-3.jpg']
@@ -45,7 +45,7 @@ export const products = [
     material: '100% Organic Heavyweight Cotton',
     fit: 'True to size with a slightly boxy drape.',
     care: 'Machine wash cold. Tumble dry low.',
-    shipping: 'Free delivery on orders above ₦75,000. Ships within 1-3 days in Lagos.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 days in Lagos.',
     images: {
       primary: '/images/products/lounge-set-1.jpg',
       gallery: ['/images/products/lounge-set-2.jpg']
@@ -68,7 +68,7 @@ export const products = [
     material: '100% Supima Cotton',
     fit: 'Tailored but not tight.',
     care: 'Machine wash cold with like colors.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/essential-tee-1.jpg',
       gallery: ['/images/products/essential-tee-2.jpg']
@@ -89,7 +89,7 @@ export const products = [
     material: '95% Cotton, 5% Elastane',
     fit: 'Slim fit. Size up if between sizes.',
     care: 'Machine wash cold. Lay flat to dry.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/henley-1.jpg',
       gallery: ['/images/products/henley-2.jpg']
@@ -110,7 +110,7 @@ export const products = [
     material: '70% Merino Wool, 30% Silk',
     fit: 'Classic fit.',
     care: 'Hand wash cold or dry clean.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/polo-1.jpg',
       gallery: ['/images/products/polo-2.jpg']
@@ -131,7 +131,7 @@ export const products = [
     material: '100% Organic Cotton',
     fit: 'Regular fit.',
     care: 'Machine wash cold.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/longsleeve-1.jpg',
       gallery: ['/images/products/longsleeve-2.jpg']
@@ -152,7 +152,7 @@ export const products = [
     material: '100% French Terry Cotton',
     fit: 'Relaxed fit.',
     care: 'Machine wash cold. Tumble dry low.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/hoodie-1.jpg',
       gallery: ['/images/products/hoodie-2.jpg']
@@ -173,7 +173,7 @@ export const products = [
     material: '100% Heavyweight Cotton',
     fit: 'Slightly oversized.',
     care: 'Machine wash cold.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/sweatshirt-1.jpg',
       gallery: ['/images/products/sweatshirt-2.jpg']
@@ -194,7 +194,7 @@ export const products = [
     material: '80% Cotton, 20% Wool',
     fit: 'Regular fit. Great for layering over tees.',
     care: 'Hand wash or delicate cycle.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/quarterzip-1.jpg',
       gallery: ['/images/products/quarterzip-2.jpg']
@@ -215,7 +215,7 @@ export const products = [
     material: '90% Merino Wool, 10% Cashmere',
     fit: 'Tailored fit.',
     care: 'Dry clean only.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/sweater-1.jpg',
       gallery: ['/images/products/sweater-2.jpg']
@@ -236,7 +236,7 @@ export const products = [
     material: '100% Cotton Twill',
     fit: 'Boxy fit. Designed to be worn over another layer.',
     care: 'Machine wash cold.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/overshirt-1.jpg',
       gallery: ['/images/products/overshirt-2.jpg']
@@ -259,7 +259,7 @@ export const products = [
     material: '65% Polyester, 35% Viscose',
     fit: 'Tapered fit. Mid-rise.',
     care: 'Dry clean recommended.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/trousers-1.jpg',
       gallery: ['/images/products/trousers-2.jpg']
@@ -280,7 +280,7 @@ export const products = [
     material: '98% Cotton, 2% Elastane',
     fit: 'Slim-straight fit.',
     care: 'Machine wash cold.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/chinos-1.jpg',
       gallery: ['/images/products/chinos-2.jpg']
@@ -301,7 +301,7 @@ export const products = [
     material: '100% Japanese Selvedge Cotton',
     fit: 'Straight fit.',
     care: 'Wash sparingly inside out. Indigo may bleed initially.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/jeans-1.jpg',
       gallery: ['/images/products/jeans-2.jpg']
@@ -322,7 +322,7 @@ export const products = [
     material: '99% Cotton, 1% Elastane',
     fit: 'Slim fit.',
     care: 'Machine wash cold inside out.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/jeans-black-1.jpg',
       gallery: ['/images/products/jeans-black-2.jpg']
@@ -343,7 +343,7 @@ export const products = [
     material: '100% Cotton Twill',
     fit: '7-inch inseam. Hits just above the knee.',
     care: 'Machine wash cold.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/shorts-1.jpg',
       gallery: ['/images/products/shorts-2.jpg']
@@ -364,7 +364,7 @@ export const products = [
     material: '100% French Terry Cotton',
     fit: 'Tapered fit with cuffed hems.',
     care: 'Machine wash cold.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/joggers-1.jpg',
       gallery: ['/images/products/joggers-2.jpg']
@@ -385,7 +385,7 @@ export const products = [
     material: '100% Ripstop Cotton',
     fit: 'Relaxed straight fit.',
     care: 'Machine wash cold.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/cargo-1.jpg',
       gallery: ['/images/products/cargo-2.jpg']
@@ -408,7 +408,7 @@ export const products = [
     material: '100% Heavyweight Cotton',
     fit: 'Boxy, relaxed fit.',
     care: 'Machine wash cold.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/pocket-tee-1.jpg',
       gallery: ['/images/products/pocket-tee-2.jpg']
@@ -429,7 +429,7 @@ export const products = [
     material: '100% Wool',
     fit: 'Relaxed fit.',
     care: 'Hand wash only. Dry flat.',
-    shipping: 'Free delivery on orders above ₦75,000.',
+    shipping: 'Free delivery on orders above ₦200,000.',
     images: {
       primary: '/images/products/chunky-sweater-1.jpg',
       gallery: ['/images/products/chunky-sweater-2.jpg']

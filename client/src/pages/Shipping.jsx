@@ -40,7 +40,7 @@ export default function Shipping() {
             </table>
           </div>
           <p className="mt-4 text-[13px] italic">
-            * Free standard shipping is automatically applied to all orders over ₦75,000.
+            * Free standard shipping is automatically applied to all orders over ₦200,000.
           </p>
         </section>
 

@@ -7,13 +7,18 @@ export default function CartDrawer() {
   const { isCartOpen, closeCart, cartItems, updateQuantity, removeFromCart, cartSubtotal } = useCart();
   const navigate = useNavigate();
 
-  const FREE_SHIPPING_THRESHOLD = 75000;
+  const FREE_SHIPPING_THRESHOLD = 200000;
   const amountToFreeShipping = FREE_SHIPPING_THRESHOLD - cartSubtotal;
   const progressPercentage = Math.min((cartSubtotal / FREE_SHIPPING_THRESHOLD) * 100, 100);
 
   const handleCheckout = () => {
     closeCart();
     navigate('/checkout');
+  };
+
+  const handleContinueShopping = () => {
+    closeCart();
+    navigate('/shop');
   };
 
   return (
@@ -71,7 +76,10 @@ export default function CartDrawer() {
               {cartItems.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
                   <p className="text-brand-taupe font-serif text-lg">Your bag is currently empty.</p>
-                  <button onClick={closeCart} className="text-xs font-bold tracking-[0.15em] uppercase text-brand-charcoal underline underline-offset-4 hover:text-brand-taupe transition-colors">
+                  <button 
+                    onClick={handleContinueShopping} 
+                    className="text-xs font-bold tracking-[0.15em] uppercase text-brand-charcoal underline underline-offset-4 hover:text-brand-taupe transition-colors cursor-pointer"
+                  >
                     Continue Shopping
                   </button>
                 </div>
@@ -122,10 +130,18 @@ export default function CartDrawer() {
                 <p className="text-xs text-brand-taupe text-center">Shipping & taxes calculated at checkout.</p>
                 <button 
                   onClick={handleCheckout}
-                  className="w-full flex items-center justify-center bg-brand-charcoal text-white py-4 text-xs font-bold tracking-[0.2em] uppercase hover:bg-black transition-colors"
+                  className="w-full flex items-center justify-center bg-brand-charcoal text-white py-4 text-xs font-bold tracking-[0.2em] uppercase hover:bg-black transition-colors cursor-pointer"
                 >
                   Checkout <ArrowRight className="w-4 h-4 ml-2" />
                 </button>
+                <div className="text-center pt-1">
+                  <button 
+                    onClick={handleContinueShopping}
+                    className="text-[11px] font-bold tracking-[0.15em] uppercase text-brand-charcoal/70 underline underline-offset-4 hover:text-brand-charcoal transition-colors cursor-pointer"
+                  >
+                    Continue Shopping
+                  </button>
+                </div>
               </div>
             )}
           </motion.div>
