@@ -1,0 +1,124 @@
+// datasource db config supports PostgreSQL or local dev
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User Model: Differentiates business owner admin from regular customers
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  phone        String?
+  role         String    @default("customer") // "admin" | "customer"
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  orders       Order[]
+}
+
+// Category Model: Tops, Bottoms, Sets, Outerwear, etc.
+model Category {
+  id           String    @id @default(uuid())
+  slug         String    @unique
+  name         String
+  displayOrder Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  products     Product[]
+}
+
+// Product Model: Capsule wardrobe pieces
+model Product {
+  id           String         @id @default(uuid())
+  slug         String         @unique
+  name         String
+  price        Float
+  description  String?
+  material     String?        @default("100% Cotton")
+  fit          String?        @default("Relaxed fit")
+  care         String?        @default("Machine wash cold.")
+  shippingInfo String?        @default("Free delivery on orders above ₦200,000.")
+  featured     Boolean        @default(false)
+  inStock      Boolean        @default(true)
+  categoryId   String
+  category     Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  images       ProductImage[]
+  variants     ProductVariant[]
+  orderItems   OrderItem[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+// ProductImage Model: Primary image and gallery photos
+model ProductImage {
+  id        String   @id @default(uuid())
+  url       String
+  publicId  String?  // Cloudinary asset ID
+  isPrimary Boolean  @default(false)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+// ProductVariant Model: Size, color, and inventory SKU
+model ProductVariant {
+  id            String   @id @default(uuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size          String   // "XS", "S", "M", "L", "XL", "XXL"
+  colorName     String   // e.g. "Charcoal", "Cream", "Olive"
+  colorHex      String?  // e.g. "#36454f"
+  stockQuantity Int      @default(10)
+  sku           String?  @unique
+}
+
+// SizeGuide Model: Centimeter (CM) and Inch measurements per garment type
+model SizeGuide {
+  id           String   @id @default(uuid())
+  category     String   @unique // "tops" | "bottoms"
+  measurements String   // JSON string of measurement rows
+  updatedAt    DateTime @updatedAt
+}
+
+// Order Model: Customer purchase transactions
+model Order {
+  id              String      @id @default(uuid())
+  orderRef        String      @unique // e.g. "PNY-892140"
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerName    String
+  customerEmail   String
+  customerPhone   String
+  shippingAddress String
+  shippingState   String
+  subtotal        Float
+  deliveryFee     Float       @default(0)
+  total           Float
+  status          String      @default("Processing") // "Processing" | "Shipped" | "Delivered" | "Cancelled"
+  paymentStatus   String      @default("Pending")    // "Pending" | "Paid" | "Failed"
+  paymentMethod   String      @default("Paystack")
+  paymentRef      String?
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+// OrderItem Model: Line items within an order
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name      String
+  size      String
+  color     String
+  quantity  Int      @default(1)
+  unitPrice Float
+  imageUrl  String?
+}
