@@ -26,7 +26,9 @@ npm run dev
 
 Then, open `http://localhost:5173` in your browser.
 
-## Developer Onboarding
+## Documentation & Roadmap
 
-If you are a developer joining the project or looking to contribute, please read our comprehensive **[Developer Onboarding Guide](docs/ONBOARDING.md)**. It contains detailed information about the project structure, how the application works, and how to get started.
+- **[Developer Onboarding Guide](docs/ONBOARDING.md)**: Setup instructions, codebase structure, and development workflows.
+- **[Implementation Phases (Step-by-Step)](docs/IMPLEMENTATION_PHASES.md)**: Detailed breakdown of Phases 11 through 16 to complete the project.
+- **[Project Roadmap & Outstanding Modules](docs/ROADMAP_AND_REMAINING_MODULES.md)**: Technical specifications for the Admin Dashboard, Backend & Database architecture, Payment Gateways, Deployment, and Academic Requirements.
 
