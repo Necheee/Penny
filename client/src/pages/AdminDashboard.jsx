@@ -19,7 +19,8 @@ import {
   Check,
   Landmark,
   Building2,
-  Save
+  Save,
+  RefreshCw
 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 
@@ -99,33 +100,52 @@ export default function AdminDashboard() {
     localStorage.setItem('penny_orders', JSON.stringify(orders));
   }, [orders]);
 
+  // Loading state for orders refresh
+  const [isRefreshingOrders, setIsRefreshingOrders] = useState(false);
+
   // Fetch registered orders and dynamic bank details from backend API
-  useEffect(() => {
-    async function loadBackendData() {
-      try {
-        const [ordersRes, configRes] = await Promise.all([
-          fetch('/api/payments/orders'),
-          fetch('/api/payments/config'),
-        ]);
+  const loadBackendData = async () => {
+    try {
+      setIsRefreshingOrders(true);
+      const [ordersRes, configRes] = await Promise.all([
+        fetch('/api/payments/orders'),
+        fetch('/api/payments/config'),
+      ]);
 
-        if (ordersRes.ok) {
-          const ordersData = await ordersRes.json();
-          if (ordersData.success && Array.isArray(ordersData.data) && ordersData.data.length > 0) {
-            setOrders(ordersData.data);
-          }
+      if (ordersRes.ok) {
+        const ordersData = await ordersRes.json();
+        if (ordersData.success && Array.isArray(ordersData.data)) {
+          setOrders(ordersData.data);
         }
-
-        if (configRes.ok) {
-          const configData = await configRes.json();
-          if (configData.bankDetails) {
-            setBankForm(configData.bankDetails);
-          }
-        }
-      } catch (err) {
-        console.warn('Could not fetch backend initial data, using local fallback.', err);
       }
+
+      if (configRes.ok) {
+        const configData = await configRes.json();
+        if (configData.bankDetails) {
+          setBankForm(configData.bankDetails);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch backend data:', err);
+    } finally {
+      setIsRefreshingOrders(false);
     }
+  };
+
+  useEffect(() => {
     loadBackendData();
+    // Auto-refresh orders every 10 seconds so new customer orders appear in real-time
+    const interval = setInterval(() => {
+      fetch('/api/payments/orders')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.data)) {
+            setOrders(data.data);
+          }
+        })
+        .catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // Bank Account Information Management (Admin Config)
@@ -914,6 +934,16 @@ export default function AdminDashboard() {
               </h3>
               <p className="text-xs text-neutral-500 mt-1">Manage dispatch, address verification, and delivery statuses.</p>
             </div>
+            <button
+              type="button"
+              onClick={loadBackendData}
+              disabled={isRefreshingOrders}
+              className="px-3 py-1.5 border border-neutral-200 text-[11px] font-bold uppercase tracking-wider text-neutral-600 hover:text-black hover:border-black rounded-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              title="Refresh Orders"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingOrders ? 'animate-spin' : ''}`} />
+              <span>{isRefreshingOrders ? 'Syncing...' : 'Sync Orders'}</span>
+            </button>
           </div>
 
           {emailNotificationMsg && (
