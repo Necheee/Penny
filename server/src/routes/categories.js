@@ -167,3 +167,4 @@ router.put('/size-guides/:category', requireAuth, requireAdmin, (req, res) => {
 });
 
 export default router;
+

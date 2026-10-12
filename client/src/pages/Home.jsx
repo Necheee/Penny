@@ -41,7 +41,7 @@ export default function Home() {
           <motion.img
             key={currentSlide}
             src={heroImages[currentSlide]}
-            alt="Menswear Editorial"
+            alt="PENNY Editorial"
             initial={{ opacity: 0, scale: 1.05 }}
             animate={{ opacity: 0.6, scale: 1 }}
             exit={{ opacity: 0 }}

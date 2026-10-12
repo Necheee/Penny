@@ -30,9 +30,13 @@ export default function ProductCard({ product }) {
     <div onClick={() => openModal(product.id)} className="group flex flex-col cursor-pointer">
       <div className="relative aspect-[4/5] mb-4 bg-[#f4f4f0] overflow-hidden">
         <img 
-          src={product.images.primary} 
+          src={product.images?.primary || '/images/products/linen-set-1.jpg'} 
           alt={product.name} 
           loading="lazy"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = '/images/products/linen-set-1.jpg';
+          }}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 ease-out" 
         />
         <button 

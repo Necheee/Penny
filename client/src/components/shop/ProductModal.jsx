@@ -165,7 +165,15 @@ export default function ProductModal({ productId, closeModal }) {
                 onClick={() => setActiveImage(img)}
                 className={`relative aspect-[3/4] w-16 sm:w-20 shrink-0 overflow-hidden bg-brand-beige/20 border transition-all ${activeImage === img ? 'border-brand-charcoal opacity-100' : 'border-transparent opacity-50 hover:opacity-100'}`}
               >
-                <img src={img} alt={`${product.name} view ${idx + 1}`} className="w-full h-full object-cover" />
+                <img 
+                  src={img} 
+                  alt={`${product.name} view ${idx + 1}`} 
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = '/images/products/linen-set-1.jpg';
+                  }}
+                  className="w-full h-full object-cover" 
+                />
               </button>
             ))}
           </div>
@@ -174,8 +182,12 @@ export default function ProductModal({ productId, closeModal }) {
             <AnimatePresence mode="wait">
               <motion.img 
                 key={activeImage}
-                src={activeImage} 
+                src={activeImage || '/images/products/linen-set-1.jpg'} 
                 alt={product.name}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = '/images/products/linen-set-1.jpg';
+                }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
