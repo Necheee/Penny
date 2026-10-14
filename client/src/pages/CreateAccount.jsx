@@ -8,6 +8,8 @@ export default function CreateAccount() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const { user, createAccount } = useAuth();
   const navigate = useNavigate();
 
@@ -16,10 +18,20 @@ export default function CreateAccount() {
     return <Navigate to="/account" replace />;
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    createAccount({ firstName, lastName, email });
-    navigate('/account');
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setErrorMsg('');
+    try {
+      await createAccount({ firstName, lastName, email, password });
+      navigate('/account');
+    } catch (err) {
+      console.error('Account creation error:', err);
+      setErrorMsg('Failed to create account. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -59,11 +71,17 @@ export default function CreateAccount() {
           className="w-full border border-neutral-300 p-3 text-[13px] focus:outline-none focus:border-black"
         />
         
+        {errorMsg && (
+          <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-xs">
+            {errorMsg}
+          </p>
+        )}
         <button 
           type="submit"
-          className="w-full bg-black text-white px-8 py-3 text-[13px] font-medium hover:bg-neutral-800 transition-colors mt-6"
+          disabled={isSubmitting}
+          className="w-full bg-black text-white px-8 py-3 text-[13px] font-medium hover:bg-neutral-800 transition-colors mt-6 disabled:opacity-50 cursor-pointer"
         >
-          Create
+          {isSubmitting ? 'Creating Account...' : 'Create'}
         </button>
       </form>
       <div className="mt-8 text-center">

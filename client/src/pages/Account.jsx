@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Navigate, Link } from 'react-router-dom';
+import { useNavigate, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { 
   User, 
   ShoppingBag, 
@@ -18,14 +19,56 @@ import {
   Clock,
   RefreshCw,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Bell,
+  Printer,
+  Truck,
+  Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { printOrderReceipt } from '../utils/printReceipt';
 
 export default function Account() {
   const { user, logout, updateProfile, updateAddresses, deleteAccount } = useAuth();
+  const { markAllAsSeen, refreshNotifications } = useNotifications();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('profile');
+  const location = useLocation();
+
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const urlTab = new URLSearchParams(window.location.search).get('tab');
+      if (urlTab) return urlTab;
+      const saved = sessionStorage.getItem('penny_account_tab');
+      if (saved) return saved;
+    }
+    return 'profile';
+  });
+
+  // Listen to search param updates (e.g. clicking the navbar notification bell icon)
+  useEffect(() => {
+    const tabParam = new URLSearchParams(location.search).get('tab');
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
+
+  // Mark notifications seen when activeTab is notifications
+  useEffect(() => {
+    if (activeTab === 'notifications') {
+      markAllAsSeen?.();
+    }
+  }, [activeTab, markAllAsSeen]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('penny_account_tab', activeTab);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('tab') !== activeTab) {
+        url.searchParams.set('tab', activeTab);
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, [activeTab]);
 
   // Address Management State
   const [isAddingAddress, setIsAddingAddress] = useState(false);
@@ -53,6 +96,16 @@ export default function Account() {
     lastName: user?.lastName || '',
     phone: user?.phone || '',
   });
+
+  useEffect(() => {
+    if (user) {
+      setProfileForm({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        phone: user.phone || '',
+      });
+    }
+  }, [user?.firstName, user?.lastName, user?.phone]);
 
   // If not logged in, redirect
   if (!user) {
@@ -132,12 +185,18 @@ export default function Account() {
     }
 
     // Update in local accounts registry
+    const cleanEmail = (user.email || '').trim().toLowerCase();
     const savedAccounts = JSON.parse(localStorage.getItem('penny_registered_users') || '[]');
-    const idx = savedAccounts.findIndex(a => a.id === user.id || a.email === user.email);
+    const idx = savedAccounts.findIndex(a => 
+      (a.id && a.id === user.id) || 
+      (a.email && a.email.trim().toLowerCase() === cleanEmail)
+    );
     if (idx !== -1) {
       savedAccounts[idx].password = passwordForm.newPassword;
-      localStorage.setItem('penny_registered_users', JSON.stringify(savedAccounts));
+    } else {
+      savedAccounts.push({ ...user, password: passwordForm.newPassword });
     }
+    localStorage.setItem('penny_registered_users', JSON.stringify(savedAccounts));
 
     setPasswordFeedback({ type: 'success', text: 'Your password has been securely updated.' });
     setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -192,9 +251,13 @@ export default function Account() {
         return false;
       });
 
+      // Filter out deleted orders
+      const deletedIds = new Set(JSON.parse(localStorage.getItem('penny_deleted_order_ids') || '[]'));
+      const activeUserOrders = userOrders.filter(ord => !deletedIds.has(ord.id));
+
       // Sort newest first
-      userOrders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-      setOrders(userOrders);
+      activeUserOrders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setOrders(activeUserOrders);
     } catch (err) {
       console.error('Error loading order history:', err);
     } finally {
@@ -202,16 +265,100 @@ export default function Account() {
     }
   };
 
+  // Support inquiries submitted by this user
+  const [userInquiries, setUserInquiries] = useState([]);
+  const [isLoadingInquiries, setIsLoadingInquiries] = useState(false);
+
+  const [dismissedNotifications, setDismissedNotifications] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return JSON.parse(localStorage.getItem('penny_dismissed_notifications') || '[]');
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm(`Are you sure you want to delete order #${orderId} from your order history?`)) {
+      return;
+    }
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+
+    // Update localStorage penny_orders
+    const local = JSON.parse(localStorage.getItem('penny_orders') || '[]');
+    localStorage.setItem('penny_orders', JSON.stringify(local.filter(o => o.id !== orderId)));
+
+    // Track deleted order IDs
+    const deleted = JSON.parse(localStorage.getItem('penny_deleted_order_ids') || '[]');
+    if (!deleted.includes(orderId)) {
+      deleted.push(orderId);
+      localStorage.setItem('penny_deleted_order_ids', JSON.stringify(deleted));
+    }
+
+    refreshNotifications?.();
+    window.dispatchEvent(new Event('penny_notifications_updated'));
+
+    // Call backend API
+    try {
+      await fetch(`/api/payments/orders/${orderId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Backend order delete error:', e);
+    }
+  };
+
+  const handleDismissNotification = (orderId) => {
+    if (!window.confirm(`Clear notification for order #${orderId}?`)) return;
+    const updated = [...dismissedNotifications, orderId];
+    setDismissedNotifications(updated);
+    localStorage.setItem('penny_dismissed_notifications', JSON.stringify(updated));
+    refreshNotifications?.();
+    window.dispatchEvent(new Event('penny_notifications_updated'));
+  };
+
+  const handleDeleteInquiry = async (inquiryId) => {
+    if (!window.confirm(`Delete inquiry #${inquiryId}?`)) return;
+    setUserInquiries(prev => prev.filter(i => i.id !== inquiryId));
+    refreshNotifications?.();
+    window.dispatchEvent(new Event('penny_notifications_updated'));
+    try {
+      await fetch(`/api/contact/messages/${inquiryId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Backend inquiry delete error:', e);
+    }
+  };
+
+  const fetchUserInquiries = async () => {
+    if (!user?.email) return;
+    try {
+      setIsLoadingInquiries(true);
+      const res = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setUserInquiries(data.data);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch user inquiries:', err);
+    } finally {
+      setIsLoadingInquiries(false);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchUserOrders();
+      fetchUserInquiries();
     }
   }, [user?.email]);
 
   const navItems = [
     { id: 'profile', label: 'Personal Details', icon: User, desc: 'Name, email, contact phone' },
     { id: 'addresses', label: 'Saved Addresses', icon: MapPin, desc: 'Shipping & delivery destinations' },
-    { id: 'orders', label: 'Order History', icon: ShoppingBag, desc: 'Purchases, tracking & receipts' },
+    { id: 'orders', label: 'Order History', icon: ShoppingBag, desc: 'Purchases & itemized breakdown' },
+    { id: 'notifications', label: 'Order Notifications & Tracking', icon: Bell, desc: 'Real-time order confirmation & delivery status' },
     { id: 'security', label: 'Security & Password', icon: Lock, desc: 'Password and session security' },
   ];
 
@@ -753,13 +900,31 @@ export default function Account() {
                                 {ord.address ? `${ord.address}, ` : ''}{ord.city}, {ord.state}
                               </div>
 
-                              <div className="text-right sm:self-end">
-                                <span className="text-[10px] uppercase tracking-wider text-brand-charcoal/60 block">
-                                  Order Total
-                                </span>
-                                <span className="font-serif font-bold text-base text-brand-charcoal">
-                                  ₦ {Number(ord.total || 0).toLocaleString()}
-                                </span>
+                              <div className="flex items-center gap-2 sm:self-end">
+                                <button
+                                  type="button"
+                                  onClick={() => printOrderReceipt(ord)}
+                                  className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-charcoal hover:bg-brand-charcoal hover:text-white px-3 py-1.5 border border-brand-charcoal/20 rounded-xs transition-colors cursor-pointer"
+                                  title="Print or save official receipt"
+                                >
+                                  <Printer className="w-3.5 h-3.5" /> Print Receipt
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteOrder(ord.id)}
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400 hover:text-red-600 hover:bg-red-50 px-2.5 py-1.5 border border-neutral-200 hover:border-red-300 rounded-xs transition-colors cursor-pointer"
+                                  title="Delete order from history"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                                </button>
+                                <div className="text-right pl-2">
+                                  <span className="text-[10px] uppercase tracking-wider text-brand-charcoal/60 block">
+                                    Order Total
+                                  </span>
+                                  <span className="font-serif font-bold text-base text-brand-charcoal">
+                                    ₦ {Number(ord.total || 0).toLocaleString()}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -782,6 +947,323 @@ export default function Account() {
                     </Link>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* TAB 4: ORDER NOTIFICATIONS & LIVE TRACKING */}
+            {activeTab === 'notifications' && (
+              <div className="space-y-6 animate-in fade-in">
+                <div className="border-b border-brand-charcoal/10 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-brand-charcoal">
+                      Order Notifications & Delivery Tracking
+                    </h2>
+                    <p className="text-xs text-brand-charcoal/60 font-serif mt-0.5">
+                      Live status updates, payment confirmations, tailoring milestones, and delivery dispatch.
+                    </p>
+                  </div>
+                  <button
+                    onClick={fetchUserOrders}
+                    disabled={isLoadingOrders}
+                    className="self-start sm:self-auto inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-charcoal/70 hover:text-black py-1.5 px-3 border border-brand-charcoal/20 hover:border-black rounded-xs transition-colors"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isLoadingOrders ? 'animate-spin' : ''}`} />
+                    Sync Status
+                  </button>
+                </div>
+
+                {isLoadingOrders ? (
+                  <div className="py-16 text-center">
+                    <RefreshCw className="w-6 h-6 animate-spin text-brand-charcoal/40 mx-auto mb-3" />
+                    <p className="text-xs uppercase tracking-wider text-brand-charcoal/60 font-bold">
+                      Checking Real-Time Order Feeds...
+                    </p>
+                  </div>
+                ) : orders.filter(ord => !dismissedNotifications.includes(ord.id)).length > 0 ? (
+                  <div className="space-y-6">
+                    {orders.filter(ord => !dismissedNotifications.includes(ord.id)).map((ord) => {
+                      const isBankTransfer = ord.paymentMethod === 'bank_transfer';
+                      const isPaymentConfirmed = ord.paymentConfirmed || !isBankTransfer;
+                      const status = ord.status || (isPaymentConfirmed ? 'Processing' : 'Awaiting Payment');
+                      
+                      // Calculate active stage index: 0=Placed, 1=Paid, 2=Processing, 3=Shipped, 4=Delivered
+                      let activeStageIndex = 0;
+                      if (status === 'Delivered') activeStageIndex = 4;
+                      else if (status === 'Shipped') activeStageIndex = 3;
+                      else if (status === 'Processing') activeStageIndex = 2;
+                      else if (isPaymentConfirmed) activeStageIndex = 1;
+
+                      const stages = [
+                        { label: 'Order Placed', desc: 'Order received & logged' },
+                        { label: 'Payment Verified', desc: isPaymentConfirmed ? 'Transfer verified' : 'Awaiting confirmation' },
+                        { label: 'Processing & Packaging', desc: 'Inspection & packaging' },
+                        { label: 'Dispatched / In Transit', desc: 'Handed to courier' },
+                        { label: 'Delivered', desc: 'Delivered to recipient' },
+                      ];
+
+                      return (
+                        <div 
+                          key={ord.id} 
+                          className="border border-brand-charcoal/15 bg-white rounded-xs shadow-xs overflow-hidden"
+                        >
+                          {/* Notification Card Header */}
+                          <div className="p-5 bg-[#FAF9F6] border-b border-brand-charcoal/10 flex flex-wrap justify-between items-center gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <Bell className="w-4 h-4 text-brand-taupe" />
+                                <span className="font-mono font-bold text-sm text-brand-charcoal">
+                                  #{ord.id}
+                                </span>
+                                <span className="text-[11px] text-brand-charcoal/50 font-serif">
+                                  • {ord.createdAt ? new Date(ord.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-brand-charcoal/70 font-serif mt-0.5">
+                                Recipient: <strong>{ord.customer || user?.firstName}</strong> • Delivery: {ord.city || 'Lagos'}, {ord.state || 'Lagos'}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => printOrderReceipt(ord)}
+                                className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-charcoal bg-white hover:bg-brand-charcoal hover:text-white px-3 py-1.5 border border-brand-charcoal/20 rounded-xs transition-colors cursor-pointer"
+                              >
+                                <Printer className="w-3 h-3" /> Receipt
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDismissNotification(ord.id)}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400 hover:text-red-600 bg-white hover:bg-red-50 px-2.5 py-1.5 border border-neutral-200 hover:border-red-300 rounded-xs transition-colors cursor-pointer"
+                                title="Delete this order notification"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                              </button>
+                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-xs inline-flex items-center gap-1.5 border ${
+                                status === 'Delivered' 
+                                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300' 
+                                  : status === 'Shipped' 
+                                  ? 'bg-blue-50 text-blue-900 border-blue-300'
+                                  : status === 'Processing'
+                                  ? 'bg-neutral-900 text-white border-neutral-900'
+                                  : 'bg-amber-50 text-amber-900 border-amber-300'
+                              }`}>
+                                {status === 'Delivered' && <Check className="w-3 h-3 text-emerald-600" />}
+                                {status === 'Shipped' && <Truck className="w-3 h-3 text-blue-600" />}
+                                {status === 'Processing' && <Package className="w-3 h-3 text-white" />}
+                                {status === 'Awaiting Payment' && <Clock className="w-3 h-3 text-amber-600" />}
+                                {status}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* 5-Stage Interactive Progress Bar */}
+                          <div className="p-6 border-b border-brand-charcoal/10">
+                            <div className="relative">
+                              {/* Horizontal track line for desktop */}
+                              <div className="hidden md:block absolute top-4 left-6 right-6 h-0.5 bg-neutral-200 -z-0" />
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative z-10">
+                                {stages.map((stage, sIdx) => {
+                                  const isComplete = sIdx <= activeStageIndex;
+                                  const isCurrent = sIdx === activeStageIndex;
+
+                                  return (
+                                    <div key={sIdx} className="flex md:flex-col items-center md:text-center gap-3 md:gap-2">
+                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
+                                        isComplete 
+                                          ? 'bg-brand-charcoal text-white shadow-xs' 
+                                          : 'bg-neutral-100 text-neutral-400 border border-neutral-300'
+                                      } ${isCurrent ? 'ring-2 ring-brand-charcoal ring-offset-2' : ''}`}>
+                                        {isComplete ? <Check className="w-4 h-4" /> : (sIdx + 1)}
+                                      </div>
+                                      <div>
+                                        <p className={`text-xs font-bold uppercase tracking-wider ${
+                                          isComplete ? 'text-brand-charcoal' : 'text-neutral-400'
+                                        }`}>
+                                          {stage.label}
+                                        </p>
+                                        <p className="text-[10px] text-brand-charcoal/60 font-serif">
+                                          {stage.desc}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Live Alert Status Message */}
+                          <div className="p-5 space-y-3">
+                            {status === 'Delivered' && (
+                              <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs rounded-xs font-serif">
+                                <strong className="font-sans font-bold uppercase tracking-wider block text-[10px] text-emerald-950 mb-0.5">
+                                  Package Successfully Delivered
+                                </strong>
+                                Your order has been delivered to <strong>{ord.address || ord.city}</strong>. We hope your PENNY pieces elevate your wardrobe. For any exchange requests, feel free to contact PENNY support.
+                              </div>
+                            )}
+
+                            {status === 'Shipped' && (
+                              <div className="p-3.5 bg-blue-50 border border-blue-200 text-blue-900 text-xs rounded-xs font-serif">
+                                <strong className="font-sans font-bold uppercase tracking-wider block text-[10px] text-blue-950 mb-0.5">
+                                  Package In Transit
+                                </strong>
+                                Your order has been dispatched from our store and handed to our logistics partner. Standard Lagos deliveries arrive within 1 to 3 business days.
+                              </div>
+                            )}
+
+                            {status === 'Processing' && (
+                              <div className="p-3.5 bg-neutral-50 border border-neutral-200 text-neutral-800 text-xs rounded-xs font-serif">
+                                <strong className="font-sans font-bold uppercase tracking-wider block text-[10px] text-neutral-900 mb-0.5">
+                                  Order Confirmed & Quality Check
+                                </strong>
+                                Payment has been verified. Our team is currently inspecting, steaming, and packaging your items with complimentary garment bags.
+                              </div>
+                            )}
+
+                            {status === 'Awaiting Payment' && (
+                              <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xs font-serif">
+                                <strong className="font-sans font-bold uppercase tracking-wider block text-[10px] text-amber-950 mb-0.5">
+                                  Direct Bank Transfer Verification
+                                </strong>
+                                Order placed successfully. Please ensure your bank transfer has been made using reference <strong>#{ord.id}</strong>. Once our accounting team confirms credit, fulfillment commences immediately and you will receive an updated status here.
+                              </div>
+                            )}
+
+                            {/* Ordered Items Preview */}
+                            <div className="pt-2 flex flex-wrap items-center justify-between gap-4 text-xs">
+                              <span className="text-neutral-500 font-serif">
+                                Package Contents: <strong>{ord.items?.length || ord.itemsCount || 1}</strong> piece(s) • Total Paid: <strong className="font-sans text-brand-charcoal">₦ {Number(ord.total || 0).toLocaleString()}</strong>
+                              </span>
+                              <Link
+                                to="/contact"
+                                className="text-xs text-brand-charcoal font-bold uppercase tracking-wider hover:underline"
+                              >
+                                Need Help? Contact Support &rarr;
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-16 border border-dashed border-neutral-300 p-8 rounded-xs bg-white">
+                    <Bell className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-brand-charcoal">No Order Notifications</h3>
+                    <p className="text-xs text-brand-charcoal/60 font-serif mt-1 max-w-sm mx-auto mb-6">
+                      When you place an order, live delivery tracking and confirmation milestones will be updated here in real-time.
+                    </p>
+                    <Link
+                      to="/shop"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-[0.15em] hover:bg-black transition-colors rounded-xs"
+                    >
+                      Explore Catalogue <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                )}
+
+                {/* Customer Inquiries & PENNY Responses Section */}
+                <div className="mt-12 pt-8 border-t border-brand-charcoal/15">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-brand-charcoal flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-brand-taupe" /> Customer Inquiries & PENNY Responses
+                      </h3>
+                      <p className="text-[11px] text-brand-charcoal/60 font-serif mt-0.5">
+                        Inquiries submitted through the Contact page and official responses from PENNY.
+                      </p>
+                    </div>
+                    <Link
+                      to="/contact"
+                      className="self-start sm:self-auto text-[11px] font-bold uppercase tracking-wider text-brand-charcoal border border-brand-charcoal/20 hover:border-black px-3 py-1.5 rounded-xs transition-colors"
+                    >
+                      New Inquiry &rarr;
+                    </Link>
+                  </div>
+
+                  {isLoadingInquiries ? (
+                    <div className="py-8 text-center text-xs text-neutral-400">
+                      <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-2 text-neutral-400" />
+                      Loading messages...
+                    </div>
+                  ) : userInquiries.length > 0 ? (
+                    <div className="space-y-4">
+                      {userInquiries.map((inq) => (
+                        <div key={inq.id} className="border border-brand-charcoal/15 bg-white rounded-xs p-5 shadow-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-brand-charcoal/10 pb-3 mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-xs text-brand-charcoal">#{inq.id}</span>
+                              <span className="text-[11px] text-neutral-400 font-serif">
+                                • {new Date(inq.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {inq.orderNumber && (
+                                <span className="text-[10px] font-mono font-bold bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded-xs border border-neutral-200">
+                                  Order: #{inq.orderNumber}
+                                </span>
+                              )}
+                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-xs border ${
+                                inq.status === 'replied' 
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                  : 'bg-amber-50 text-amber-800 border-amber-200'
+                              }`}>
+                                {inq.status === 'replied' ? '✓ Replied by Store' : 'Awaiting Response'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteInquiry(inq.id)}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-neutral-400 hover:text-red-600 hover:bg-red-50 px-2 py-0.5 border border-neutral-200 hover:border-red-300 rounded-xs transition-colors cursor-pointer"
+                                title="Delete inquiry record"
+                              >
+                                <Trash2 className="w-3 h-3" /> Delete
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Customer's original inquiry */}
+                          <div className="text-xs text-neutral-600 mb-3 bg-[#FAF9F6] p-3 rounded-xs border border-brand-charcoal/10">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">
+                              Your Inquiry:
+                            </span>
+                            <p className="font-serif leading-relaxed text-[12px]">{inq.message}</p>
+                          </div>
+
+                          {/* Admin response */}
+                          {inq.reply ? (
+                            <div className="bg-emerald-50/70 border border-emerald-200 p-4 rounded-xs text-xs">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                                  <Check className="w-3.5 h-3.5 text-emerald-700" /> PENNY Response (from Admin)
+                                </span>
+                                <span className="text-[10px] text-neutral-400 font-mono">
+                                  {inq.repliedAt ? new Date(inq.repliedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                                </span>
+                              </div>
+                              <p className="text-emerald-950 font-serif text-[13px] leading-relaxed mt-2 whitespace-pre-wrap">
+                                {inq.reply}
+                              </p>
+                              <p className="text-[10px] text-neutral-400 mt-3 pt-2 border-t border-emerald-200/50">
+                                This message was also dispatched to your email address ({inq.email}).
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-amber-800 italic font-serif">
+                              Inquiry logged. Our team responds to client emails within 24 hours.
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-6 bg-brand-offwhite/50 border border-brand-charcoal/10 rounded-xs text-center text-xs text-brand-charcoal/60">
+                      <p className="font-serif">You have no active inquiries. Need sizing advice or order updates? Contact PENNY support anytime.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

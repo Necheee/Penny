@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const { user, login } = useAuth();
   const navigate = useNavigate();
 
@@ -13,10 +15,20 @@ export default function SignIn() {
     return <Navigate to="/account" replace />;
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    login(email, password);
-    navigate('/account');
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setErrorMsg('');
+    try {
+      await login(email, password);
+      navigate('/account');
+    } catch (err) {
+      console.error('Sign-in error:', err);
+      setErrorMsg('Unable to sign in. Please check your credentials and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -44,11 +56,17 @@ export default function SignIn() {
             Forgot your password?
           </Link>
         </div>
+        {errorMsg && (
+          <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-xs">
+            {errorMsg}
+          </p>
+        )}
         <button 
           type="submit"
-          className="w-full bg-black text-white px-8 py-3 text-[13px] font-medium hover:bg-neutral-800 transition-colors"
+          disabled={isSubmitting}
+          className="w-full bg-black text-white px-8 py-3 text-[13px] font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 cursor-pointer"
         >
-          Sign In
+          {isSubmitting ? 'Signing In...' : 'Sign In'}
         </button>
       </form>
       <div className="mt-8 text-center">
