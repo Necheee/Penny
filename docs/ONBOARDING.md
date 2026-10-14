@@ -1,105 +1,190 @@
-# Developer Onboarding Guide
+# PENNY — Developer & User Onboarding Guide
 
-Welcome to PENNY! This guide will help you get familiar with the project, set it up locally, and understand how to start contributing.
+Welcome to **PENNY**, a minimalist men's capsule wardrobe e-commerce platform built with React 19, Vite, Tailwind CSS v4, Node.js, Express, Neon Cloud PostgreSQL, and Nodemailer.
 
-## 1. Project Overview
+This guide provides everything you need to start, test, and understand the platform in minutes.
 
-PENNY is a minimal men's capsule wardrobe e-commerce platform. The project features a complete storefront and administrative dashboard, currently backed by a client-side reactive state engine (`ProductContext` + `localStorage`). Full-stack backend integration with PostgreSQL, Prisma, and Cloudinary is underway in Phase 12.
+---
 
-**Current Development Status:**
-- **Storefront (Phases 1–10):** Fully implemented with responsive product catalogues, filtering, bag drawer, size guides, and checkout flows.
-- **Admin Dashboard (Phase 11):** Fully implemented at `/admin` with live state synchronization, drag-and-drop image uploader, category manager, size guide editor, and order fulfillment drawer.
-- **Backend & Database (Phase 12 — Current Target):** Node.js/Express REST API, PostgreSQL database with Prisma ORM, and Cloudinary media storage.
-
-## 2. Technology Stack
-
-### Frontend:
-- **Framework:** [React 19](https://react.dev/)
-- **Build Tool:** [Vite](https://vitejs.dev/)
-- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
-- **Routing:** [React Router DOM](https://reactrouter.com/)
-- **Animations:** [Framer Motion](https://www.framer.com/motion/)
-- **Icons:** [Lucide React](https://lucide.dev/)
-- **State Management:** React Context API with LocalStorage caching
-- **Linting:** [oxlint](https://oxc-project.github.io/docs/guide/usage/linter.html)
-
-### Backend & Database (Phase 12+):
-- **Server Runtime:** [Node.js](https://nodejs.org/) & [Express.js](https://expressjs.com/)
-- **Database:** [PostgreSQL](https://www.postgresql.org/) (hosted on Neon or Render)
-- **ORM:** [Prisma](https://www.prisma.io/) (type-safe relational modeling & migrations)
-- **Media CDN:** [Cloudinary](https://cloudinary.com/) (automated image optimization & responsive delivery)
-- **Authentication:** JWT (JSON Web Tokens), HTTP-Only Cookies, and `bcryptjs` password hashing
-- **Security:** Helmet headers, CORS policies, and strictly private single-owner administrative access
-
-## 3. Getting Started
+## 1. Quick Start (Get Running in 3 Steps)
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or higher recommended)
-- `npm` (comes with Node.js)
+- **Node.js** (v18 or higher recommended)
+- **npm** (included with Node.js)
 
-### Setup & Run
-1. Clone the repository and navigate to the `client` directory:
+### Step 1: Install Dependencies
+Open two terminal windows (one for the server, one for the client).
+
+```bash
+# Terminal 1: Backend
+cd server
+npm install
+
+# Terminal 2: Frontend
+cd client
+npm install
+```
+
+### Step 2: Configure Environment Variables
+Inside `server/`, create or check `.env` (you can copy from `server/.env.example`):
+
+```bash
+PORT=5000
+CLIENT_URL=http://localhost:5173
+ADMIN_EMAIL=owner@penny.com
+ADMIN_PASSWORD=your_secure_password_here
+ADMIN_NAME="PENNY Owner"
+```
+*(If no external PostgreSQL `DATABASE_URL` or Gmail credentials are provided, PENNY automatically uses persistent local JSON storage and Ethereal test inbox preview links).*
+
+### Step 3: Start Development Servers
+```bash
+# In Terminal 1 (Backend):
+cd server
+npm run dev
+# Running on http://localhost:5000
+
+# In Terminal 2 (Frontend):
+cd client
+npm run dev
+# Running on http://localhost:5173
+```
+
+Open your browser to `http://localhost:5173` to explore the storefront!
+
+---
+
+## 2. Default Access & Accounts
+
+| Role | URL | Email | Password | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Storefront Customer** | `/account/login` | *Register any email* | *Your password* | Full cart, wishlist, orders, and real-time notifications |
+| **Store Administrator** | `/admin/login` | `owner@penny.com` | Set in `server/.env` | Single-owner secured management dashboard |
+
+---
+
+## 3. Key Features & How to Test Them
+
+### A. Storefront & Shopping Flow
+1. Browse products on `/shop`.
+2. Filter by category or search instantly using the search icon (`SearchModal`).
+3. Click any product to view garment details or click **Size Guide** to view the live measurement chart.
+4. Add items to bag and open the sliding cart drawer (`CartDrawer`).
+5. Proceed to **Checkout** (`/checkout`).
+
+### B. Order Placement & Bank Transfer
+1. At checkout, fill in the shipping address and select **Direct Bank Transfer**.
+2. Click **Complete Order**. You will receive an official **Order Number** (e.g. `#PNY-892140`).
+3. The order details, bank account narration, and transfer instructions will display on screen.
+4. Click **Print Official Receipt** to open the branded printable receipt featuring the PENNY logo.
+
+### C. Real-Time Navbar Notifications & Red Dot
+1. Look at the top navigation bar: notice the **Bell notification icon**.
+2. Whenever an order is placed, or when the store admin updates the order's status (e.g., from *Awaiting Payment* to *Processing*, *Shipped*, or *Delivered*), a **pulsing red dot** lights up on the navbar bell icon.
+3. Clicking the bell icon takes the customer directly to **Order Notifications & Tracking** (`/account?tab=notifications`).
+4. Viewing the notifications automatically marks them as seen, clearing the red dot.
+5. Customers can also **Dismiss / Delete** individual notifications or order records from their history.
+
+### D. Admin Dashboard (`/admin`)
+Log in at `/admin/login` with your admin credentials to access:
+- **Overview:** High-level metrics (revenue, total orders, catalogue size, active clients) and recent transactions.
+- **Catalogue & Inventory:** Add new products, edit descriptions, adjust pricing, and upload images.
+- **Categories Manager:** Add or delete garment categories. Changes persist across page reloads and instantly sync with the storefront navigation.
+- **Announcement Bar Editor:** Edit the top announcement banner text and link in real time.
+- **Size Guide Editor:** Edit sizing headings, garment descriptions, and measurement tables.
+- **Bank Transfer Settings:** Customize the store's bank name, account number, and beneficiary name for customer transfers.
+- **Order Fulfillment:**
+  - Inspect any customer order.
+  - Confirm received bank transfers with one click.
+  - Update delivery status (*Processing*, *Shipped*, *Delivered*).
+  - Print packing slips / official receipts.
+  - **Preview Email Receipt:** Admins can preview the branded digital receipt email sent to the customer before or after confirming payment.
+- **Messages & Inquiries:**
+  - Review messages submitted via the storefront **Contact Us** page.
+  - Click **Reply via Email** to compose a response.
+  - Switch to **Live Email Preview** to see the branded email layout before dispatching.
+  - Access live **Ethereal Inbox** links to view sent emails in a browser.
+
+### E. Customer Support Contact Flow
+1. Visit `/contact` on the storefront.
+2. Fill out the contact form with an inquiry (and optional order number).
+3. The inquiry is delivered instantly to the admin dashboard (`/admin?tab=messages`).
+4. The admin replies; an email is dispatched to the customer, and the reply appears in the customer's account portal (`/account?tab=inquiries`).
+
+---
+
+## 4. Mobile & Remote Testing with ngrok
+
+To test the application on a mobile phone or share it with reviewers outside your local WiFi:
+
+1. **Tunnel the Frontend:**
    ```bash
-   cd client
+   ngrok http 5173
    ```
-2. Install the dependencies:
+   Copy the generated URL (e.g. `https://your-frontend.ngrok-free.dev`).
+
+2. **Tunnel the Backend:**
    ```bash
-   npm install
+   ngrok http 5000
    ```
-3. Start the development server:
-   ```bash
-   npm run dev
+   Copy the generated URL (e.g. `https://your-backend.ngrok-free.dev`).
+
+3. **Update Frontend API Target:**
+   In `client/vite.config.js`, set the proxy target to your backend ngrok URL:
+   ```javascript
+   server: {
+     proxy: {
+       '/api': {
+         target: 'https://your-backend.ngrok-free.dev',
+         changeOrigin: true,
+       }
+     }
+   }
    ```
-4. Open your browser and navigate to `http://localhost:5173`.
+   Now open your frontend ngrok URL on any mobile device or tablet!
 
-*Note: No environment variables or additional configuration are required to run the application currently.*
+---
 
-## 4. Project Structure
+## 5. Project Directory Structure
 
-All application code is located in the `client/` directory. Here is the breakdown:
+```text
+Penny/
+├── client/                     # Frontend (React 19 + Vite + Tailwind CSS)
+│   ├── public/                 # Static assets (logo.png, etc.)
+│   └── src/
+│       ├── components/
+│       │   ├── admin/          # AdminLayout, AdminProtectedRoute
+│       │   ├── cart/           # CartDrawer
+│       │   ├── layout/         # Header (with Notification Bell), Footer, AnnouncementBar
+│       │   └── shop/           # ProductCard, SearchModal, SizeGuideModal
+│       ├── context/            # AuthContext, CartContext, ProductContext, WishlistContext, NotificationContext
+│       ├── pages/              # Home, Shop, Account, Checkout, Contact, AdminDashboard, AdminLogin, etc.
+│       └── utils/              # printReceipt.js, emailPreviewGenerator.js
+│
+├── server/                     # Backend (Node.js + Express REST API)
+│   ├── src/
+│   │   ├── data/storage/       # Persistent JSON fallbacks (orders.json, inquiries.json, users.json, etc.)
+│   │   ├── routes/             # auth.js, categories.js, payments.js, contact.js
+│   │   └── utils/              # cloudDb.js (Neon PostgreSQL), persistentStorage.js, receiptEmail.js
+│   ├── .env                    # Active server environment variables
+│   └── .env.example            # Example configuration template
+│
+└── docs/                       # Project documentation
+    ├── IMPLEMENTATION_PHASES.md# Detailed project development roadmap
+    └── ONBOARDING.md           # This onboarding guide
+```
 
-- `client/public/`: Static assets (e.g., product images).
-- `client/src/`: Main source code.
-  - `assets/`: Global CSS and other assets.
-  - `components/`: Reusable React components, organized by domain:
-    - `admin/`: Administrative components (AdminLayout, Sidebar, Navigation).
-    - `cart/`: Cart-related components (CartDrawer, etc.).
-    - `layout/`: Main storefront layout components (Navbar, Footer, etc.).
-    - `shop/`: Shop-related components (ProductCard, SearchModal, ProductModal, SizeGuideModal).
-    - `ui/`: Generic, reusable UI elements (Buttons, Inputs, etc.).
-  - `context/`: React Context providers for global state (CartContext, WishlistContext, AuthContext, ModalContext).
-  - `data/`: Mock data used by the simulated API (`mockCatalogue.js`).
-  - `hooks/`: Custom React hooks.
-  - `pages/`: Page-level components corresponding to routes (Home, Shop, Product Details, Checkout, etc.).
-  - `services/`: Simulated API service (`api.js`) that handles asynchronous data fetching.
-  - `utils/`: Helper functions.
+---
 
-## 5. How the Project Works
+## 6. Common Troubleshooting
 
-- **State Management:** The application uses React Context to manage global state. For example, `CartContext` handles adding/removing items from the cart, while `AuthContext` manages the simulated user login state.
-- **Data Flow:** When a component needs data (like the shop page fetching products), it calls a function from `services/api.js`. Currently, `api.js` returns data from `data/mockCatalogue.js` after a simulated delay to mimic a real network request.
-- **Navigation:** `react-router-dom` is used for client-side routing. The main routes are defined in the root component, rendering the appropriate page component.
+- **Categories or products disappear on page refresh?**  
+  Make sure the backend server (`server/`) is running on port 5000. The frontend communicates with the backend to persist all product and category modifications.
+- **Where are test emails sent?**  
+  If you have not set Gmail or custom SMTP in `server/.env`, PENNY uses **Ethereal Mail**. When an email or reply is dispatched, look at the terminal output or the Admin Dashboard for a link starting with `https://ethereal.email/message/...` to view the exact rendered email online.
+- **Port 5000 or 5173 is already in use?**  
+  Close any other running node processes, or edit `PORT` in `server/.env` and adjust the proxy in `client/vite.config.js`.
 
-## 6. Development Guide
+---
 
-- **Adding a Component:** Create new components in the appropriate subfolder inside `client/src/components/`. If it's a generic UI element, put it in `ui/`.
-- **Styling:** Use Tailwind CSS utility classes directly in your JSX. Avoid writing custom CSS unless absolutely necessary.
-- **Linting:** Run `npm run lint` inside the `client` directory to check for code style issues using `oxlint`. Fix any warnings before committing.
-- **Committing:** Keep commits small and focused. Use descriptive commit messages.
-
-## 7. Troubleshooting
-
-- **Server won't start:** Ensure you are inside the `client` directory when running `npm run dev`.
-- **Changes not reflecting:** Vite's Hot Module Replacement (HMR) is usually fast, but if it gets stuck, restart the development server.
-- **Package installation errors:** Try clearing your npm cache (`npm cache clean --force`) or deleting `node_modules` and `package-lock.json` and running `npm install` again.
-
-## 8. Quick Checklist
-
-Before you start your first task, make sure you can answer 'Yes' to these questions:
-- [ ] Have I navigated into the `client` folder?
-- [ ] Have I run `npm install` without errors?
-- [ ] Can I start the development server with `npm run dev`?
-- [ ] Does the application load successfully at `http://localhost:5173`?
-
-You are now ready to contribute to PENNY!
-
+You are now fully set up to develop, test, or demonstrate the PENNY capsule platform!

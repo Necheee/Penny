@@ -7,22 +7,22 @@ This document outlines the structured development phases for **PENNY**, covering
 ## High-Level Phase Overview
 
 ```
-[Phases 1-10: Frontend Storefront]       --> COMPLETED
+[Phases 1-10: Frontend Storefront]                  --> COMPLETED
                  │
                  ▼
-[Phase 11: Admin Dashboard UI & Workflows] --> COMPLETED
+[Phase 11: Admin Dashboard UI & Workflows]            --> COMPLETED
                  │
                  ▼
-[Phase 12: Backend Server & Database Setup] --> CURRENT TARGET
+[Phase 12: Backend Server & Neon Cloud PostgreSQL]    --> COMPLETED
                  │
                  ▼
-[Phase 13: Full-Stack Integration & Cloud Media]
+[Phase 13: Full-Stack Integration & Persistent Sync]  --> COMPLETED
                  │
                  ▼
-[Phase 14: Payment Gateway & Transactional Emails]
+[Phase 14: Payment Workflows & Transactional Emails]  --> COMPLETED
                  │
                  ▼
-[Phase 15: Production Deployment & Optimization]
+[Phase 15: Production Deployment & SEO (Live Launch)] --> CURRENT TARGET
                  │
                  ▼
 [Phase 16: Academic Defense & Documentation (FYP)]
@@ -145,48 +145,51 @@ The objective of Phase 12 is to establish the secure production server runtime, 
   - `Order` & `OrderItem`: Customer contact, shipping address, fulfillment status history, line item pricing, and totals.
 - **Task 12.2.3:** Execute initial database migration to generate tables.
 - **Task 12.2.4:** Seed the database with PENNY’s complete 20+ piece ready-to-wear catalogue and default CM size guides.
+- **Task 12.2.5 [COMPLETED]:** Connect live **Neon Serverless PostgreSQL** database for cross-device synchronization and auto-provisioning (`users`, `orders`, and `bank_config` tables).
 
 ---
 
-## Phase 13: Full-Stack Integration & Cloud Media Storage
+## Phase 13: Full-Stack Integration & Cloud Media Storage (Completed)
 
-The objective of Phase 13 is to connect the React storefront and Admin dashboard to the live server API and integrate high-performance cloud media management.
+The objective of Phase 13 is to connect the React storefront and Admin dashboard to the live server API, cloud database, and multi-device persistent storage.
 
-### Confirmed Architectural Decisions:
-- **Cloud Media Provider:** **Cloudinary** (automated web format conversion, responsive image compression, high-availability CDN delivery).
-- **Single-Source Image Reflection:** Product images uploaded via the Admin dashboard upload directly to Cloudinary and store the CDN URL in the PostgreSQL database. This URL automatically feeds the Shop collection, Product modal, and the Homepage **"Featured Essentials"** grid without manual code edits.
-
-### Phase 13.1: Cloud Media Upload Service (Cloudinary)
-- **Task 13.1.1:** Configure Cloudinary SDK and credentials (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`).
-- **Task 13.1.2:** Build secure server upload endpoint (`POST /api/admin/media/upload`) using `multer` memory storage streaming directly to Cloudinary.
-- **Task 13.1.3:** Connect Admin Product Modal file dropzone to the upload endpoint, displaying Cloudinary CDN URLs and thumbnails in real time.
-- **Task 13.1.4:** Configure delivery transformation parameters (e.g. `f_auto`, `q_auto`, responsive widths) for fast image loading.
-
-### Phase 13.2: API Service Layer Refactoring (Storefront & Admin)
-- **Task 13.2.1:** Refactor `client/src/services/api.js` to replace mock delay functions with live `fetch`/`axios` calls to the Express API.
-- **Task 13.2.2:** Implement React error boundaries, loading skeletons, and fallback states.
-- **Task 13.2.3:** Connect Storefront filters, categories, search, and product modal to database endpoints.
-- **Task 13.2.4:** Implement protected `/admin/login` page with automatic redirection for unauthenticated visitors and secure session logout.
-
+### Completed Architectural Implementations:
+- **Neon Cloud Database (`cloudDb.js`):** Connection pooling integration directly syncing orders, user accounts, and bank details across all devices.
+- **Multi-Device Persistent Storage Fallback:** Server-side atomic JSON persistence (`orders.json`, `products.json`, `categories.json`, `bankDetails.json`, `users.json`) ensures no data loss upon refresh or server restart.
+- **Customer Portal & Session Hydration:**
+  - Synchronous session hydration in `AuthContext.jsx` preventing accidental redirects or header name reverts to "Login" upon page refresh.
+  - Multi-tiered user registry: synchronizes custom customer profile edits (first name, last name, phone, addresses) between browser localStorage (`penny_registered_users`), local file storage (`users.json`), and Neon Cloud PostgreSQL (`users` table).
+  - Asynchronous form submission in `SignIn.jsx` and `CreateAccount.jsx` with loading states to eliminate navigation race conditions.
+  - Interactive **Order History** tab with real-time status tracking, item thumbnails, size/color breakdown, and delivery addresses.
+  - Multi-address management book (add, set default, delete).
+  - Password management and permanent **Account Deletion** (Danger Zone).
+  - Route protection guards locking `/account/login` and `/account/register` when authenticated.
+- **Shopping Cart & Wishlist Persistence:**
+  - Synchronous lazy hydration for `CartContext.jsx` (`penny_cart`) and `WishlistContext.jsx` (`penny_wishlist`) ensuring bag contents and saved items survive browser refresh, navigation, and logout/login cycles until explicitly cleared upon checkout completion.
 
 ---
 
-## Phase 14: Payment Gateway & Transactional Email Systems
+## Phase 14: Payment Workflows & Transactional Email Systems (Completed)
 
-The objective of Phase 14 is to automate end-to-end purchasing and communications.
+The objective of Phase 14 was to automate purchasing, payment identification, and communications.
 
-### Phase 14.1: Paystack Payment Gateway Integration
+### Phase 14.1: Direct Bank Transfer & Payment Identification (Completed)
+- **Primary Payment Method:** Direct Bank Transfer configured as the primary active payment option (Paystack deactivated temporarily per store requirements).
+- **Dynamic Bank Details Management:** Built dedicated **"Bank & Payments"** tab in Admin Dashboard allowing the single-owner admin to update bank name, account name, account number, and payment narration instructions.
+- **Payer Discrepancy Identification:** Added `transferAccountName` field to Checkout Step 3, linking the payer's bank account name with the order in Admin Dashboard to resolve name discrepancies.
 
-- **Task 14.1.1:** Configure Paystack API keys (Test Mode).
-- **Task 14.1.2:** Trigger Paystack inline checkout popup during checkout Step 3.
-- **Task 14.1.3:** Build secure server webhook (`/api/payments/webhook`) listening to `charge.success` to verify real payments.
-- **Task 14.1.4:** Update order status to _Paid_ and decrement inventory automatically upon successful payment.
+### Phase 14.2: Transactional Email Notifications (Completed)
+- **Nodemailer Integration (`receiptEmail.js`):** Fully configured transactional notification engine for automated receipt generation.
+- **Admin Payment Confirmation Trigger:** Dispatches an official, branded luxury digital purchase receipt to the customer's email as soon as the store admin confirms bank transfer receipt in `/admin`.
+- **Ethereal & Production SMTP Support:** Automated instant test preview URLs + production support for Gmail App Passwords and custom SMTP (Resend/SendGrid).
 
-### Phase 14.2: Transactional Email Notifications
-
-- **Task 14.2.1:** Connect email service provider (Resend, SendGrid, or Nodemailer).
-- **Task 14.2.2:** Create and send automatic Order Confirmation emails with receipt breakdowns.
-- **Task 14.2.3:** Send Shipping / Tracking Notification emails when an order is dispatched in the admin dashboard.
+### Phase 14.3: Real-Time Order Tracking & Communication (Completed)
+- **Navbar Notification Bell & Red Dot:** Stores real-time tracking milestones with a pulsing red dot badge on the navbar for newly received order updates and support replies.
+- **Order Notifications & Delivery Tracking Tab:** Real-time 5-stage progress indicator (Placed, Paid, Processing, Shipped, Delivered) on the user's account dashboard with clear/delete options.
+- **Contact Us & Customer Support Inquiries:** Front-end Contact Us form sends notifications directly to the admin dashboard; admin can reply directly via email, and customer receives both an email and an in-app response card.
+- **Admin Email Preview Modal:** Live in-dashboard preview for customer receipts and inquiry responses before and after dispatching.
+- **Official Logo on Receipts:** Official PENNY logo embedded in print utility and digital receipt layouts.
+- **Storefront Persistence & Live Customization:** Dynamic Announcement Bar editor, Size Guide editor, Category Manager, and Bank Details manager all synchronize across client and admin in real time and persist on page reload.
 
 ---
 
