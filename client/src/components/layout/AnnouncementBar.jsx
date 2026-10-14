@@ -1,22 +1,25 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const messages = [
-  "Enjoy free shipping on orders above ₦200,000",
-  "Lagos delivery in 1 to 3 days",
-  "Pieces designed to work perfectly together"
-];
+import { useProducts } from '../../context/ProductContext';
 
 export default function AnnouncementBar() {
+  const { announcements = [] } = useProducts();
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  const messages = announcements.length > 0 ? announcements : [
+    "Enjoy free shipping on orders above ₦200,000",
+    "Lagos delivery in 1 to 3 days",
+    "Pieces designed to work perfectly together"
+  ];
+
   useEffect(() => {
+    if (messages.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % messages.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, [currentIndex]); // Reset timer when manually changed
+  }, [currentIndex, messages.length]); // Reset timer when manually changed
 
   const next = () => setCurrentIndex((prev) => (prev + 1) % messages.length);
   const prev = () => setCurrentIndex((prev) => (prev - 1 + messages.length) % messages.length);

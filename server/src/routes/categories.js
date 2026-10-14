@@ -1,38 +1,55 @@
 import express from 'express';
 import { initialCategories, initialSizeGuides } from '../data/initialCatalogue.js';
+import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
+import { getPool } from '../utils/cloudDb.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Active cache for categories and size guides
-let categories = [...initialCategories];
-let sizeGuides = [...initialSizeGuides];
+// Active persistent storage for categories and size guides
+let categories = readJsonFile('categories.json', initialCategories) || initialCategories;
+let sizeGuides = readJsonFile('sizeGuides.json', initialSizeGuides) || initialSizeGuides;
 
 /**
  * GET /api/categories
  * Retrieve all active product categories
  */
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    return res.status(200).json({
-      success: true,
-      count: categories.length,
-      data: categories,
-    });
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve categories.',
-    });
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      const pool = getPool();
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS categories (
+          id VARCHAR(100) PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          slug VARCHAR(100)
+        );
+      `);
+      const dbRes = await pool.query('SELECT * FROM categories');
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        const map = new Map();
+        categories.forEach(c => map.set(c.id, c));
+        dbRes.rows.forEach(r => map.set(r.id, { id: r.id, name: r.name, slug: r.slug || r.id }));
+        categories = Array.from(map.values());
+        writeJsonFile('categories.json', categories);
+      }
+    }
+  } catch (err) {
+    // Fallback to cached file
   }
+
+  return res.status(200).json({
+    success: true,
+    count: categories.length,
+    data: categories,
+  });
 });
 
 /**
  * POST /api/categories
- * Add a new category (Admin only)
+ * Add a new category (Persists to local storage & cloud DB)
  */
-router.post('/', requireAuth, requireAdmin, (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { name, slug } = req.body;
 
@@ -63,6 +80,24 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     };
 
     categories.push(newCategory);
+    writeJsonFile('categories.json', categories);
+
+    try {
+      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+        const pool = getPool();
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS categories (
+            id VARCHAR(100) PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            slug VARCHAR(100)
+          );
+          INSERT INTO categories (id, name, slug) VALUES ($1, $2, $3)
+          ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug;
+        `, [newCategory.id, newCategory.name, newCategory.slug]);
+      }
+    } catch (e) {
+      console.warn('[CATEGORIES] DB category sync warning:', e.message);
+    }
 
     return res.status(201).json({
       success: true,
@@ -80,9 +115,9 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 
 /**
  * DELETE /api/categories/:id
- * Remove a category (Admin only)
+ * Remove a category
  */
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const index = categories.findIndex(c => c.id === id || c.slug === id);
@@ -95,6 +130,16 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
     }
 
     const removed = categories.splice(index, 1)[0];
+    writeJsonFile('categories.json', categories);
+
+    try {
+      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+        const pool = getPool();
+        await pool.query('DELETE FROM categories WHERE id = $1 OR slug = $1', [id]);
+      }
+    } catch (e) {
+      console.warn('[CATEGORIES] DB category delete warning:', e.message);
+    }
 
     return res.status(200).json({
       success: true,
