@@ -78,6 +78,7 @@ export const generateOrderReceiptHtml = (order) => {
     <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #fbfbfa; margin: 0; padding: 40px 20px; color: #232220;">
       <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border: 1px solid #e8e7e4; padding: 40px; border-radius: 2px;">
         <div style="text-align: center; border-bottom: 1px solid #e8e7e4; padding-bottom: 24px; margin-bottom: 28px;">
+          <img src="${process.env.CLIENT_URL || 'http://localhost:5173'}/logo.png" alt="PENNY" style="height: 40px; width: auto; object-fit: contain; margin-bottom: 8px;" />
           <h1 style="letter-spacing: 0.35em; font-size: 24px; font-weight: 300; margin: 0; text-transform: uppercase;">PENNY</h1>
           <p style="font-size: 11px; letter-spacing: 0.15em; color: #8e8d8a; margin-top: 6px; text-transform: uppercase;">Official Purchase Receipt & Order Confirmation</p>
         </div>
@@ -134,11 +135,6 @@ export const generateOrderReceiptHtml = (order) => {
             <span style="font-family: monospace;">₦ ${(Number(order.total) || 0).toLocaleString()}</span>
           </div>
         </div>
-
-        <div style="text-align: center; border-top: 1px solid #e8e7e4; padding-top: 24px; font-size: 11px; color: #8e8d8a; line-height: 1.6;">
-          <p style="margin: 0;">PENNY CLOTHING CO • Victoria Island, Lagos, Nigeria</p>
-          <p style="margin: 4px 0 0 0;">For inquiries regarding your order, reply directly to this notice or contact support@pennycapsule.com.</p>
-        </div>
       </div>
     </body>
     </html>
@@ -150,7 +146,7 @@ export const generateOrderReceiptHtml = (order) => {
  */
 export const sendOrderConfirmationEmail = async (order) => {
   const receiptHtml = generateOrderReceiptHtml(order);
-  const senderEmail = process.env.SMTP_FROM || process.env.GMAIL_USER || 'concierge@pennycapsule.com';
+  const senderEmail = process.env.SMTP_FROM || process.env.GMAIL_USER || 'support@penny.com';
 
   let previewUrl = null;
   let info = null;
@@ -159,7 +155,7 @@ export const sendOrderConfirmationEmail = async (order) => {
     const mailer = await getTransporter();
     if (mailer) {
       info = await mailer.sendMail({
-        from: `"PENNY Concierge" <${senderEmail}>`,
+        from: `"PENNY" <${senderEmail}>`,
         to: order.email,
         subject: `Official Purchase Receipt & Order Confirmation #${order.id} - PENNY`,
         html: receiptHtml,

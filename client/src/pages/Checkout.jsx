@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock, User } from 'lucide-react';
+import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock, User, Printer } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { printOrderReceipt } from '../utils/printReceipt';
 
 const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
@@ -22,6 +23,7 @@ const Checkout = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderId, setOrderId] = useState('');
+  const [completedOrder, setCompletedOrder] = useState(null);
   
   // Checkout mode: 'member' if user is signed in, or 'guest'
   const [checkoutMode, setCheckoutMode] = useState(user ? 'member' : 'guest');
@@ -216,17 +218,36 @@ const Checkout = () => {
         });
 
         const verifyData = await verifyRes.json();
-        if (verifyData?.order) {
-          try {
-            const existing = JSON.parse(localStorage.getItem('penny_orders') || '[]');
-            const filtered = existing.filter(o => o.id !== verifyData.order.id);
-            localStorage.setItem('penny_orders', JSON.stringify([verifyData.order, ...filtered]));
-          } catch {}
-        }
-        setOrderId(generatedOrderRef);
+        const confirmedOrder = verifyData?.order || {
+          id: generatedOrderRef,
+          customer: `${formData.firstName} ${formData.lastName}`.trim(),
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          paymentMethod: 'bank_transfer',
+          paymentConfirmed: false,
+          status: 'Awaiting Payment',
+          subtotal: cartSubtotal,
+          deliveryFee: shippingCost,
+          total: grandTotal,
+          items: cartItems,
+          createdAt: new Date().toISOString()
+        };
+
+        setCompletedOrder(confirmedOrder);
+        try {
+          const existing = JSON.parse(localStorage.getItem('penny_orders') || '[]');
+          const filtered = existing.filter(o => o.id !== confirmedOrder.id);
+          localStorage.setItem('penny_orders', JSON.stringify([confirmedOrder, ...filtered]));
+        } catch {}
+
+        setOrderId(confirmedOrder.id);
         setIsProcessing(false);
         setOrderComplete(true);
         clearCart();
+        window.dispatchEvent(new Event('penny_notifications_updated'));
         return;
       }
 
@@ -282,12 +303,14 @@ const Checkout = () => {
               setIsProcessing(false);
               setOrderComplete(true);
               clearCart();
+              window.dispatchEvent(new Event('penny_notifications_updated'));
             } catch (verErr) {
               console.error('Order verification error:', verErr);
               setOrderId(generatedOrderRef);
               setIsProcessing(false);
               setOrderComplete(true);
               clearCart();
+              window.dispatchEvent(new Event('penny_notifications_updated'));
             }
           },
           onClose: () => {
@@ -312,17 +335,36 @@ const Checkout = () => {
         });
 
         const verifyData = await verifyRes.json();
-        if (verifyData?.order) {
-          try {
-            const existing = JSON.parse(localStorage.getItem('penny_orders') || '[]');
-            const filtered = existing.filter(o => o.id !== verifyData.order.id);
-            localStorage.setItem('penny_orders', JSON.stringify([verifyData.order, ...filtered]));
-          } catch {}
-        }
-        setOrderId(generatedOrderRef);
+        const confirmedOrder = verifyData?.order || {
+          id: generatedOrderRef,
+          customer: `${formData.firstName} ${formData.lastName}`.trim(),
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          paymentMethod: 'paystack',
+          paymentConfirmed: true,
+          status: 'Processing',
+          subtotal: cartSubtotal,
+          deliveryFee: shippingCost,
+          total: grandTotal,
+          items: cartItems,
+          createdAt: new Date().toISOString()
+        };
+
+        setCompletedOrder(confirmedOrder);
+        try {
+          const existing = JSON.parse(localStorage.getItem('penny_orders') || '[]');
+          const filtered = existing.filter(o => o.id !== confirmedOrder.id);
+          localStorage.setItem('penny_orders', JSON.stringify([confirmedOrder, ...filtered]));
+        } catch {}
+
+        setOrderId(confirmedOrder.id);
         setIsProcessing(false);
         setOrderComplete(true);
         clearCart();
+        window.dispatchEvent(new Event('penny_notifications_updated'));
       }
     } catch (err) {
       console.error('Payment checkout processing error:', err);
@@ -419,18 +461,43 @@ const Checkout = () => {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 w-full max-w-lg">
+          <button
+            type="button"
+            onClick={() => {
+              printOrderReceipt(completedOrder || {
+                id: orderId,
+                customer: `${formData.firstName} ${formData.lastName}`.trim(),
+                email: formData.email,
+                phone: formData.phone,
+                address: formData.address,
+                city: formData.city,
+                state: formData.state,
+                paymentMethod: formData.paymentMethod,
+                paymentConfirmed: !isBankTransfer,
+                status: isBankTransfer ? 'Awaiting Payment' : 'Processing',
+                subtotal: cartSubtotal,
+                deliveryFee: shippingCost,
+                total: grandTotal,
+                items: cartItems,
+                createdAt: new Date().toISOString()
+              });
+            }}
+            className="flex-1 bg-brand-charcoal text-white px-6 py-3.5 text-xs font-bold uppercase tracking-[0.15em] hover:bg-black transition-colors inline-flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+          >
+            <Printer className="w-4 h-4" /> Print Receipt / PDF
+          </button>
           <button
             onClick={() => navigate('/shop')}
-            className="bg-brand-charcoal text-white px-8 py-3.5 text-xs font-bold uppercase tracking-[0.15em] hover:bg-black transition-colors"
+            className="border border-brand-charcoal text-brand-charcoal px-6 py-3.5 text-xs font-bold uppercase tracking-[0.15em] hover:bg-neutral-50 transition-colors"
           >
             Continue Shopping
           </button>
           <button
             onClick={() => navigate('/')}
-            className="border border-brand-charcoal/20 px-8 py-3.5 text-xs font-bold uppercase tracking-[0.15em] hover:border-brand-charcoal transition-colors"
+            className="border border-brand-charcoal/20 px-6 py-3.5 text-xs font-bold uppercase tracking-[0.15em] hover:border-brand-charcoal transition-colors"
           >
-            Return to Home
+            Home
           </button>
         </div>
       </div>
