@@ -83,13 +83,31 @@ export default function SearchModal({ isOpen, onClose }) {
         >
           {/* Search Bar Input Row */}
           <div className="max-w-4xl mx-auto px-4 sm:px-8 py-6">
-            <div className="flex items-center justify-between gap-4 border-b-2 border-brand-charcoal pb-3">
-              <Search className="w-5 h-5 text-brand-charcoal/60 shrink-0" />
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (searchTerm.trim()) handleViewAllInShop();
+              }}
+              className="flex items-center justify-between gap-3 border-b-2 border-brand-charcoal pb-3"
+            >
+              <button 
+                type="submit" 
+                aria-label="Submit search"
+                className="text-brand-charcoal/60 hover:text-brand-charcoal p-1 transition-colors cursor-pointer shrink-0"
+              >
+                <Search className="w-5 h-5" />
+              </button>
               <input
                 ref={inputRef}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (searchTerm.trim()) handleViewAllInShop();
+                  }
+                }}
                 placeholder="Search by product, category, color, or fabric..."
                 className="w-full text-base sm:text-xl font-serif text-brand-charcoal placeholder:text-brand-charcoal/30 bg-transparent focus:outline-none"
               />
@@ -98,20 +116,28 @@ export default function SearchModal({ isOpen, onClose }) {
                   type="button"
                   onClick={() => setSearchTerm('')}
                   aria-label="Clear search input"
-                  className="p-1 hover:bg-neutral-100 rounded-full text-brand-charcoal/40 hover:text-brand-charcoal transition-colors"
+                  className="p-1 hover:bg-neutral-100 rounded-full text-brand-charcoal/40 hover:text-brand-charcoal transition-colors shrink-0"
                 >
                   <X className="w-4 h-4" />
+                </button>
+              )}
+              {searchTerm && (
+                <button
+                  type="submit"
+                  className="text-xs uppercase font-bold tracking-wider bg-brand-charcoal text-white px-3 py-1.5 hover:bg-black transition-colors rounded-xs shrink-0 cursor-pointer hidden sm:block"
+                >
+                  Search
                 </button>
               )}
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close search"
-                className="text-xs uppercase font-bold tracking-widest text-brand-charcoal/60 hover:text-brand-charcoal px-2 py-1 transition-colors"
+                className="text-xs uppercase font-bold tracking-widest text-brand-charcoal/60 hover:text-brand-charcoal px-2 py-1 transition-colors shrink-0 cursor-pointer"
               >
                 Close
               </button>
-            </div>
+            </form>
 
             {/* Quick Suggestions / Popular Searches */}
             {!searchTerm && (
@@ -151,12 +177,7 @@ export default function SearchModal({ isOpen, onClose }) {
                 )}
               </div>
 
-              {isLoading ? (
-                <div className="py-12 flex justify-center items-center text-brand-charcoal/60">
-                  <Loader2 className="w-6 h-6 animate-spin mr-2" />
-                  <span className="text-sm font-serif">Searching catalogue...</span>
-                </div>
-              ) : filteredProducts.length === 0 ? (
+              {filteredProducts.length === 0 ? (
                 <div className="py-12 text-center text-brand-charcoal/60 font-serif">
                   <p className="text-lg mb-2">No pieces found matching &ldquo;{searchTerm}&rdquo;.</p>
                   <p className="text-xs text-brand-charcoal/40 font-sans uppercase tracking-wider">
