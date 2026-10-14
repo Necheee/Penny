@@ -6,14 +6,43 @@ This guide provides everything you need to start, test, and understand the platf
 
 ---
 
-## 1. Quick Start (Get Running in 3 Steps)
+## 1. Getting the Code from GitHub
 
 ### Prerequisites
-- **Node.js** (v18 or higher recommended)
+- **Git** installed on your computer ([Download Git](https://git-scm.com/downloads))
+- **Node.js** (v18 or higher recommended) ([Download Node.js](https://nodejs.org/))
 - **npm** (included with Node.js)
 
-### Step 1: Install Dependencies
-Open two terminal windows (one for the server, one for the client).
+---
+
+### Step 1: Clone or Pull the Repository
+
+#### Option A: First-Time Setup (Clone from GitHub)
+If you are setting up the project on your computer for the first time:
+```bash
+# 1. Clone the repository
+git clone https://github.com/Necheee/Penny.git
+
+# 2. Move into the project directory
+cd Penny
+```
+
+#### Option B: Updating Existing Code (Pull Latest Changes)
+If you already cloned the repository previously and want the latest commits:
+```bash
+# 1. Ensure you are on the main branch
+git checkout main
+
+# 2. Pull the newest updates from GitHub
+git pull origin main
+```
+> [!TIP]
+> If you have local uncommitted changes that prevent pulling, run `git stash`, then `git pull origin main`, then `git stash pop`.
+
+---
+
+### Step 2: Install Dependencies
+Open two terminal windows (one for the backend server, one for the frontend client):
 
 ```bash
 # Terminal 1: Backend
@@ -25,8 +54,10 @@ cd client
 npm install
 ```
 
-### Step 2: Configure Environment Variables
-Inside `server/`, create or check `.env` (you can copy from `server/.env.example`):
+---
+
+### Step 3: Configure Environment Variables
+Inside `server/`, create or verify your `.env` file (you can copy the provided `server/.env.example`):
 
 ```bash
 PORT=5000
@@ -35,9 +66,11 @@ ADMIN_EMAIL=owner@penny.com
 ADMIN_PASSWORD=your_secure_password_here
 ADMIN_NAME="PENNY Owner"
 ```
-*(If no external PostgreSQL `DATABASE_URL` or Gmail credentials are provided, PENNY automatically uses persistent local JSON storage and Ethereal test inbox preview links).*
+*(If no external PostgreSQL `DATABASE_URL` or Gmail SMTP credentials are provided, PENNY automatically falls back to persistent local JSON storage and live Ethereal test inbox preview URLs without crashing).*
 
-### Step 3: Start Development Servers
+---
+
+### Step 4: Start the Development Servers
 ```bash
 # In Terminal 1 (Backend):
 cd server
