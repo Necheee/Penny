@@ -73,10 +73,15 @@ export const getCategories = async () => {
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
+        const stored = getStoredCategories();
+        const map = new Map();
+        data.data.forEach(c => map.set(c.id, c));
+        stored.forEach(c => map.set(c.id, c));
+        const merged = Array.from(map.values());
         if (typeof window !== 'undefined') {
-          localStorage.setItem('penny_categories', JSON.stringify(data.data));
+          localStorage.setItem('penny_categories', JSON.stringify(merged));
         }
-        return data.data;
+        return merged;
       }
     }
   } catch (err) {

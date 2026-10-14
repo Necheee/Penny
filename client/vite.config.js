@@ -13,9 +13,7 @@ export default defineConfig({
     host: true,
     port: 5173,
     allowedHosts: ['.loca.lt', 'unwanted-reapprove-reproach.ngrok-free.dev'],
-    hmr: {
-      clientPort: 443,
-    },
+    hmr: process.env.VITE_TUNNEL === 'true' ? { clientPort: 443 } : undefined,
     proxy: {
       '/api': {
         target: 'http://localhost:5000',

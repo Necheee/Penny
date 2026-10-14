@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Heart, ShoppingBag, Menu, X, ChevronDown } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Menu, X, ChevronDown, Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useWishlist } from '../../context/WishlistContext';
+import { useProducts } from '../../context/ProductContext';
+import { useNotifications } from '../../context/NotificationContext';
 import SearchModal from '../shop/SearchModal';
 
 export default function Header() {
@@ -20,6 +22,8 @@ export default function Header() {
   const { openCart, cartCount } = useCart();
   const { user } = useAuth();
   const { wishlist } = useWishlist();
+  const { categories = [] } = useProducts();
+  const { hasUnreadNotifications, unreadCount, markAllAsSeen } = useNotifications();
   
   const wishlistCount = wishlist.length;
 
@@ -68,9 +72,15 @@ export default function Header() {
                   className="absolute top-full left-0 w-48 bg-white shadow-lg border border-brand-border py-2 flex flex-col z-50 font-sans"
                 >
                   <Link to="/shop" className="px-6 py-2.5 hover:bg-brand-beige/40 transition-colors">All Products</Link>
-                  <Link to="/shop?category=tops" className="px-6 py-2.5 hover:bg-brand-beige/40 transition-colors">Tops</Link>
-                  <Link to="/shop?category=bottoms" className="px-6 py-2.5 hover:bg-brand-beige/40 transition-colors">Bottoms</Link>
-                  <Link to="/shop?category=sets" className="px-6 py-2.5 hover:bg-brand-beige/40 transition-colors">Two-Piece Sets</Link>
+                  {categories.map((cat) => (
+                    <Link 
+                      key={cat.id} 
+                      to={`/shop?category=${cat.id}`} 
+                      className="px-6 py-2.5 hover:bg-brand-beige/40 transition-colors"
+                    >
+                      {cat.name}
+                    </Link>
+                  ))}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -134,6 +144,20 @@ export default function Header() {
               </>
             ) : (
               "Login"
+            )}
+          </Link>
+
+          {/* Notification Bell Icon with Red Dot */}
+          <Link
+            to={user ? "/account?tab=notifications" : "/account/login"}
+            onClick={() => markAllAsSeen?.()}
+            aria-label="Order Notifications & Tracking"
+            className="hover:text-brand-taupe transition-colors flex items-center relative p-1 cursor-pointer"
+            title={hasUnreadNotifications ? `${unreadCount} new order update${unreadCount === 1 ? '' : 's'}` : "Order Notifications & Tracking"}
+          >
+            <Bell className="w-5 h-5" />
+            {hasUnreadNotifications && (
+              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-600 rounded-full ring-2 ring-brand-offwhite animate-pulse" />
             )}
           </Link>
           
@@ -206,9 +230,15 @@ export default function Header() {
                         className="flex flex-col space-y-4 mt-4 ml-4 text-lg font-normal text-brand-charcoal/80 overflow-hidden"
                       >
                         <Link to="/shop" onClick={closeMenu}>All Products</Link>
-                        <Link to="/shop?category=tops" onClick={closeMenu}>Tops</Link>
-                        <Link to="/shop?category=bottoms" onClick={closeMenu}>Bottoms</Link>
-                        <Link to="/shop?category=sets" onClick={closeMenu}>Two-Piece Sets</Link>
+                        {categories.map((cat) => (
+                          <Link 
+                            key={cat.id} 
+                            to={`/shop?category=${cat.id}`} 
+                            onClick={closeMenu}
+                          >
+                            {cat.name}
+                          </Link>
+                        ))}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -254,8 +284,24 @@ export default function Header() {
                   <span>Search</span>
                 </button>
                 <Link to={user ? "/account" : "/account/login"} className="text-lg uppercase tracking-wider text-sm font-medium flex items-center justify-between" onClick={closeMenu}>
-                  <span>{user ? `Account (${user.firstName})` : "Login / Register"}</span>
+                  <span>{user ? `Account (${user.firstName || 'Client'})` : "Login / Register"}</span>
                   {user && <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Active</span>}
+                </Link>
+                <Link 
+                  to={user ? "/account?tab=notifications" : "/account/login"} 
+                  className="text-lg uppercase tracking-wider text-sm font-medium flex items-center justify-between" 
+                  onClick={() => { closeMenu(); markAllAsSeen?.(); }}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Bell className="w-5 h-5 text-brand-charcoal" />
+                    <span>Notifications</span>
+                  </span>
+                  {hasUnreadNotifications && (
+                    <span className="flex items-center gap-1 text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full font-bold">
+                      <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping inline-block mr-0.5"></span>
+                      New
+                    </span>
+                  )}
                 </Link>
                 <Link to="/wishlist" className="text-lg uppercase tracking-wider text-sm font-medium" onClick={closeMenu}>Wishlist {wishlistCount > 0 ? `(${wishlistCount})` : ''}</Link>
               </nav>

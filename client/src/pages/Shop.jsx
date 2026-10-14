@@ -46,7 +46,11 @@ export default function Shop() {
 
     // Filter by Category
     if (activeCategory !== 'all') {
-      result = result.filter(p => p.category === activeCategory);
+      const matchedCat = categoriesList.find(c => c.id === activeCategory || c.slug === activeCategory);
+      result = result.filter(p => 
+        p.category === activeCategory || 
+        (matchedCat && (p.category === matchedCat.id || p.category === matchedCat.slug))
+      );
     }
 
     // Filter by Search query
@@ -93,7 +97,7 @@ export default function Shop() {
             ? `Search: "${searchQuery}"`
             : activeCategory === 'all' 
               ? 'The Collection' 
-              : categoriesList.find(c => c.id === activeCategory)?.name || 'The Collection'}
+              : categoriesList.find(c => c.id === activeCategory || c.slug === activeCategory)?.name || 'The Collection'}
         </h1>
         {searchQuery && (
           <div className="flex justify-center mt-4">
@@ -165,7 +169,11 @@ export default function Shop() {
                 <li key={cat.id}>
                   <button
                     onClick={() => handleCategoryChange(cat.id)}
-                    className={`text-sm tracking-wide transition-colors ${activeCategory === cat.id ? 'font-bold text-brand-charcoal' : 'text-brand-charcoal/60 hover:text-brand-charcoal'}`}
+                    className={`text-sm tracking-wide transition-colors ${
+                      (activeCategory === cat.id || (cat.slug && activeCategory === cat.slug))
+                        ? 'font-bold text-brand-charcoal'
+                        : 'text-brand-charcoal/60 hover:text-brand-charcoal'
+                    }`}
                   >
                     {cat.name}
                   </button>

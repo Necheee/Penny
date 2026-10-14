@@ -3,14 +3,14 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const WishlistContext = createContext();
 
 export function WishlistProvider({ children }) {
-  const [wishlist, setWishlist] = useState([]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('penny_wishlist');
-    if (saved) {
-      setWishlist(JSON.parse(saved));
+  const [wishlist, setWishlist] = useState(() => {
+    try {
+      const saved = localStorage.getItem('penny_wishlist');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
-  }, []);
+  });
 
   const addToWishlist = (product) => {
     setWishlist(prev => {

@@ -22,16 +22,18 @@ import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { ProductProvider } from './context/ProductContext';
+import { NotificationProvider } from './context/NotificationContext';
 import CartDrawer from './components/cart/CartDrawer';
 
 function App() {
   return (
     <AuthProvider>
-      <ProductProvider>
-        <WishlistProvider>
-          <CartProvider>
-            <ModalProvider>
-            <Router>
+      <NotificationProvider>
+        <ProductProvider>
+          <WishlistProvider>
+            <CartProvider>
+              <ModalProvider>
+              <Router>
               <CartDrawer />
               <Layout>
                 <Routes>
@@ -76,7 +78,8 @@ function App() {
         </CartProvider>
       </WishlistProvider>
     </ProductProvider>
-  </AuthProvider>
+  </NotificationProvider>
+</AuthProvider>
   );
 }
 
