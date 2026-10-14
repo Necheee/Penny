@@ -30,7 +30,7 @@ import { printOrderReceipt } from '../utils/printReceipt';
 
 export default function Account() {
   const { user, logout, updateProfile, updateAddresses, deleteAccount } = useAuth();
-  const { markAllAsSeen, refreshNotifications } = useNotifications();
+  const { markAllAsSeen, refreshNotifications, hasUnreadNotifications } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -355,11 +355,11 @@ export default function Account() {
   }, [user?.email]);
 
   const navItems = [
-    { id: 'profile', label: 'Personal Details', icon: User, desc: 'Name, email, contact phone' },
-    { id: 'addresses', label: 'Saved Addresses', icon: MapPin, desc: 'Shipping & delivery destinations' },
-    { id: 'orders', label: 'Order History', icon: ShoppingBag, desc: 'Purchases & itemized breakdown' },
-    { id: 'notifications', label: 'Order Notifications & Tracking', icon: Bell, desc: 'Real-time order confirmation & delivery status' },
-    { id: 'security', label: 'Security & Password', icon: Lock, desc: 'Password and session security' },
+    { id: 'profile', label: 'Personal Details', shortLabel: 'Details', icon: User, desc: 'Name, email, contact phone' },
+    { id: 'orders', label: 'Order History', shortLabel: 'Orders', icon: ShoppingBag, desc: 'Purchases & itemized breakdown' },
+    { id: 'notifications', label: 'Order Notifications & Tracking', shortLabel: 'Notifications', icon: Bell, desc: 'Real-time order confirmation & delivery status' },
+    { id: 'addresses', label: 'Saved Addresses', shortLabel: 'Addresses', icon: MapPin, desc: 'Shipping & delivery destinations' },
+    { id: 'security', label: 'Security & Password', shortLabel: 'Security', icon: Lock, desc: 'Password and session security' },
   ];
 
   return (
@@ -367,7 +367,7 @@ export default function Account() {
       <div className="max-w-6xl mx-auto">
         
         {/* Luxury Account Header */}
-        <div className="border-b border-brand-charcoal/10 pb-8 mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div className="border-b border-brand-charcoal/10 pb-8 mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
@@ -391,11 +391,37 @@ export default function Account() {
           </button>
         </div>
 
+        {/* Mobile Horizontal Tab Navigation (Clean, compact, no giant stacked sidebar at top of screen) */}
+        <div className="lg:hidden mb-6 -mx-4 px-4 overflow-x-auto flex items-center gap-2 pb-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xs text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer relative ${
+                  isActive 
+                    ? 'bg-brand-charcoal text-white shadow-xs' 
+                    : 'bg-white text-brand-charcoal/70 border border-brand-charcoal/15 hover:text-black hover:bg-neutral-50'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-brand-taupe'}`} />
+                <span>{item.shortLabel || item.label}</span>
+                {item.id === 'notifications' && hasUnreadNotifications && (
+                  <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Layout Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Navigation Sidebar */}
-          <aside className="lg:col-span-4 bg-white border border-brand-charcoal/10 rounded-xs p-3 shadow-xs">
+          {/* Navigation Sidebar (Desktop Only) */}
+          <aside className="hidden lg:block lg:col-span-4 bg-white border border-brand-charcoal/10 rounded-xs p-3 shadow-xs">
             <nav className="space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -437,7 +463,7 @@ export default function Account() {
           </aside>
 
           {/* Dynamic Content Panel */}
-          <main className="lg:col-span-8 bg-white border border-brand-charcoal/10 rounded-xs p-6 md:p-8 shadow-xs min-h-[460px]">
+          <main className="w-full lg:col-span-8 bg-white border border-brand-charcoal/10 rounded-xs p-6 md:p-8 shadow-xs min-h-[460px]">
             
             {/* TAB 1: PROFILE DETAILS */}
             {activeTab === 'profile' && (
