@@ -1,0 +1,57 @@
+[
+  {
+    "id": "usr_1791844871840",
+    "email": "test.client@gmail.com",
+    "firstName": "Alexander",
+    "lastName": "Balogun",
+    "phone": "+234 809 999 8888",
+    "addresses": [
+      {
+        "id": "addr_1",
+        "street": "14 Victoria Island Crescent",
+        "city": "Victoria Island",
+        "state": "Lagos",
+        "isDefault": true
+      }
+    ],
+    "role": "customer"
+  },
+  {
+    "id": "usr_1",
+    "email": "chinaecheremimekaeze@gmail.com",
+    "firstName": "Chinaecherem",
+    "lastName": "",
+    "phone": "+234 800 000 0000",
+    "addresses": [
+      {
+        "id": "addr_1",
+        "city": "Victoria Island",
+        "label": "Default Shipping Address",
+        "state": "Lagos",
+        "street": "14 Victoria Island Crescent, Apt 4B",
+        "fullName": "Valued Client",
+        "isDefault": true
+      }
+    ],
+    "role": "customer"
+  },
+  {
+    "id": "usr_1791958968301",
+    "email": "mails2paschal@gmail.com",
+    "firstName": "Paschal",
+    "lastName": "Imekaeze",
+    "phone": "",
+    "addresses": [
+      {
+        "id": "addr_1",
+        "label": "Primary Delivery Address",
+        "fullName": "Paschal Imekaeze",
+        "street": "",
+        "city": "Lagos",
+        "state": "Lagos",
+        "isDefault": true
+      }
+    ],
+    "role": "customer"
+  }
+]

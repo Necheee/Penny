@@ -7,6 +7,7 @@ import productRoutes from './routes/products.js';
 import categoryRoutes from './routes/categories.js';
 import mediaRoutes from './routes/media.js';
 import paymentRoutes from './routes/payments.js';
+import contactRoutes from './routes/contact.js';
 import { initCloudDatabase } from './utils/cloudDb.js';
 
 import path from 'path';
@@ -55,6 +56,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/admin/media', mediaRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/contact', contactRoutes);
 
 // 404 Handler for Unmatched API Endpoints
 app.use((req, res) => {

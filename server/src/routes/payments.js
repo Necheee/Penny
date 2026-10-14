@@ -2,10 +2,41 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { sendOrderConfirmationEmail } from '../utils/receiptEmail.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
+import { getPool } from '../utils/cloudDb.js';
 
 dotenv.config();
 
 const router = express.Router();
+
+function mapDbOrder(row) {
+  let items = [];
+  try {
+    items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
+  } catch {}
+
+  return {
+    id: row.id,
+    reference: row.reference,
+    customer: row.customer,
+    email: row.email,
+    phone: row.phone,
+    state: row.state,
+    city: row.city,
+    address: row.address,
+    shippingMethod: row.shipping_method,
+    paymentMethod: row.payment_method,
+    transferAccountName: row.transfer_account_name,
+    paymentConfirmed: Boolean(row.payment_confirmed),
+    itemsCount: parseInt(row.items_count) || 1,
+    subtotal: Number(row.subtotal || 0),
+    deliveryFee: Number(row.delivery_fee || 0),
+    total: Number(row.total || 0),
+    status: row.status,
+    items,
+    paidAt: row.paid_at,
+    createdAt: row.created_at,
+  };
+}
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || '';
 const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY || '';
@@ -259,8 +290,10 @@ router.post('/verify', async (req, res) => {
       });
     }
 
-    // Register order in the system
-    const orderId = orderData?.orderRef || `PNY-${Math.floor(100000 + Math.random() * 900000)}`;
+    // Register order in the system with unified order ID
+    const orderId = (orderData?.orderRef && typeof orderData.orderRef === 'string' && orderData.orderRef.startsWith('PNY-'))
+      ? orderData.orderRef
+      : `PNY-${Math.floor(100000 + Math.random() * 900000)}`;
     
     const newOrder = {
       id: orderId,
@@ -293,8 +326,37 @@ router.post('/verify', async (req, res) => {
       })) : [],
     };
 
-    // Store in order store
-    ordersStore.unshift(newOrder);
+    // 1. Persist directly to Neon Cloud PostgreSQL Database
+    try {
+      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+        const pool = getPool();
+        await pool.query(`
+          INSERT INTO orders (id, reference, customer, email, phone, state, city, address, shipping_method, payment_method, transfer_account_name, payment_confirmed, items_count, subtotal, delivery_fee, total, status, items, paid_at, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+          ON CONFLICT (id) DO UPDATE SET
+            status = EXCLUDED.status,
+            payment_confirmed = EXCLUDED.payment_confirmed,
+            paid_at = EXCLUDED.paid_at
+        `, [
+          newOrder.id, newOrder.reference, newOrder.customer, newOrder.email, newOrder.phone,
+          newOrder.state, newOrder.city, newOrder.address, newOrder.shippingMethod, newOrder.paymentMethod,
+          newOrder.transferAccountName || '', newOrder.paymentConfirmed, newOrder.itemsCount,
+          newOrder.subtotal, newOrder.deliveryFee, newOrder.total, newOrder.status,
+          JSON.stringify(newOrder.items), newOrder.paidAt, newOrder.createdAt
+        ]);
+        console.log(`[ORDERS] Order #${newOrder.id} successfully saved to Neon PostgreSQL Cloud DB!`);
+      }
+    } catch (dbErr) {
+      console.warn('[ORDERS] Neon PostgreSQL insert warning, stored in local cache:', dbErr.message);
+    }
+
+    // 2. Persist to local JSON file & memory store
+    const existingIndex = ordersStore.findIndex(o => o.id === newOrder.id);
+    if (existingIndex >= 0) {
+      ordersStore[existingIndex] = newOrder;
+    } else {
+      ordersStore.unshift(newOrder);
+    }
     writeJsonFile('orders.json', ordersStore);
 
     return res.status(200).json({
@@ -315,20 +377,30 @@ router.post('/verify', async (req, res) => {
 
 /**
  * PATCH /api/payments/orders/:id/status
- * Updates the fulfillment status of an order
+ * Updates the fulfillment status of an order in Neon DB & memory
  */
-router.patch('/orders/:id/status', (req, res) => {
+router.patch('/orders/:id/status', async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
-  const order = ordersStore.find(o => o.id === id);
-  if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found.' });
-  }
+  let order = ordersStore.find(o => o.id === id);
 
   if (status) {
-    order.status = status;
-    writeJsonFile('orders.json', ordersStore);
+    // 1. Update in Neon Cloud DB
+    try {
+      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+        const pool = getPool();
+        await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [status, id]);
+      }
+    } catch (e) {
+      console.warn('[ORDERS] Could not update status in Neon PostgreSQL:', e.message);
+    }
+
+    // 2. Update local store
+    if (order) {
+      order.status = status;
+      writeJsonFile('orders.json', ordersStore);
+    }
   }
 
   return res.status(200).json({
@@ -340,21 +412,36 @@ router.patch('/orders/:id/status', (req, res) => {
 
 /**
  * POST /api/payments/orders/:id/confirm-payment
- * Confirms bank transfer receipt for an order and dispatches confirmation receipt email to the customer
+ * Confirms bank transfer receipt for an order in Neon DB and dispatches confirmation receipt email to the customer
  */
 router.post('/orders/:id/confirm-payment', async (req, res) => {
   try {
     const { id } = req.params;
-    const order = ordersStore.find(o => o.id === id);
+    let order = ordersStore.find(o => o.id === id);
 
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found.' });
+    const paidAt = new Date().toISOString();
+
+    // 1. Update in Neon Cloud DB
+    try {
+      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+        const pool = getPool();
+        await pool.query(
+          'UPDATE orders SET payment_confirmed = true, status = $1, paid_at = $2 WHERE id = $3',
+          ['Processing', paidAt, id]
+        );
+      }
+    } catch (e) {
+      console.warn('[ORDERS] Could not confirm payment in Neon PostgreSQL:', e.message);
     }
 
-    order.paymentConfirmed = true;
-    order.status = 'Processing';
-    order.paidAt = new Date().toISOString();
-    writeJsonFile('orders.json', ordersStore);
+    if (order) {
+      order.paymentConfirmed = true;
+      order.status = 'Processing';
+      order.paidAt = paidAt;
+      writeJsonFile('orders.json', ordersStore);
+    } else {
+      order = { id, paymentConfirmed: true, status: 'Processing', paidAt };
+    }
 
     // Trigger transactional digital receipt and confirmation email
     const emailResult = await sendOrderConfirmationEmail(order);
@@ -376,14 +463,63 @@ router.post('/orders/:id/confirm-payment', async (req, res) => {
 
 /**
  * GET /api/payments/orders
- * Returns registered orders for admin inspection or customer lookup
+ * Returns registered orders from Neon PostgreSQL Cloud DB (with memory store fallback)
  */
-router.get('/orders', (req, res) => {
+router.get('/orders', async (req, res) => {
+  try {
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      const pool = getPool();
+      const dbRes = await pool.query('SELECT * FROM orders ORDER BY created_at DESC');
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        const mappedOrders = dbRes.rows.map(mapDbOrder);
+        ordersStore = mappedOrders;
+        return res.status(200).json({
+          success: true,
+          count: mappedOrders.length,
+          data: mappedOrders,
+        });
+      }
+    }
+  } catch (dbErr) {
+    console.warn('[ORDERS] Could not query Neon PostgreSQL, using cache fallback:', dbErr.message);
+  }
+
   return res.status(200).json({
     success: true,
     count: ordersStore.length,
     data: ordersStore,
   });
+});
+
+/**
+ * DELETE /api/payments/orders/:id
+ * Deletes an order from storage and database
+ */
+router.delete('/orders/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    ordersStore = ordersStore.filter(o => o.id !== id);
+    writeJsonFile('orders.json', ordersStore);
+
+    try {
+      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+        const pool = getPool();
+        await pool.query('DELETE FROM orders WHERE id = $1', [id]);
+      }
+    } catch (e) {
+      console.warn('[ORDERS] DB delete warning:', e.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Order #${id} deleted successfully.`,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete order.',
+    });
+  }
 });
 
 export default router;
