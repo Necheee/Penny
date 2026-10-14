@@ -6,6 +6,8 @@ import {
   Ruler, 
   ShoppingBag, 
   Landmark,
+  Megaphone,
+  Mail,
   ExternalLink, 
   LogOut,
   Menu,
@@ -13,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-export default function AdminLayout({ children, activeTab, setActiveTab }) {
+export default function AdminLayout({ children, activeTab, setActiveTab, unreadMessagesCount = 0 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -21,8 +23,10 @@ export default function AdminLayout({ children, activeTab, setActiveTab }) {
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'categories', label: 'Categories', icon: FolderTree },
+    { id: 'announcements', label: 'Announcements', icon: Megaphone },
     { id: 'size-guide', label: 'Size Guide', icon: Ruler },
     { id: 'orders', label: 'Orders', icon: ShoppingBag },
+    { id: 'messages', label: 'Messages & Inquiries', icon: Mail, badge: unreadMessagesCount },
     { id: 'bank-settings', label: 'Bank & Payments', icon: Landmark },
   ];
 
@@ -83,7 +87,14 @@ export default function AdminLayout({ children, activeTab, setActiveTab }) {
                 `}
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-neutral-400'}`} />
-                <span>{item.label}</span>
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.badge > 0 && (
+                  <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
+                    isActive ? 'bg-white text-brand-charcoal' : 'bg-amber-500 text-white'
+                  }`}>
+                    {item.badge}
+                  </span>
+                )}
               </button>
             );
           })}

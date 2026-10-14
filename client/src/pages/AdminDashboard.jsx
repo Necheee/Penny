@@ -20,14 +20,41 @@ import {
   Landmark,
   Building2,
   Save,
-  RefreshCw
+  RefreshCw,
+  Megaphone,
+  MessageSquare,
+  Reply,
+  Send,
+  Inbox,
+  ExternalLink
 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
+import { printOrderReceipt } from '../utils/printReceipt';
+import { generateOrderReceiptEmailHtml, generateInquiryReplyEmailHtml } from '../utils/emailPreviewGenerator';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const urlTab = new URLSearchParams(window.location.search).get('tab');
+      if (urlTab) return urlTab;
+      const saved = sessionStorage.getItem('penny_admin_tab');
+      if (saved) return saved;
+    }
+    return 'overview';
+  });
 
-  // Product & Category State from Shared ProductContext (Synced with LocalStorage & Storefront)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('penny_admin_tab', activeTab);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('tab') !== activeTab) {
+        url.searchParams.set('tab', activeTab);
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, [activeTab]);
+
+  // Product, Category, Announcements & Size Guide State from Shared ProductContext
   const { 
     products: productList = [], 
     categories: categoryList = [], 
@@ -37,7 +64,11 @@ export default function AdminDashboard() {
     toggleFeatured, 
     toggleStock, 
     addCategory, 
-    deleteCategory 
+    deleteCategory,
+    announcements = [],
+    updateAnnouncements,
+    sizeGuideData = {},
+    updateSizeGuide,
   } = useProducts();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -215,25 +246,79 @@ export default function AdminDashboard() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategorySlug, setNewCategorySlug] = useState('');
 
-  // Sizing Grid State
-  const [sizeMeasurements, setSizeMeasurements] = useState({
-    tops: [
-      { size: 'XS', chest: '86 - 91', waist: '71 - 76', shoulder: '42' },
-      { size: 'S', chest: '91 - 96', waist: '76 - 81', shoulder: '44' },
-      { size: 'M', chest: '96 - 101', waist: '81 - 86', shoulder: '46' },
-      { size: 'L', chest: '101 - 106', waist: '86 - 91', shoulder: '48' },
-      { size: 'XL', chest: '106 - 111', waist: '91 - 96', shoulder: '50' },
-      { size: 'XXL', chest: '111 - 116', waist: '96 - 101', shoulder: '52' },
-    ],
-    bottoms: [
-      { size: 'XS', waist: '71 - 76', hips: '88 - 93', inseam: '78' },
-      { size: 'S', waist: '76 - 81', hips: '93 - 98', inseam: '80' },
-      { size: 'M', waist: '81 - 86', hips: '98 - 103', inseam: '81' },
-      { size: 'L', waist: '86 - 91', hips: '103 - 108', inseam: '82' },
-      { size: 'XL', waist: '91 - 96', hips: '108 - 113', inseam: '83' },
-      { size: 'XXL', waist: '96 - 101', hips: '113 - 118', inseam: '84' },
-    ]
+  // Announcements Admin State
+  const [announcementList, setAnnouncementList] = useState(announcements || []);
+  const [newAnnouncementText, setNewAnnouncementText] = useState('');
+  const [announcementFeedback, setAnnouncementFeedback] = useState('');
+
+  useEffect(() => {
+    if (Array.isArray(announcements)) {
+      setAnnouncementList(announcements);
+    }
+  }, [announcements]);
+
+  const handleUpdateAnnouncementItem = (index, value) => {
+    const updated = [...announcementList];
+    updated[index] = value;
+    setAnnouncementList(updated);
+  };
+
+  const handleAddAnnouncementItem = (e) => {
+    e.preventDefault();
+    if (!newAnnouncementText.trim()) return;
+    const updated = [...announcementList, newAnnouncementText.trim()];
+    setAnnouncementList(updated);
+    updateAnnouncements(updated);
+    setNewAnnouncementText('');
+    setAnnouncementFeedback('New announcement message added and live!');
+    setTimeout(() => setAnnouncementFeedback(''), 4000);
+  };
+
+  const handleDeleteAnnouncementItem = (index) => {
+    if (announcementList.length <= 1) {
+      alert('You must keep at least one active announcement message.');
+      return;
+    }
+    const updated = announcementList.filter((_, idx) => idx !== index);
+    setAnnouncementList(updated);
+    updateAnnouncements(updated);
+    setAnnouncementFeedback('Announcement removed.');
+    setTimeout(() => setAnnouncementFeedback(''), 4000);
+  };
+
+  const handleSaveAllAnnouncements = () => {
+    const cleaned = announcementList.map(a => a.trim()).filter(Boolean);
+    updateAnnouncements(cleaned);
+    setAnnouncementFeedback('All announcements saved successfully and live on storefront!');
+    setTimeout(() => setAnnouncementFeedback(''), 4000);
+  };
+
+  // Dynamic Size Guide Admin State
+  const [activeSizeCategory, setActiveSizeCategory] = useState('tops');
+  const [sizeGuideFeedback, setSizeGuideFeedback] = useState('');
+
+  // Local editable copy of current category's size data
+  const [sizeForm, setSizeForm] = useState(() => {
+    return sizeGuideData[activeSizeCategory] || {
+      title: 'Tops & Shirts',
+      subtitle: 'Standard Fit',
+      columns: [{ key: 'size', label: 'Size' }],
+      rows: []
+    };
   });
+
+  useEffect(() => {
+    if (sizeGuideData[activeSizeCategory]) {
+      setSizeForm(sizeGuideData[activeSizeCategory]);
+    }
+  }, [activeSizeCategory, sizeGuideData]);
+
+  const handleSaveSizeGuide = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    updateSizeGuide(activeSizeCategory, sizeForm);
+    setSizeGuideFeedback(`Size guide for "${sizeForm.title}" saved successfully!`);
+    setTimeout(() => setSizeGuideFeedback(''), 4000);
+  };
 
   // Calculate Metrics
   const totalRevenue = orders.reduce((sum, ord) => sum + ord.total, 0);
@@ -523,9 +608,94 @@ export default function AdminDashboard() {
     }
   };
 
+  // Customer Inquiries / Messages state
+  const [messages, setMessages] = useState([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [messageFilter, setMessageFilter] = useState('all'); // 'all' | 'unread' | 'replied'
+  const [replyModalMessage, setReplyModalMessage] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [isSendingReply, setIsSendingReply] = useState(false);
+  const [replyFeedback, setReplyFeedback] = useState({ type: '', text: '' });
+  const [replyComposerTab, setReplyComposerTab] = useState('compose'); // 'compose' | 'preview'
+  const [previewEmailData, setPreviewEmailData] = useState(null); // { isOpen, title, subject, recipient, date, htmlContent, externalPreviewUrl }
+
+  const fetchMessages = async () => {
+    try {
+      setIsLoadingMessages(true);
+      const res = await fetch('/api/contact/messages');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setMessages(data.data);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load inquiries:', err);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 12000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleMarkMessageAsRead = async (id) => {
+    try {
+      const res = await fetch(`/api/contact/messages/${id}/read`, {
+        method: 'PATCH',
+      });
+      if (res.ok) {
+        setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'read' } : m));
+      }
+    } catch (err) {
+      console.error('Error marking message read:', err);
+    }
+  };
+
+  const handleSendReply = async (e) => {
+    e.preventDefault();
+    if (!replyModalMessage || !replyText.trim()) return;
+
+    setIsSendingReply(true);
+    setReplyFeedback({ type: '', text: '' });
+
+    try {
+      const res = await fetch(`/api/contact/messages/${replyModalMessage.id}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replyText: replyText.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setReplyFeedback({ type: 'success', text: `Email reply dispatched to ${replyModalMessage.email} successfully!` });
+        setMessages(prev => prev.map(m => m.id === replyModalMessage.id ? { 
+          ...m, 
+          status: 'replied', 
+          reply: replyText.trim(),
+          repliedAt: new Date().toISOString()
+        } : m));
+        setTimeout(() => {
+          setReplyModalMessage(null);
+          setReplyText('');
+          setReplyFeedback({ type: '', text: '' });
+        }, 1800);
+      } else {
+        setReplyFeedback({ type: 'error', text: data.message || 'Failed to dispatch email reply.' });
+      }
+    } catch (err) {
+      setReplyFeedback({ type: 'error', text: 'Network error occurred while sending reply.' });
+    } finally {
+      setIsSendingReply(false);
+    }
+  };
+
+  const unreadMessagesCount = messages.filter(m => m.status === 'unread').length;
 
   return (
-    <AdminLayout activeTab={activeTab} setActiveTab={setActiveTab}>
+    <AdminLayout activeTab={activeTab} setActiveTab={setActiveTab} unreadMessagesCount={unreadMessagesCount}>
       
       {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
@@ -634,10 +804,28 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => setSelectedOrder(ord)}
-                          className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs transition-colors inline-flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider"
+                          className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs transition-colors inline-flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider cursor-pointer"
                           title="Inspect Order"
                         >
                           <Eye className="w-3.5 h-3.5" /> View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewEmailData({
+                              isOpen: true,
+                              title: 'Customer Receipt Email',
+                              subject: `Official Purchase Receipt & Order Confirmation #${ord.id} - PENNY`,
+                              recipient: `${ord.customer} <${ord.email}>`,
+                              date: ord.createdAt || ord.date,
+                              externalPreviewUrl: ord.previewUrl || null,
+                              htmlContent: generateOrderReceiptEmailHtml(ord),
+                            });
+                          }}
+                          className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs transition-colors inline-flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider ml-1 cursor-pointer"
+                          title="Preview Email Receipt"
+                        >
+                          <Mail className="w-3.5 h-3.5" /> Receipt
                         </button>
                       </td>
                     </tr>
@@ -843,77 +1031,301 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 4: SIZE GUIDE EDITOR */}
-      {activeTab === 'size-guide' && (
-        <div className="bg-white p-6 border border-neutral-200 rounded-sm shadow-xs space-y-6">
-          <div className="flex justify-between items-center border-b border-neutral-200 pb-4">
+      {/* TAB 4: ANNOUNCEMENTS MANAGER */}
+      {activeTab === 'announcements' && (
+        <div className="space-y-6 max-w-4xl">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-brand-charcoal">
-                Size & Fit Measurement Tables
-              </h3>
+              <h1 className="text-xl font-bold font-serif text-brand-charcoal">Storefront Announcement Bar</h1>
               <p className="text-xs text-neutral-500 mt-1">
-                Edit dimensions in Centimeters (CM). Changes update customer size modals immediately.
+                Customize the luxury announcement messages displayed at the very top of your storefront. Shoppers see these rotate dynamically.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-neutral-900 text-white text-xs font-bold uppercase rounded-xs">
+              <Megaphone className="w-3.5 h-3.5" /> Top Banner Active
+            </span>
+          </div>
+
+          {/* Feedback banner */}
+          {announcementFeedback && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between rounded-xs animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span>{announcementFeedback}</span>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setAnnouncementFeedback('')}
+                className="text-neutral-400 hover:text-black font-bold uppercase text-[10px]"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Live Storefront Preview */}
+          <div className="bg-white p-5 border border-neutral-200 rounded-sm shadow-xs space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 block">
+              Live Storefront Preview
+            </span>
+            <div className="bg-brand-charcoal text-white text-[11px] font-medium tracking-[0.15em] uppercase text-center py-2.5 px-4 rounded-xs shadow-inner">
+              {announcementList[0] || "Enjoy free shipping on orders above ₦200,000"}
+            </div>
+          </div>
+
+          {/* Edit Existing Announcements */}
+          <div className="bg-white p-6 border border-neutral-200 rounded-sm shadow-xs space-y-4">
+            <div className="flex justify-between items-center border-b border-neutral-100 pb-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-brand-charcoal">
+                  Active Messages ({announcementList.length})
+                </h3>
+                <p className="text-[11px] text-neutral-500">Edit existing messages or remove unwanted ones.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveAllAnnouncements}
+                className="bg-brand-charcoal text-white px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors rounded-xs inline-flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" /> Save Changes
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {announcementList.map((msg, idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <span className="text-[11px] font-bold font-mono text-neutral-400 w-6">#{idx + 1}</span>
+                  <input
+                    type="text"
+                    value={msg}
+                    onChange={(e) => handleUpdateAnnouncementItem(idx, e.target.value)}
+                    placeholder="Enter announcement text..."
+                    className="flex-1 border border-neutral-200 p-2.5 text-xs focus:outline-none focus:border-brand-charcoal rounded-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAnnouncementItem(idx)}
+                    className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-xs transition-colors"
+                    title="Remove announcement message"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Add New Announcement Message */}
+          <div className="bg-white p-6 border border-neutral-200 rounded-sm shadow-xs">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-brand-charcoal mb-3">
+              Add New Announcement Message
+            </h3>
+            <form onSubmit={handleAddAnnouncementItem} className="flex gap-3">
+              <input
+                type="text"
+                value={newAnnouncementText}
+                onChange={(e) => setNewAnnouncementText(e.target.value)}
+                placeholder="e.g. Complimentary weekend shipping on all linen pieces"
+                className="flex-1 border border-neutral-200 p-2.5 text-xs focus:outline-none focus:border-brand-charcoal rounded-xs"
+                required
+              />
+              <button
+                type="submit"
+                className="bg-brand-charcoal text-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors shrink-0 rounded-xs inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" /> Add Message
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: SIZE GUIDE EDITOR */}
+      {activeTab === 'size-guide' && (
+        <div className="bg-white p-6 border border-neutral-200 rounded-sm shadow-xs space-y-6 max-w-5xl">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-neutral-200 pb-4">
+            <div>
+              <h2 className="text-xl font-bold font-serif text-brand-charcoal">
+                Size & Fit Guide Headings & Content
+              </h2>
+              <p className="text-xs text-neutral-500 mt-1">
+                Customize category titles, descriptive subtitles, table column headers, and measurement rows. Updates sync with customer size modals immediately.
               </p>
             </div>
             <button 
-              onClick={() => alert("Size chart updates saved!")}
-              className="bg-brand-charcoal text-white px-4 py-2 text-xs font-bold uppercase tracking-wider"
+              type="button"
+              onClick={handleSaveSizeGuide}
+              className="bg-brand-charcoal text-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors rounded-xs inline-flex items-center gap-2 cursor-pointer shadow-xs"
             >
-              Save Table
+              <Save className="w-3.5 h-3.5" /> Save Size Guide Changes
             </button>
           </div>
 
+          {/* Feedback banner */}
+          {sizeGuideFeedback && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between rounded-xs animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span>{sizeGuideFeedback}</span>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setSizeGuideFeedback('')}
+                className="text-neutral-400 hover:text-black font-bold uppercase text-[10px]"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Category Switcher */}
+          <div className="flex flex-wrap gap-2 border-b border-neutral-100 pb-4">
+            {[
+              { id: 'tops', label: 'Tops & Shirts' },
+              { id: 'bottoms', label: 'Trousers & Shorts' },
+              { id: 'sets', label: 'Two-Piece Sets' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveSizeCategory(tab.id)}
+                className={`text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-xs transition-colors ${
+                  activeSizeCategory === tab.id
+                    ? 'bg-brand-charcoal text-white shadow-xs'
+                    : 'bg-neutral-100 text-neutral-600 hover:text-black hover:bg-neutral-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Heading & Subtitle Inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50/60 p-4 border border-neutral-200 rounded-xs">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                Category Title Heading *
+              </label>
+              <input
+                type="text"
+                value={sizeForm.title || ''}
+                onChange={(e) => setSizeForm({ ...sizeForm, title: e.target.value })}
+                placeholder="e.g. Tops & Shirts"
+                className="w-full border border-neutral-200 bg-white p-2.5 text-xs focus:outline-none focus:border-brand-charcoal rounded-xs font-serif"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                Subtitle / Description *
+              </label>
+              <input
+                type="text"
+                value={sizeForm.subtitle || ''}
+                onChange={(e) => setSizeForm({ ...sizeForm, subtitle: e.target.value })}
+                placeholder="e.g. T-Shirts, Overshirts, Henleys & Sweaters"
+                className="w-full border border-neutral-200 bg-white p-2.5 text-xs focus:outline-none focus:border-brand-charcoal rounded-xs"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Column Headings Editor */}
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-3">Tops & Shirts (CM)</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border border-neutral-200">
-                <thead className="bg-neutral-50 border-b border-neutral-200 uppercase font-bold text-neutral-500">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-neutral-500">
+                Table Column Headings
+              </h4>
+              <span className="text-[11px] text-neutral-400">Edit column header labels shown to shoppers</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3 border border-neutral-200 rounded-xs">
+              {(sizeForm.columns || []).map((col, idx) => (
+                <div key={col.key || idx}>
+                  <label className="block text-[9px] font-mono text-neutral-400 uppercase mb-1">
+                    Col: {col.key}
+                  </label>
+                  <input
+                    type="text"
+                    value={col.label}
+                    onChange={(e) => {
+                      const updatedCols = [...sizeForm.columns];
+                      updatedCols[idx] = { ...col, label: e.target.value };
+                      setSizeForm({ ...sizeForm, columns: updatedCols });
+                    }}
+                    className="w-full border border-neutral-200 p-2 text-xs focus:outline-none focus:border-brand-charcoal rounded-xs"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Measurements Rows Editor */}
+          <div>
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-neutral-500">
+                Measurement Rows ({sizeForm.title || activeSizeCategory})
+              </h4>
+              <button
+                type="button"
+                onClick={() => {
+                  const newRow = { size: 'Custom' };
+                  (sizeForm.columns || []).forEach(col => {
+                    if (col.key !== 'size') newRow[col.key] = '—';
+                  });
+                  setSizeForm({ ...sizeForm, rows: [...(sizeForm.rows || []), newRow] });
+                }}
+                className="text-[11px] font-bold uppercase tracking-wider text-brand-charcoal hover:underline inline-flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Size Row
+              </button>
+            </div>
+
+            <div className="overflow-x-auto border border-neutral-200 rounded-xs">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-neutral-50 border-b border-neutral-200 uppercase font-bold text-neutral-600">
                   <tr>
-                    <th className="p-3">Size</th>
-                    <th className="p-3">Chest (CM)</th>
-                    <th className="p-3">Waist (CM)</th>
-                    <th className="p-3">Shoulder (CM)</th>
+                    {(sizeForm.columns || []).map((col) => (
+                      <th key={col.key} className="p-3">
+                        {col.label}
+                      </th>
+                    ))}
+                    <th className="p-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
-                  {sizeMeasurements.tops.map((row, idx) => (
-                    <tr key={row.size}>
-                      <td className="p-3 font-bold bg-neutral-50/50 w-20">{row.size}</td>
-                      <td className="p-2">
-                        <input
-                          type="text"
-                          value={row.chest}
-                          onChange={(e) => {
-                            const updated = [...sizeMeasurements.tops];
-                            updated[idx].chest = e.target.value;
-                            setSizeMeasurements({ ...sizeMeasurements, tops: updated });
+                  {(sizeForm.rows || []).map((row, rowIdx) => (
+                    <tr key={row.size || rowIdx} className="hover:bg-neutral-50/50">
+                      {(sizeForm.columns || []).map((col) => (
+                        <td key={col.key} className="p-2">
+                          <input
+                            type="text"
+                            value={row[col.key] || ''}
+                            onChange={(e) => {
+                              const updatedRows = [...sizeForm.rows];
+                              updatedRows[rowIdx] = {
+                                ...updatedRows[rowIdx],
+                                [col.key]: e.target.value
+                              };
+                              setSizeForm({ ...sizeForm, rows: updatedRows });
+                            }}
+                            className={`w-full border border-neutral-200 p-2 focus:outline-none focus:border-brand-charcoal text-xs rounded-xs ${
+                              col.key === 'size' ? 'font-bold font-sans' : 'font-serif'
+                            }`}
+                          />
+                        </td>
+                      ))}
+                      <td className="p-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updatedRows = sizeForm.rows.filter((_, idx) => idx !== rowIdx);
+                            setSizeForm({ ...sizeForm, rows: updatedRows });
                           }}
-                          className="w-full border border-neutral-200 p-1.5 focus:outline-none focus:border-brand-charcoal text-xs"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="text"
-                          value={row.waist}
-                          onChange={(e) => {
-                            const updated = [...sizeMeasurements.tops];
-                            updated[idx].waist = e.target.value;
-                            setSizeMeasurements({ ...sizeMeasurements, tops: updated });
-                          }}
-                          className="w-full border border-neutral-200 p-1.5 focus:outline-none focus:border-brand-charcoal text-xs"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="text"
-                          value={row.shoulder}
-                          onChange={(e) => {
-                            const updated = [...sizeMeasurements.tops];
-                            updated[idx].shoulder = e.target.value;
-                            setSizeMeasurements({ ...sizeMeasurements, tops: updated });
-                          }}
-                          className="w-full border border-neutral-200 p-1.5 focus:outline-none focus:border-brand-charcoal text-xs"
-                        />
+                          className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-xs"
+                          title="Delete row"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1032,6 +1444,24 @@ export default function AdminDashboard() {
                         title="Inspect Order"
                       >
                         <Eye className="w-3.5 h-3.5" /> Inspect
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreviewEmailData({
+                            isOpen: true,
+                            title: 'Customer Receipt Email',
+                            subject: `Official Purchase Receipt & Order Confirmation #${ord.id} - PENNY`,
+                            recipient: `${ord.customer} <${ord.email}>`,
+                            date: ord.createdAt || ord.date,
+                            externalPreviewUrl: ord.previewUrl || null,
+                            htmlContent: generateOrderReceiptEmailHtml(ord),
+                          });
+                        }}
+                        className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs transition-colors inline-flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider ml-1 cursor-pointer"
+                        title="Preview Email Receipt"
+                      >
+                        <Mail className="w-3.5 h-3.5" /> Receipt
                       </button>
                     </td>
                   </tr>
@@ -1205,6 +1635,358 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB 7: MESSAGES & CUSTOMER INQUIRIES */}
+      {activeTab === 'messages' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold font-serif text-brand-charcoal">Customer Inquiries & Contact Emails</h1>
+                {unreadMessagesCount > 0 && (
+                  <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full uppercase">
+                    {unreadMessagesCount} Unread
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-neutral-500 mt-1">
+                Messages submitted via the storefront Contact Us page. Read inquiries and reply directly via email.
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={fetchMessages}
+                disabled={isLoadingMessages}
+                className="px-3.5 py-2 border border-neutral-200 text-xs font-bold uppercase tracking-wider text-brand-charcoal hover:bg-neutral-50 rounded-xs inline-flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingMessages ? 'animate-spin' : ''}`} />
+                <span>Refresh Inquiries</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-2 border-b border-neutral-200 pb-3">
+            {[
+              { id: 'all', label: `All (${messages.length})` },
+              { id: 'unread', label: `Unread (${unreadMessagesCount})` },
+              { id: 'replied', label: `Replied (${messages.filter(m => m.status === 'replied').length})` },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setMessageFilter(tab.id)}
+                className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-xs transition-colors cursor-pointer ${
+                  messageFilter === tab.id
+                    ? 'bg-brand-charcoal text-white'
+                    : 'bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Inquiries List */}
+          {messages.length === 0 ? (
+            <div className="bg-white border border-neutral-200 rounded-xs p-12 text-center text-neutral-400">
+              <Mail className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="font-bold uppercase tracking-wider text-xs">No Customer Inquiries Yet</p>
+              <p className="text-[11px] mt-1">When clients send a message through the Contact Us page, it will appear here instantly.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {messages
+                .filter(m => {
+                  if (messageFilter === 'unread') return m.status === 'unread';
+                  if (messageFilter === 'replied') return m.status === 'replied';
+                  return true;
+                })
+                .map((msg) => {
+                  const isUnread = msg.status === 'unread';
+                  const isReplied = msg.status === 'replied';
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`bg-white border rounded-xs p-5 transition-all shadow-xs ${
+                        isUnread ? 'border-amber-400 ring-1 ring-amber-400/20' : 'border-neutral-200'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-neutral-100 pb-3 mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                            isUnread ? 'bg-amber-100 text-amber-900' : 'bg-neutral-100 text-neutral-700'
+                          }`}>
+                            {msg.name ? msg.name.charAt(0).toUpperCase() : 'C'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-xs text-brand-charcoal">{msg.name}</h3>
+                              <span className="text-[11px] text-neutral-500">&lt;{msg.email}&gt;</span>
+                            </div>
+                            <p className="text-[10px] text-neutral-400 font-mono">
+                              Inquiry Ref: {msg.id} • {new Date(msg.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {msg.orderNumber && (
+                            <span className="px-2 py-0.5 bg-neutral-100 text-neutral-800 border border-neutral-200 rounded-xs text-[10px] font-mono font-bold">
+                              Order: {msg.orderNumber}
+                            </span>
+                          )}
+                          <span className={`px-2 py-0.5 rounded-xs text-[10px] font-bold uppercase tracking-wider ${
+                            isUnread ? 'bg-amber-100 text-amber-900 border border-amber-200' :
+                            isReplied ? 'bg-emerald-100 text-emerald-900 border border-emerald-200' :
+                            'bg-neutral-100 text-neutral-700 border border-neutral-200'
+                          }`}>
+                            {msg.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Message Body */}
+                      <div className="text-xs text-neutral-700 bg-neutral-50/70 p-3.5 rounded-xs border border-neutral-100 leading-relaxed font-sans mb-3">
+                        <p className="font-serif text-[13px]">{msg.message}</p>
+                      </div>
+
+                      {/* Existing Reply Display if already replied */}
+                      {msg.reply && (
+                        <div className="mb-3 p-3 bg-emerald-50/60 border border-emerald-200 rounded-xs text-xs">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[10px] font-bold text-emerald-900 uppercase tracking-wider mb-1 gap-1">
+                            <span className="flex items-center gap-1.5">
+                              <Check className="w-3.5 h-3.5" /> Dispatched Admin Reply
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPreviewEmailData({
+                                    isOpen: true,
+                                    title: 'Dispatched Support Email Reply',
+                                    subject: `Response to your PENNY inquiry ${msg.orderNumber ? `[Order #${msg.orderNumber}]` : ''}`,
+                                    recipient: `${msg.name} <${msg.email}>`,
+                                    date: msg.repliedAt,
+                                    externalPreviewUrl: msg.previewUrl || null,
+                                    htmlContent: generateInquiryReplyEmailHtml(msg, msg.reply),
+                                  });
+                                }}
+                                className="text-brand-charcoal hover:underline font-mono uppercase text-[10px] inline-flex items-center gap-1 cursor-pointer font-bold"
+                              >
+                                <Mail className="w-3 h-3" /> Preview Email
+                              </button>
+                              {msg.previewUrl && (
+                                <a
+                                  href={msg.previewUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-blue-600 hover:text-blue-800 underline font-mono lowercase text-[10px] inline-flex items-center gap-1"
+                                >
+                                  Ethereal Inbox ↗
+                                </a>
+                              )}
+                              <span className="text-neutral-400 font-mono font-normal">
+                                {msg.repliedAt ? new Date(msg.repliedAt).toLocaleString() : ''}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-emerald-950 font-serif text-[12px]">{msg.reply}</p>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                        {isUnread && (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkMessageAsRead(msg.id)}
+                            className="px-3 py-1.5 border border-neutral-200 text-[11px] font-bold uppercase tracking-wider text-neutral-600 hover:text-black hover:bg-neutral-50 rounded-xs transition-colors cursor-pointer"
+                          >
+                            Mark Read
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReplyModalMessage(msg);
+                            setReplyComposerTab('compose');
+                            setReplyText(msg.reply ? `Follow-up: ` : '');
+                            setReplyFeedback({ type: '', text: '' });
+                          }}
+                          className="px-3.5 py-1.5 bg-brand-charcoal text-white hover:bg-black text-[11px] font-bold uppercase tracking-wider rounded-xs inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                        >
+                          <Reply className="w-3.5 h-3.5" />
+                          <span>{msg.reply ? 'Send Another Reply' : 'Reply via Email'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+
+          {/* Email Reply Composer Modal */}
+          {replyModalMessage && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <div className="bg-white w-full max-w-xl border border-neutral-200 shadow-2xl p-6 rounded-xs">
+                <div className="flex justify-between items-center border-b border-neutral-200 pb-3 mb-4">
+                  <div>
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-brand-charcoal flex items-center gap-2">
+                      <Reply className="w-4 h-4" /> Reply to Customer
+                    </h2>
+                    <p className="text-[11px] text-neutral-500 mt-0.5">
+                      Responding to <strong>{replyModalMessage.name}</strong> ({replyModalMessage.email})
+                    </p>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setReplyModalMessage(null)}
+                    className="text-neutral-400 hover:text-black p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {replyFeedback.text && (
+                  <div className={`p-3 mb-4 rounded-xs text-xs font-medium border ${
+                    replyFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-red-50 text-red-900 border-red-200'
+                  }`}>
+                    {replyFeedback.text}
+                  </div>
+                )}
+
+                {/* Excerpt of customer message */}
+                <div className="bg-neutral-50 p-3 rounded-xs border border-neutral-200 mb-4 text-xs">
+                  <span className="text-[10px] font-bold uppercase text-neutral-400 block mb-1">Customer Inquiry:</span>
+                  <p className="text-neutral-700 italic font-serif">"{replyModalMessage.message}"</p>
+                </div>
+
+                {/* Tabs: Compose Reply vs Live Email Preview */}
+                <div className="flex items-center gap-2 border-b border-neutral-200 mb-4 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => setReplyComposerTab('compose')}
+                    className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors cursor-pointer ${
+                      replyComposerTab === 'compose'
+                        ? 'border-brand-charcoal text-brand-charcoal'
+                        : 'border-transparent text-neutral-400 hover:text-neutral-700'
+                    }`}
+                  >
+                    Compose Reply
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReplyComposerTab('preview')}
+                    className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                      replyComposerTab === 'preview'
+                        ? 'border-brand-charcoal text-brand-charcoal'
+                        : 'border-transparent text-neutral-400 hover:text-neutral-700'
+                    }`}
+                  >
+                    <Eye className="w-3.5 h-3.5" /> Live Email Preview
+                  </button>
+                </div>
+
+                {replyComposerTab === 'compose' ? (
+                  <form onSubmit={handleSendReply} className="space-y-4 text-xs font-sans">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                        Your Response *
+                      </label>
+                      <textarea
+                        rows={5}
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Write your response to the client... This will be sent directly to their email address."
+                        className="w-full border border-neutral-200 p-3 focus:outline-none focus:border-brand-charcoal text-xs leading-relaxed"
+                        required
+                      />
+                    </div>
+
+                    <div className="pt-3 border-t border-neutral-100 flex justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setReplyModalMessage(null)}
+                        className="px-4 py-2 border border-neutral-200 text-xs font-bold uppercase tracking-wider hover:bg-neutral-50 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSendingReply || !replyText.trim()}
+                        className="px-5 py-2 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSendingReply ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending Email...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" /> Dispatch Reply
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="space-y-4 text-xs font-sans">
+                    <div className="border border-neutral-200 rounded-xs overflow-hidden bg-[#fbfbfa]">
+                      <div className="p-2.5 bg-neutral-100 border-b border-neutral-200 text-[10px] font-mono text-neutral-600 flex justify-between items-center">
+                        <span>Preview: To {replyModalMessage.email}</span>
+                        <span className="text-emerald-700 font-bold uppercase">PENNY Branded Email</span>
+                      </div>
+                      <iframe
+                        title="Live Reply Email Preview"
+                        srcDoc={generateInquiryReplyEmailHtml(replyModalMessage, replyText.trim() || 'Your response will appear here...')}
+                        className="w-full h-80 bg-white"
+                      />
+                    </div>
+
+                    <div className="pt-3 border-t border-neutral-100 flex justify-between items-center">
+                      <button
+                        type="button"
+                        onClick={() => setReplyComposerTab('compose')}
+                        className="text-xs font-bold uppercase tracking-wider text-brand-charcoal hover:underline cursor-pointer"
+                      >
+                        ← Back to Edit
+                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setReplyModalMessage(null)}
+                          className="px-4 py-2 border border-neutral-200 text-xs font-bold uppercase tracking-wider hover:bg-neutral-50 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSendReply}
+                          disabled={isSendingReply || !replyText.trim()}
+                          className="px-5 py-2 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {isSendingReply ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending Email...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-3.5 h-3.5" /> Dispatch Reply
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1606,21 +2388,133 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Actions: Print Receipt & Close */}
-              <div className="pt-4 flex justify-between items-center border-t border-neutral-200">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-4 py-2 border border-neutral-300 text-xs font-bold uppercase tracking-wider text-brand-charcoal hover:bg-neutral-50 inline-flex items-center gap-2"
-                >
-                  <Printer className="w-4 h-4" /> Print Packing Slip
-                </button>
+              {/* Actions: Print Receipt, Preview Email Receipt & Close */}
+              <div className="pt-4 flex flex-wrap justify-between items-center gap-3 border-t border-neutral-200">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => printOrderReceipt(selectedOrder)}
+                    className="px-4 py-2 border border-neutral-300 text-xs font-bold uppercase tracking-wider text-brand-charcoal hover:bg-neutral-50 inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4" /> Print Official Receipt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewEmailData({
+                        isOpen: true,
+                        title: 'Official Customer Receipt Email',
+                        subject: `Official Purchase Receipt & Order Confirmation #${selectedOrder.id} - PENNY`,
+                        recipient: `${selectedOrder.customer} <${selectedOrder.email}>`,
+                        date: selectedOrder.createdAt || selectedOrder.date,
+                        externalPreviewUrl: selectedOrder.previewUrl || null,
+                        htmlContent: generateOrderReceiptEmailHtml(selectedOrder),
+                      });
+                    }}
+                    className="px-4 py-2 bg-neutral-100 text-brand-charcoal hover:bg-neutral-200 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Mail className="w-4 h-4" /> Preview Email Receipt
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setSelectedOrder(null)}
-                  className="px-5 py-2 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black"
+                  className="px-5 py-2 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black cursor-pointer"
                 >
                   Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STANDALONE EMAIL PREVIEW MODAL */}
+      {previewEmailData?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-2xl max-h-[92vh] flex flex-col border border-neutral-200 shadow-2xl rounded-xs overflow-hidden">
+            {/* Modal Top Bar */}
+            <div className="flex justify-between items-center border-b border-neutral-200 px-6 py-4 bg-neutral-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-brand-charcoal text-white flex items-center justify-center">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-brand-charcoal">
+                    {previewEmailData.title || 'Email Dispatch Preview'}
+                  </h2>
+                  <p className="text-[11px] text-neutral-500 font-mono mt-0.5">
+                    To: {previewEmailData.recipient}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewEmailData(null)}
+                className="text-neutral-400 hover:text-black p-1 cursor-pointer transition-colors"
+                title="Close Preview"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Meta Bar */}
+            <div className="px-6 py-2.5 bg-neutral-100/70 border-b border-neutral-200 flex flex-wrap items-center justify-between text-[11px] font-sans gap-2">
+              <div className="truncate max-w-md">
+                <span className="font-bold uppercase tracking-wider text-neutral-500 mr-2 text-[10px]">Subject:</span>
+                <span className="text-brand-charcoal font-medium">{previewEmailData.subject}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                {previewEmailData.date && (
+                  <span className="text-neutral-400 font-mono text-[10px]">
+                    {new Date(previewEmailData.date).toLocaleString()}
+                  </span>
+                )}
+                {previewEmailData.externalPreviewUrl && (
+                  <a
+                    href={previewEmailData.externalPreviewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline font-mono text-[10px] inline-flex items-center gap-1"
+                  >
+                    Open Ethereal Mailbox <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* Email Body Iframe Preview */}
+            <div className="flex-1 overflow-auto p-4 bg-[#fbfbfa]">
+              <iframe
+                title="Email Preview"
+                srcDoc={previewEmailData.htmlContent}
+                className="w-full h-[520px] bg-white border border-neutral-200 rounded-xs shadow-inner"
+                sandbox="allow-same-origin allow-scripts"
+              />
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="px-6 py-3 border-t border-neutral-200 bg-white flex justify-between items-center">
+              <span className="text-[11px] text-neutral-400 font-mono">
+                Rendered via PENNY Transactional Email Engine
+              </span>
+              <div className="flex items-center gap-2">
+                {previewEmailData.externalPreviewUrl && (
+                  <a
+                    href={previewEmailData.externalPreviewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3.5 py-1.5 border border-neutral-300 text-[11px] font-bold uppercase tracking-wider hover:bg-neutral-50 inline-flex items-center gap-1.5 cursor-pointer text-brand-charcoal"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> Open in Inbox
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewEmailData(null)}
+                  className="px-5 py-1.5 bg-brand-charcoal text-white text-[11px] font-bold uppercase tracking-wider hover:bg-black cursor-pointer"
+                >
+                  Close Preview
                 </button>
               </div>
             </div>
