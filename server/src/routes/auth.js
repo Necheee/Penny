@@ -8,19 +8,25 @@ import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 const router = express.Router();
 
 /**
- * In-memory / Mock fallback for initial boots before database migration
- * Provides guaranteed functionality during runtime setup
+ * Resolves administrator account strictly from private environment variables
  */
-let registeredUsers = [
-  {
+const getAdminAccount = () => {
+  const email = (process.env.ADMIN_EMAIL || '').trim();
+  const password = process.env.ADMIN_PASSWORD || '';
+  const name = (process.env.ADMIN_NAME || 'PENNY Owner').trim();
+
+  if (!email || !password) {
+    return null;
+  }
+
+  return {
     id: 'owner-admin-01',
-    email: process.env.ADMIN_EMAIL || 'owner@penny.com',
-    passwordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'PennyAdmin2026!', 10),
-    name: process.env.ADMIN_NAME || 'PENNY Owner',
+    email,
+    password,
+    name,
     role: 'admin',
-    createdAt: new Date(),
-  },
-];
+  };
+};
 
 /**
  * POST /api/auth/login
@@ -38,16 +44,25 @@ router.post('/login', async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const user = registeredUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+    const admin = getAdminAccount();
 
-    if (!user) {
+    if (!admin || cleanEmail !== admin.email.toLowerCase()) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials. Please verify your email and password.',
       });
     }
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    // Secure password comparison: supports plain text or bcrypt-hashed passwords from .env
+    let isMatch = password === admin.password;
+    if (!isMatch && admin.password.startsWith('$2')) {
+      try {
+        isMatch = await bcrypt.compare(password, admin.password);
+      } catch {
+        isMatch = false;
+      }
+    }
+
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -56,17 +71,17 @@ router.post('/login', async (req, res) => {
     }
 
     // Generate signed JWT token
-    const token = generateToken(user);
+    const token = generateToken(admin);
 
     return res.status(200).json({
       success: true,
       message: 'Authentication successful.',
       token,
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
+        id: admin.id,
+        email: admin.email,
+        name: admin.name,
+        role: admin.role,
       },
     });
   } catch (error) {
