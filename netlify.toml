@@ -1,0 +1,19 @@
+# Netlify Configuration for PENNY Storefront
+
+[build]
+  base = "client"
+  publish = "dist"
+  command = "npm run build"
+
+# Proxy all backend API requests to the live Render Node.js backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://penny-kbrh.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# Fallback for Single-Page Application (SPA) routing (Shop, Account, Admin, etc.)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
