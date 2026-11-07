@@ -84,6 +84,16 @@ export async function initCloudDatabase() {
         instructions TEXT,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS categories (
+        id VARCHAR(100) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        slug VARCHAR(100),
+        display_order INTEGER DEFAULT 1,
+        subcategories JSONB DEFAULT '[]'::jsonb
+      );
+      ALTER TABLE categories ADD COLUMN IF NOT EXISTS subcategories JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE categories ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 1;
     `);
 
     // Seed existing orders and bank config from local files if empty
@@ -127,6 +137,32 @@ export async function initCloudDatabase() {
         ON CONFLICT (id) DO NOTHING
       `, [bankData.bankName, bankData.accountName, bankData.accountNumber, bankData.instructions]);
       console.log('[DATABASE] Seeded bank details to Neon Cloud!');
+    }
+
+    // Seed categories with subcategories
+    const catRes = await client.query('SELECT COUNT(*) FROM categories');
+    if (parseInt(catRes.rows[0].count) === 0) {
+      const catFile = path.resolve(__dirname, '../data/storage/categories.json');
+      if (fs.existsSync(catFile)) {
+        const catData = JSON.parse(fs.readFileSync(catFile, 'utf-8'));
+        for (const cat of catData) {
+          await client.query(`
+            INSERT INTO categories (id, name, slug, display_order, subcategories)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (id) DO UPDATE SET
+              name = EXCLUDED.name,
+              slug = EXCLUDED.slug,
+              subcategories = EXCLUDED.subcategories
+          `, [
+            cat.id,
+            cat.name,
+            cat.slug || cat.id,
+            cat.displayOrder || 1,
+            JSON.stringify(cat.subcategories || [])
+          ]);
+        }
+        console.log(`[DATABASE] Seeded ${catData.length} categories with subcategories to Neon Cloud!`);
+      }
     }
 
     client.release();

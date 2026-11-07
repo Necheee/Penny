@@ -1,10 +1,34 @@
 // server/src/data/initialCatalogue.js - Complete PENNY Product & Category Catalogue
 
 export const initialCategories = [
-  { id: 'sets', name: 'Two-Piece Sets', slug: 'two-piece-sets', displayOrder: 1 },
-  { id: 'tops', name: 'Tops', slug: 'tops', displayOrder: 2 },
-  { id: 'bottoms', name: 'Bottoms', slug: 'bottoms', displayOrder: 3 },
-  { id: 'outerwear', name: 'Outerwear', slug: 'outerwear', displayOrder: 4 }
+  {
+    id: 'sets',
+    name: 'Two-Piece Sets',
+    slug: 'two-piece-sets',
+    displayOrder: 1,
+    subcategories: ['Linen Sets', 'Cotton Lounge Sets']
+  },
+  {
+    id: 'tops',
+    name: 'Tops',
+    slug: 'tops',
+    displayOrder: 2,
+    subcategories: ['T-Shirts', 'Henleys', 'Polos', 'Long-Sleeve Shirts', 'Hoodies', 'Sweatshirts', 'Quarter-Zips', 'Sweaters', 'Overshirts']
+  },
+  {
+    id: 'bottoms',
+    name: 'Bottoms',
+    slug: 'bottoms',
+    displayOrder: 3,
+    subcategories: ['Trousers', 'Chinos', 'Jeans', 'Shorts', 'Joggers', 'Cargo Pants']
+  },
+  {
+    id: 'outerwear',
+    name: 'Outerwear',
+    slug: 'outerwear',
+    displayOrder: 4,
+    subcategories: ['Jackets', 'Coats', 'Overcoats']
+  }
 ];
 
 export const initialSizeGuides = [
