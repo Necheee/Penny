@@ -65,6 +65,8 @@ export default function AdminDashboard() {
     toggleStock, 
     addCategory, 
     deleteCategory,
+    addSubcategory,
+    deleteSubcategory,
     announcements = [],
     updateAnnouncements,
     sizeGuideData = {},
@@ -73,6 +75,12 @@ export default function AdminDashboard() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
+  const [selectedSubcategoryFilter, setSelectedSubcategoryFilter] = useState('all');
+  const [newCategorySubcategories, setNewCategorySubcategories] = useState('');
+  const [subInputs, setSubInputs] = useState({});
+  const [isAddingCustomSub, setIsAddingCustomSub] = useState(false);
+  const [customSubcategoryInput, setCustomSubcategoryInput] = useState('');
+  const [categoryFeedback, setCategoryFeedback] = useState('');
 
   // Orders state initialized from localStorage with fallback, and synced from /api/payments/orders
   const [orders, setOrders] = useState(() => {
@@ -328,18 +336,25 @@ export default function AdminDashboard() {
   // Filter Products
   const filteredProducts = productList.filter(p => {
     const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.category?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategoryFilter === 'all' || p.category === selectedCategoryFilter;
-    return matchesSearch && matchesCategory;
+                          p.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.subcategory?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategoryFilter === 'all' || 
+                            p.category === selectedCategoryFilter || 
+                            p.category === categoryList.find(c => c.id === selectedCategoryFilter)?.slug;
+    const matchesSubcategory = selectedSubcategoryFilter === 'all' || 
+                               !selectedSubcategoryFilter || 
+                               p.subcategory?.toLowerCase() === selectedSubcategoryFilter.toLowerCase();
+    return matchesSearch && matchesCategory && matchesSubcategory;
   });
 
   // Open Add Product Modal
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
+    const firstCat = categoryList[0];
     setProductForm({
       name: '',
-      category: categoryList[0]?.id || 'tops',
-      subcategory: '',
+      category: firstCat?.id || 'tops',
+      subcategory: firstCat?.subcategories?.[0] || '',
       price: '',
       description: '',
       material: '100% Cotton',
@@ -350,6 +365,8 @@ export default function AdminDashboard() {
       availableSizes: ['S', 'M', 'L', 'XL'],
       imageUrl: ''
     });
+    setIsAddingCustomSub(false);
+    setCustomSubcategoryInput('');
     setIsProductModalOpen(true);
   };
 
@@ -370,6 +387,8 @@ export default function AdminDashboard() {
       availableSizes: product.availableSizes || ['M', 'L'],
       imageUrl: product.images?.primary || ''
     });
+    setIsAddingCustomSub(false);
+    setCustomSubcategoryInput('');
     setIsProductModalOpen(true);
   };
 
@@ -462,12 +481,20 @@ export default function AdminDashboard() {
       return;
     }
 
+    const finalSubcategory = isAddingCustomSub && customSubcategoryInput.trim()
+      ? customSubcategoryInput.trim()
+      : (productForm.subcategory || '');
+
+    if (isAddingCustomSub && customSubcategoryInput.trim()) {
+      addSubcategory(productForm.category, customSubcategoryInput.trim());
+    }
+
     if (editingProduct) {
       updateProduct({
         ...editingProduct,
         name: productForm.name,
         category: productForm.category,
-        subcategory: productForm.subcategory,
+        subcategory: finalSubcategory,
         price: Number(productForm.price),
         description: productForm.description,
         material: productForm.material,
@@ -487,7 +514,7 @@ export default function AdminDashboard() {
         id: newId,
         name: productForm.name,
         category: productForm.category,
-        subcategory: productForm.subcategory || 'New Arrival',
+        subcategory: finalSubcategory || 'New Arrival',
         price: Number(productForm.price),
         description: productForm.description || 'Premium menswear essential.',
         material: productForm.material || '100% Cotton',
@@ -530,20 +557,48 @@ export default function AdminDashboard() {
   const handleAddCategory = (e) => {
     e.preventDefault();
     if (!newCategoryName.trim()) return;
-    const slug = newCategorySlug.trim() || newCategoryName.toLowerCase().replace(/\s+/g, '-');
+    const slug = newCategorySlug.trim() || newCategoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const initialSubs = newCategorySubcategories
+      ? newCategorySubcategories.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
     addCategory({
       id: slug,
-      name: newCategoryName,
-      slug: slug
+      name: newCategoryName.trim(),
+      slug: slug,
+      subcategories: initialSubs
     });
     setNewCategoryName('');
     setNewCategorySlug('');
+    setNewCategorySubcategories('');
+    setCategoryFeedback(`Category "${newCategoryName}" created successfully.`);
+    setTimeout(() => setCategoryFeedback(''), 4000);
   };
 
   // Delete Category with Context Sync
   const handleDeleteCategory = (categoryId) => {
     if (confirm('Delete this category?')) {
       deleteCategory(categoryId);
+      setCategoryFeedback('Category deleted.');
+      setTimeout(() => setCategoryFeedback(''), 3000);
+    }
+  };
+
+  // Add subcategory to specific category
+  const handleAddSubcategoryToCat = (catId) => {
+    const text = (subInputs[catId] || '').trim();
+    if (!text) return;
+    addSubcategory(catId, text);
+    setSubInputs(prev => ({ ...prev, [catId]: '' }));
+    setCategoryFeedback(`Added "${text}" subcategory.`);
+    setTimeout(() => setCategoryFeedback(''), 3000);
+  };
+
+  // Delete subcategory from specific category
+  const handleDeleteSubcategoryFromCat = (catId, subName) => {
+    if (confirm(`Remove subcategory "${subName}" from this category?`)) {
+      deleteSubcategory(catId, subName);
+      setCategoryFeedback(`Removed "${subName}" subcategory.`);
+      setTimeout(() => setCategoryFeedback(''), 3000);
     }
   };
 
@@ -858,7 +913,10 @@ export default function AdminDashboard() {
               {/* Category Filter */}
               <select
                 value={selectedCategoryFilter}
-                onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                onChange={(e) => {
+                  setSelectedCategoryFilter(e.target.value);
+                  setSelectedSubcategoryFilter('all');
+                }}
                 className="py-2 px-3 text-xs border border-neutral-200 focus:outline-none focus:border-brand-charcoal bg-white"
               >
                 <option value="all">All Categories</option>
@@ -866,6 +924,22 @@ export default function AdminDashboard() {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
+
+              {/* Subcategory Filter (when specific category selected) */}
+              {selectedCategoryFilter !== 'all' && (
+                <select
+                  value={selectedSubcategoryFilter}
+                  onChange={(e) => setSelectedSubcategoryFilter(e.target.value)}
+                  className="py-2 px-3 text-xs border border-neutral-200 focus:outline-none focus:border-brand-charcoal bg-white"
+                >
+                  <option value="all">All Subcategories</option>
+                  {categoryList
+                    .find(c => c.id === selectedCategoryFilter || c.slug === selectedCategoryFilter)
+                    ?.subcategories?.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                </select>
+              )}
             </div>
 
             <button
@@ -907,7 +981,12 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td className="py-3 px-4 uppercase text-[11px] font-medium text-neutral-600">
-                        {p.category}
+                        <span className="font-bold text-brand-charcoal">{p.category}</span>
+                        {p.subcategory && (
+                          <span className="block text-[10px] text-brand-taupe font-normal lowercase tracking-wide capitalize">
+                            • {p.subcategory}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 font-serif font-bold text-sm text-brand-charcoal">
                         ₦ {p.price.toLocaleString()}
@@ -967,8 +1046,8 @@ export default function AdminDashboard() {
       {activeTab === 'categories' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Add Category Form */}
-          <div className="bg-white p-6 border border-neutral-200 rounded-sm shadow-xs h-fit">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-brand-charcoal mb-4">
+          <div className="bg-white p-6 border border-neutral-200 rounded-sm shadow-xs h-fit space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-brand-charcoal">
               Create New Category
             </h3>
             <form onSubmit={handleAddCategory} className="space-y-4 text-xs">
@@ -980,7 +1059,7 @@ export default function AdminDashboard() {
                   type="text"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="e.g. Outerwear"
+                  placeholder="e.g. Footwear"
                   className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
                   required
                 />
@@ -993,9 +1072,22 @@ export default function AdminDashboard() {
                   type="text"
                   value={newCategorySlug}
                   onChange={(e) => setNewCategorySlug(e.target.value)}
-                  placeholder="e.g. outerwear"
+                  placeholder="e.g. footwear"
                   className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
                 />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                  Initial Subcategories (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={newCategorySubcategories}
+                  onChange={(e) => setNewCategorySubcategories(e.target.value)}
+                  placeholder="e.g. Loafers, Mules, Sandals (comma-separated)"
+                  className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
+                />
+                <p className="text-[10px] text-neutral-400 mt-1">Separate with commas, or add them individually below anytime.</p>
               </div>
               <button
                 type="submit"
@@ -1006,26 +1098,112 @@ export default function AdminDashboard() {
             </form>
           </div>
 
-          {/* Existing Categories List */}
-          <div className="md:col-span-2 bg-white p-6 border border-neutral-200 rounded-sm shadow-xs">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-brand-charcoal mb-4">
-              Active Store Categories ({categoryList.length})
-            </h3>
-            <div className="divide-y divide-neutral-100">
-              {categoryList.map((cat) => (
-                <div key={cat.id} className="py-3 flex justify-between items-center text-xs">
-                  <div>
-                    <p className="font-bold uppercase tracking-wider text-brand-charcoal">{cat.name}</p>
-                    <p className="text-[10px] text-neutral-400 font-mono">/shop?category={cat.slug || cat.id}</p>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteCategory(cat.id)}
-                    className="text-red-500 hover:text-red-700 text-xs uppercase font-bold tracking-wider"
-                  >
-                    Delete
-                  </button>
+          {/* Existing Categories & Subcategories List */}
+          <div className="md:col-span-2 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-brand-charcoal">
+                Active Store Categories & Subcategories ({categoryList.length})
+              </h3>
+            </div>
+
+            {categoryFeedback && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between rounded-xs">
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span>{categoryFeedback}</span>
                 </div>
-              ))}
+                <button type="button" onClick={() => setCategoryFeedback('')} className="text-neutral-400 hover:text-black">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {categoryList.map((cat) => {
+                const productCount = productList.filter(p => p.category === cat.id || p.category === cat.slug).length;
+                const subs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
+                return (
+                  <div key={cat.id} className="bg-white p-5 border border-neutral-200 rounded-sm shadow-xs space-y-4">
+                    {/* Header Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold uppercase tracking-wider text-sm text-brand-charcoal">{cat.name}</h4>
+                          <span className="text-[10px] px-2 py-0.5 bg-neutral-100 text-neutral-600 rounded-full font-mono">
+                            {productCount} {productCount === 1 ? 'product' : 'products'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-400 font-mono mt-0.5">/shop?category={cat.slug || cat.id}</p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteCategory(cat.id)}
+                        className="text-red-500 hover:text-red-700 text-xs uppercase font-bold tracking-wider self-start sm:self-auto cursor-pointer"
+                      >
+                        Delete Category
+                      </button>
+                    </div>
+
+                    {/* Subcategories Section */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+                          Subcategories ({subs.length})
+                        </span>
+                      </div>
+
+                      {/* Subcategory Badges */}
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {subs.length > 0 ? (
+                          subs.map((sub) => (
+                            <span 
+                              key={sub}
+                              className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#F7F7F5] border border-neutral-200 text-brand-charcoal text-xs font-medium rounded-sm"
+                            >
+                              <span>{sub}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSubcategoryFromCat(cat.id, sub)}
+                                className="text-neutral-400 hover:text-red-600 transition-colors ml-0.5 cursor-pointer"
+                                title={`Delete ${sub}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-neutral-400 italic">
+                            No subcategories added yet. Add one below to give shoppers subcategory filter tabs.
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Add Subcategory Input Form */}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={subInputs[cat.id] || ''}
+                          onChange={(e) => setSubInputs({ ...subInputs, [cat.id]: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddSubcategoryToCat(cat.id);
+                            }
+                          }}
+                          placeholder={`Add a subcategory to ${cat.name} (e.g. ${cat.id === 'tops' ? 'V-Necks' : cat.id === 'bottoms' ? 'Tailored Shorts' : 'Lounge Sets'})...`}
+                          className="flex-1 text-xs border border-neutral-200 p-2 focus:outline-none focus:border-brand-charcoal bg-neutral-50/50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddSubcategoryToCat(cat.id)}
+                          className="px-4 py-2 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors whitespace-nowrap cursor-pointer"
+                        >
+                          + Add Subcategory
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -2028,7 +2206,17 @@ export default function AdminDashboard() {
                   </label>
                   <select
                     value={productForm.category}
-                    onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                    onChange={(e) => {
+                      const newCatId = e.target.value;
+                      const catObj = categoryList.find(c => c.id === newCatId || c.slug === newCatId);
+                      setProductForm({ 
+                        ...productForm, 
+                        category: newCatId,
+                        subcategory: catObj?.subcategories?.[0] || ''
+                      });
+                      setIsAddingCustomSub(false);
+                      setCustomSubcategoryInput('');
+                    }}
                     className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white"
                   >
                     {categoryList.map(c => (
@@ -2049,6 +2237,58 @@ export default function AdminDashboard() {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Subcategory Selection / Creator */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                  Subcategory
+                </label>
+                {!isAddingCustomSub ? (
+                  <div className="flex gap-2">
+                    <select
+                      value={productForm.subcategory}
+                      onChange={(e) => {
+                        if (e.target.value === '__NEW_SUB__') {
+                          setIsAddingCustomSub(true);
+                          setCustomSubcategoryInput('');
+                        } else {
+                          setProductForm({ ...productForm, subcategory: e.target.value });
+                        }
+                      }}
+                      className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white text-xs"
+                    >
+                      <option value="">(None / General)</option>
+                      {categoryList
+                        .find(c => c.id === productForm.category || c.slug === productForm.category)
+                        ?.subcategories?.map((sub) => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                      <option value="__NEW_SUB__">+ Add New Subcategory for this Category...</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customSubcategoryInput}
+                      onChange={(e) => setCustomSubcategoryInput(e.target.value)}
+                      placeholder="Type new subcategory name..."
+                      className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal text-xs"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingCustomSub(false);
+                        setCustomSubcategoryInput('');
+                      }}
+                      className="px-3 py-2 border border-neutral-300 text-neutral-600 text-xs uppercase font-bold hover:bg-neutral-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Interactive Image Dropzone & Preview */}
