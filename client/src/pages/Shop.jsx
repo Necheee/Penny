@@ -8,9 +8,11 @@ import ProductCard from '../components/shop/ProductCard';
 export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialCategory = searchParams.get('category') || 'all';
+  const initialSubcategory = searchParams.get('subcategory') || 'all';
 
   const { products, categories } = useProducts();
   const [activeCategory, setActiveCategory] = useState(initialCategory);
+  const [activeSubcategory, setActiveSubcategory] = useState(initialSubcategory);
   const [sortOption, setSortOption] = useState('featured'); // featured, price-asc, price-desc
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
@@ -19,21 +21,52 @@ export default function Shop() {
     return [{ id: 'all', name: 'All Products' }, ...(categories || [])];
   }, [categories]);
 
+  // Current selected category object
+  const currentCategory = useMemo(() => {
+    if (activeCategory === 'all') return null;
+    return categoriesList.find(c => c.id === activeCategory || c.slug === activeCategory);
+  }, [activeCategory, categoriesList]);
+
+  // Available subcategories for the active category
+  const activeSubcategories = useMemo(() => {
+    return currentCategory?.subcategories || [];
+  }, [currentCategory]);
 
   // Sync state with URL params
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category') || 'all';
+    const subcategoryFromUrl = searchParams.get('subcategory') || 'all';
     setActiveCategory(categoryFromUrl);
+    setActiveSubcategory(subcategoryFromUrl);
   }, [searchParams]);
 
   // Update URL when category changes
   const handleCategoryChange = (catId) => {
     setActiveCategory(catId);
+    setActiveSubcategory('all');
+    const params = new URLSearchParams(searchParams);
     if (catId === 'all') {
-      setSearchParams({});
+      params.delete('category');
+      params.delete('subcategory');
     } else {
-      setSearchParams({ category: catId });
+      params.set('category', catId);
+      params.delete('subcategory');
     }
+    setSearchParams(params);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setIsMobileFilterOpen(false);
+  };
+
+  // Update URL when subcategory changes
+  const handleSubcategoryChange = (subName) => {
+    setActiveSubcategory(subName);
+    const params = new URLSearchParams(searchParams);
+    if (!subName || subName === 'all') {
+      params.delete('subcategory');
+    } else {
+      params.set('subcategory', subName);
+    }
+    setSearchParams(params);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setIsMobileFilterOpen(false);
   };
@@ -51,6 +84,11 @@ export default function Shop() {
         p.category === activeCategory || 
         (matchedCat && (p.category === matchedCat.id || p.category === matchedCat.slug))
       );
+    }
+
+    // Filter by Subcategory
+    if (activeSubcategory && activeSubcategory !== 'all') {
+      result = result.filter(p => p.subcategory?.toLowerCase() === activeSubcategory.toLowerCase());
     }
 
     // Filter by Search query
@@ -165,20 +203,54 @@ export default function Shop() {
           <div className="sticky top-24">
             <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-brand-taupe mb-6">Categories</h3>
             <ul className="space-y-4 mb-12">
-              {categoriesList.map((cat) => (
-                <li key={cat.id}>
-                  <button
-                    onClick={() => handleCategoryChange(cat.id)}
-                    className={`text-sm tracking-wide transition-colors ${
-                      (activeCategory === cat.id || (cat.slug && activeCategory === cat.slug))
-                        ? 'font-bold text-brand-charcoal'
-                        : 'text-brand-charcoal/60 hover:text-brand-charcoal'
-                    }`}
-                  >
-                    {cat.name}
-                  </button>
-                </li>
-              ))}
+              {categoriesList.map((cat) => {
+                const isCatActive = activeCategory === cat.id || (cat.slug && activeCategory === cat.slug);
+                const subs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
+                return (
+                  <li key={cat.id} className="space-y-2">
+                    <button
+                      onClick={() => handleCategoryChange(cat.id)}
+                      className={`text-sm tracking-wide transition-colors block text-left ${
+                        isCatActive
+                          ? 'font-bold text-brand-charcoal'
+                          : 'text-brand-charcoal/60 hover:text-brand-charcoal'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                    {isCatActive && subs.length > 0 && (
+                      <ul className="pl-3 border-l border-brand-charcoal/20 space-y-2 pt-1">
+                        <li>
+                          <button
+                            onClick={() => handleSubcategoryChange('all')}
+                            className={`text-xs tracking-wider uppercase transition-colors block text-left ${
+                              activeSubcategory === 'all'
+                                ? 'font-bold text-brand-charcoal underline underline-offset-4'
+                                : 'text-brand-charcoal/50 hover:text-brand-charcoal'
+                            }`}
+                          >
+                            All {cat.name}
+                          </button>
+                        </li>
+                        {subs.map((sub) => (
+                          <li key={sub}>
+                            <button
+                              onClick={() => handleSubcategoryChange(sub)}
+                              className={`text-xs tracking-wider uppercase transition-colors block text-left ${
+                                activeSubcategory.toLowerCase() === sub.toLowerCase()
+                                  ? 'font-bold text-brand-charcoal underline underline-offset-4'
+                                  : 'text-brand-charcoal/50 hover:text-brand-charcoal'
+                              }`}
+                            >
+                              {sub}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
 
             {/* Desktop Sort */}
@@ -203,6 +275,34 @@ export default function Shop() {
 
         {/* Product Grid */}
         <div className="flex-grow">
+          {/* Subcategory Pills Bar */}
+          {activeSubcategories.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-8 hide-scrollbar border-b border-brand-charcoal/10">
+              <button
+                onClick={() => handleSubcategoryChange('all')}
+                className={`px-4 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors rounded-full whitespace-nowrap shrink-0 ${
+                  activeSubcategory === 'all'
+                    ? 'bg-brand-charcoal text-white font-bold shadow-xs'
+                    : 'bg-brand-beige/30 text-brand-charcoal/70 hover:bg-brand-beige/60 hover:text-brand-charcoal'
+                }`}
+              >
+                All {currentCategory.name}
+              </button>
+              {activeSubcategories.map((sub) => (
+                <button
+                  key={sub}
+                  onClick={() => handleSubcategoryChange(sub)}
+                  className={`px-4 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors rounded-full whitespace-nowrap shrink-0 ${
+                    activeSubcategory.toLowerCase() === sub.toLowerCase()
+                      ? 'bg-brand-charcoal text-white font-bold shadow-xs'
+                      : 'bg-brand-beige/30 text-brand-charcoal/70 hover:bg-brand-beige/60 hover:text-brand-charcoal'
+                  }`}
+                >
+                  {sub}
+                </button>
+              ))}
+            </div>
+          )}
           {!products ? (
             <div className="py-20 flex justify-center items-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal"></div>

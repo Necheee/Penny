@@ -202,6 +202,11 @@ export default function ProductModal({ productId, closeModal }) {
         <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col">
           <div className="mb-6 flex justify-between items-start">
             <div>
+              {product.subcategory && (
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-taupe mb-1 block">
+                  {product.subcategory}
+                </span>
+              )}
               <h1 className="text-2xl font-serif text-brand-charcoal mb-2">{product.name}</h1>
               <p className="text-lg font-serif text-brand-charcoal/80">₦ {product.price.toLocaleString()}</p>
             </div>
