@@ -75,8 +75,15 @@ export const getCategories = async () => {
       if (data.success && Array.isArray(data.data)) {
         const stored = getStoredCategories();
         const map = new Map();
-        data.data.forEach(c => map.set(c.id, c));
         stored.forEach(c => map.set(c.id, c));
+        data.data.forEach(c => {
+          const prev = map.get(c.id) || {};
+          map.set(c.id, {
+            ...prev,
+            ...c,
+            subcategories: Array.isArray(c.subcategories) ? c.subcategories : (prev.subcategories || []),
+          });
+        });
         const merged = Array.from(map.values());
         if (typeof window !== 'undefined') {
           localStorage.setItem('penny_categories', JSON.stringify(merged));

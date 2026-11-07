@@ -23,7 +23,18 @@ export function ProductProvider({ children }) {
     const saved = localStorage.getItem('penny_categories');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((c) => {
+            const initial = initialCategories.find(ic => ic.id === c.id || ic.slug === c.slug);
+            return {
+              ...c,
+              subcategories: Array.isArray(c.subcategories) && c.subcategories.length > 0
+                ? c.subcategories
+                : (initial?.subcategories || [])
+            };
+          });
+        }
       } catch (e) {
         console.error("Failed to parse saved categories", e);
       }
@@ -144,8 +155,17 @@ export function ProductProvider({ children }) {
           if (Array.isArray(liveCategories) && liveCategories.length > 0) {
             setCategories((prevCategories) => {
               const map = new Map();
-              liveCategories.forEach(c => map.set(c.id, c));
               prevCategories.forEach(c => map.set(c.id, c));
+              liveCategories.forEach(c => {
+                const prev = map.get(c.id) || {};
+                map.set(c.id, {
+                  ...prev,
+                  ...c,
+                  subcategories: (Array.isArray(c.subcategories) && c.subcategories.length > 0)
+                    ? c.subcategories
+                    : (prev.subcategories || [])
+                });
+              });
               const merged = Array.from(map.values());
               localStorage.setItem('penny_categories', JSON.stringify(merged));
               return merged;
@@ -202,10 +222,14 @@ export function ProductProvider({ children }) {
     );
   };
 
-  // 6. Category Management
+  // 6. Category & Subcategory Management
   const addCategory = async (newCat) => {
+    const catWithSubs = {
+      ...newCat,
+      subcategories: Array.isArray(newCat.subcategories) ? newCat.subcategories : []
+    };
     setCategories((prev) => {
-      const updated = [...prev, newCat];
+      const updated = [...prev, catWithSubs];
       localStorage.setItem('penny_categories', JSON.stringify(updated));
       return updated;
     });
@@ -214,7 +238,7 @@ export function ProductProvider({ children }) {
       await fetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCat)
+        body: JSON.stringify(catWithSubs)
       });
     } catch (err) {
       console.warn("Backend category sync note:", err);
@@ -234,6 +258,66 @@ export function ProductProvider({ children }) {
       });
     } catch (err) {
       console.warn("Backend category delete note:", err);
+    }
+  };
+
+  const addSubcategory = async (categoryId, subcategoryName) => {
+    const cleanSub = subcategoryName.trim();
+    if (!cleanSub) return;
+
+    setCategories((prev) => {
+      const updated = prev.map((cat) => {
+        if (cat.id === categoryId || cat.slug === categoryId) {
+          const currentSubs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
+          if (currentSubs.some(s => s.toLowerCase() === cleanSub.toLowerCase())) {
+            return cat;
+          }
+          return {
+            ...cat,
+            subcategories: [...currentSubs, cleanSub]
+          };
+        }
+        return cat;
+      });
+      localStorage.setItem('penny_categories', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subcategory: cleanSub })
+      });
+    } catch (err) {
+      console.warn("Backend subcategory add sync note:", err);
+    }
+  };
+
+  const deleteSubcategory = async (categoryId, subcategoryName) => {
+    const cleanSub = subcategoryName.trim().toLowerCase();
+
+    setCategories((prev) => {
+      const updated = prev.map((cat) => {
+        if (cat.id === categoryId || cat.slug === categoryId) {
+          const currentSubs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
+          return {
+            ...cat,
+            subcategories: currentSubs.filter(s => s.toLowerCase() !== cleanSub)
+          };
+        }
+        return cat;
+      });
+      localStorage.setItem('penny_categories', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories/${encodeURIComponent(subcategoryName)}`, {
+        method: 'DELETE'
+      });
+    } catch (err) {
+      console.warn("Backend subcategory delete sync note:", err);
     }
   };
 
@@ -278,6 +362,8 @@ export function ProductProvider({ children }) {
         toggleStock,
         addCategory,
         deleteCategory,
+        addSubcategory,
+        deleteSubcategory,
       }}
     >
       {children}

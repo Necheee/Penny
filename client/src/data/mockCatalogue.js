@@ -1,13 +1,35 @@
 export const categories = [
-  { id: 'tops', name: 'Tops', slug: 'tops' },
-  { id: 'bottoms', name: 'Bottoms', slug: 'bottoms' },
-  { id: 'sets', name: 'Two-Piece Sets', slug: 'two-piece-sets' }
+  {
+    id: 'sets',
+    name: 'Two-Piece Sets',
+    slug: 'two-piece-sets',
+    subcategories: ['Linen Sets', 'Cotton Lounge Sets']
+  },
+  {
+    id: 'tops',
+    name: 'Tops',
+    slug: 'tops',
+    subcategories: ['T-Shirts', 'Henleys', 'Polos', 'Long-Sleeve Shirts', 'Hoodies', 'Sweatshirts', 'Quarter-Zips', 'Sweaters', 'Overshirts']
+  },
+  {
+    id: 'bottoms',
+    name: 'Bottoms',
+    slug: 'bottoms',
+    subcategories: ['Trousers', 'Chinos', 'Jeans', 'Shorts', 'Joggers', 'Cargo Pants']
+  },
+  {
+    id: 'outerwear',
+    name: 'Outerwear',
+    slug: 'outerwear',
+    subcategories: ['Jackets', 'Coats', 'Overcoats']
+  }
 ];
 
 export const subcategories = {
+  sets: ['Linen Sets', 'Cotton Lounge Sets'],
   tops: ['T-Shirts', 'Henleys', 'Polos', 'Long-Sleeve Shirts', 'Hoodies', 'Sweatshirts', 'Quarter-Zips', 'Sweaters', 'Overshirts'],
   bottoms: ['Trousers', 'Chinos', 'Jeans', 'Shorts', 'Joggers', 'Cargo Pants'],
-  sets: ['Linen Sets', 'Cotton Lounge Sets']
+  outerwear: ['Jackets', 'Coats', 'Overcoats']
 };
 
 export const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
