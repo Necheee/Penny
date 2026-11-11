@@ -383,6 +383,8 @@ export default function AdminDashboard() {
   const [subInputs, setSubInputs] = useState({});
   const [isAddingCustomSub, setIsAddingCustomSub] = useState(false);
   const [customSubcategoryInput, setCustomSubcategoryInput] = useState('');
+  const [isAddingCustomSubtype, setIsAddingCustomSubtype] = useState(false);
+  const [customSubtypeInput, setCustomSubtypeInput] = useState('');
   const [categoryFeedback, setCategoryFeedback] = useState('');
 
   // Category & Subcategory Editing Modal State
@@ -395,6 +397,7 @@ export default function AdminDashboard() {
   });
   const [modalNewSubName, setModalNewSubName] = useState('');
   const [modalNewSubSubtypes, setModalNewSubSubtypes] = useState('');
+  const [styleInputs, setStyleInputs] = useState({});
 
   // Orders state initialized from localStorage with fallback, and synced from /api/payments/orders
   const [orders, setOrders] = useState(() => {
@@ -870,6 +873,8 @@ export default function AdminDashboard() {
     });
     setIsAddingCustomSub(false);
     setCustomSubcategoryInput('');
+    setIsAddingCustomSubtype(false);
+    setCustomSubtypeInput('');
     setIsProductModalOpen(true);
   };
 
@@ -895,6 +900,8 @@ export default function AdminDashboard() {
     });
     setIsAddingCustomSub(false);
     setCustomSubcategoryInput('');
+    setIsAddingCustomSubtype(false);
+    setCustomSubtypeInput('');
     setIsProductModalOpen(true);
   };
 
@@ -920,6 +927,8 @@ export default function AdminDashboard() {
     });
     setIsAddingCustomSub(false);
     setCustomSubcategoryInput('');
+    setIsAddingCustomSubtype(false);
+    setCustomSubtypeInput('');
     setIsProductModalOpen(true);
   };
 
@@ -1016,8 +1025,28 @@ export default function AdminDashboard() {
       ? customSubcategoryInput.trim()
       : (productForm.subcategory || '');
 
+    const finalSubtype = isAddingCustomSubtype && customSubtypeInput.trim()
+      ? customSubtypeInput.trim()
+      : (productForm.subtype || '');
+
     if (isAddingCustomSub && customSubcategoryInput.trim()) {
-      addSubcategory(productForm.category, customSubcategoryInput.trim());
+      const cleanSub = customSubcategoryInput.trim();
+      const initialStyles = isAddingCustomSubtype && customSubtypeInput.trim() ? [customSubtypeInput.trim()] : [];
+      addSubcategory(productForm.category, cleanSub, initialStyles);
+    } else if (isAddingCustomSubtype && customSubtypeInput.trim()) {
+      const newStyle = customSubtypeInput.trim();
+      const catObj = categoryList.find(c => c.id === productForm.category || c.slug === productForm.category);
+      if (catObj) {
+        const subObj = (catObj.subcategories || []).find(s => (typeof s === 'string' ? s : s?.name) === finalSubcategory);
+        const subName = typeof subObj === 'string' ? subObj : subObj?.name || finalSubcategory;
+        const currentSubtypes = typeof subObj === 'object' && Array.isArray(subObj?.subtypes) ? subObj.subtypes : [];
+        if (!currentSubtypes.some(st => st.toLowerCase() === newStyle.toLowerCase())) {
+          updateSubcategory(catObj.id, subName, {
+            name: subName,
+            subtypes: [...currentSubtypes, newStyle]
+          });
+        }
+      }
     }
 
     if (editingProduct) {
@@ -1026,7 +1055,7 @@ export default function AdminDashboard() {
         name: productForm.name,
         category: productForm.category,
         subcategory: finalSubcategory,
-        subtype: productForm.subtype || '',
+        subtype: finalSubtype,
         price: Number(productForm.price),
         description: productForm.description,
         material: productForm.material,
@@ -1049,7 +1078,7 @@ export default function AdminDashboard() {
         name: productForm.name,
         category: productForm.category,
         subcategory: finalSubcategory || 'New Arrival',
-        subtype: productForm.subtype || '',
+        subtype: finalSubtype,
         price: Number(productForm.price),
         description: productForm.description || 'Premium menswear essential.',
         material: productForm.material || '100% Cotton',
@@ -1149,6 +1178,7 @@ export default function AdminDashboard() {
     });
     setModalNewSubName('');
     setModalNewSubSubtypes('');
+    setStyleInputs({});
     setIsEditCategoryModalOpen(true);
   };
 
@@ -1160,11 +1190,45 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleUpdateEditingSubcategorySubtypes = (index, subtypesString) => {
-    const list = subtypesString.split(',').map(s => s.trim()).filter(Boolean);
+  // Add one or multiple styles (comma-separated or single) to an existing subcategory in the modal
+  const handleAddStyleToSubcategoryInModal = (subIndex) => {
+    const raw = (styleInputs[subIndex] || '').trim();
+    if (!raw) return;
+
+    const newItems = raw.split(',').map(s => s.trim()).filter(Boolean);
+    if (newItems.length === 0) return;
+
     setEditingCategory(prev => {
       const subs = [...prev.subcategories];
-      subs[index] = { ...subs[index], subtypes: list };
+      const targetSub = subs[subIndex];
+      if (!targetSub) return prev;
+
+      const currentSubtypes = Array.isArray(targetSub.subtypes) ? [...targetSub.subtypes] : [];
+      newItems.forEach(item => {
+        if (!currentSubtypes.some(s => s.toLowerCase() === item.toLowerCase())) {
+          currentSubtypes.push(item);
+        }
+      });
+
+      subs[subIndex] = { ...targetSub, subtypes: currentSubtypes };
+      return { ...prev, subcategories: subs };
+    });
+
+    setStyleInputs(prev => ({ ...prev, [subIndex]: '' }));
+  };
+
+  // Remove a single style chip from a subcategory in the modal
+  const handleRemoveStyleChipInModal = (subIndex, styleIndex) => {
+    setEditingCategory(prev => {
+      const subs = [...prev.subcategories];
+      const targetSub = subs[subIndex];
+      if (!targetSub) return prev;
+
+      const currentSubtypes = Array.isArray(targetSub.subtypes) ? targetSub.subtypes : [];
+      subs[subIndex] = {
+        ...targetSub,
+        subtypes: currentSubtypes.filter((_, idx) => idx !== styleIndex)
+      };
       return { ...prev, subcategories: subs };
     });
   };
@@ -1883,6 +1947,14 @@ export default function AdminDashboard() {
                                     ))}
                                   </div>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditCategory(cat)}
+                                  className="text-[9px] text-neutral-400 hover:text-brand-charcoal font-semibold text-left underline pt-0.5 cursor-pointer inline-flex items-center gap-1"
+                                >
+                                  <Plus className="w-2.5 h-2.5" />
+                                  Add / Edit Styles
+                                </button>
                               </div>
                             );
                           })
@@ -3033,35 +3105,85 @@ export default function AdminDashboard() {
 
                 {/* Subtype / Style Category */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    Style / Sub-Category (Tier 3)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500">
+                      Style / Sub-Category (Tier 3)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingCustomSubtype(!isAddingCustomSubtype);
+                        setCustomSubtypeInput('');
+                      }}
+                      className="text-[10px] text-brand-charcoal underline hover:text-black font-semibold cursor-pointer"
+                    >
+                      {isAddingCustomSubtype ? 'Select from list' : '+ New Style'}
+                    </button>
+                  </div>
                   {(() => {
                     const catObj = categoryList.find(c => c.id === productForm.category || c.slug === productForm.category);
                     const subObj = (catObj?.subcategories || []).find(s => (typeof s === 'string' ? s : s?.name) === productForm.subcategory);
                     const availableSubtypes = typeof subObj === 'object' && Array.isArray(subObj?.subtypes) ? subObj.subtypes : [];
 
+                    if (isAddingCustomSubtype || (availableSubtypes.length === 0 && !productForm.subtype)) {
+                      return (
+                        <div className="space-y-1">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={isAddingCustomSubtype ? customSubtypeInput : productForm.subtype}
+                              onChange={(e) => {
+                                if (isAddingCustomSubtype) {
+                                  setCustomSubtypeInput(e.target.value);
+                                  setProductForm({ ...productForm, subtype: e.target.value });
+                                } else {
+                                  setProductForm({ ...productForm, subtype: e.target.value });
+                                }
+                              }}
+                              placeholder="Type style (e.g. Collared Quarter-Zip, Cuffed)..."
+                              className="w-full border border-neutral-300 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white text-xs"
+                            />
+                            {isAddingCustomSubtype && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsAddingCustomSubtype(false);
+                                  setCustomSubtypeInput('');
+                                }}
+                                className="px-3 py-2 border border-neutral-300 text-neutral-600 text-xs uppercase font-bold hover:bg-neutral-100 cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-neutral-400">
+                            New styles are saved and automatically added to this subcategory's options.
+                          </p>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div className="space-y-1">
                         <select
                           value={productForm.subtype}
-                          onChange={(e) => setProductForm({ ...productForm, subtype: e.target.value })}
+                          onChange={(e) => {
+                            if (e.target.value === '__NEW_STYLE__') {
+                              setIsAddingCustomSubtype(true);
+                              setCustomSubtypeInput('');
+                              setProductForm({ ...productForm, subtype: '' });
+                            } else {
+                              setProductForm({ ...productForm, subtype: e.target.value });
+                            }
+                          }}
                           className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white text-xs"
                         >
                           <option value="">(None / General)</option>
                           {availableSubtypes.map((st) => (
                             <option key={st} value={st}>{st}</option>
                           ))}
+                          <option value="__NEW_STYLE__">+ Add New Style...</option>
                         </select>
-                        {availableSubtypes.length === 0 && (
-                          <input
-                            type="text"
-                            value={productForm.subtype}
-                            onChange={(e) => setProductForm({ ...productForm, subtype: e.target.value })}
-                            placeholder="Optional custom sub-style..."
-                            className="w-full border border-neutral-200 p-1.5 focus:outline-none focus:border-brand-charcoal text-[11px] bg-neutral-50/50"
-                          />
-                        )}
                       </div>
                     );
                   })()}
@@ -4219,30 +4341,67 @@ export default function AdminDashboard() {
                           </button>
                         </div>
 
-                        {/* Tier 3 Styles / Subtypes */}
-                        <div>
-                          <label className="block text-[9px] font-bold uppercase tracking-widest text-neutral-500 mb-0.5">
-                            Styles / Subtypes (Comma-separated)
-                          </label>
-                          <input
-                            type="text"
-                            value={Array.isArray(sub.subtypes) ? sub.subtypes.join(', ') : ''}
-                            onChange={(e) => handleUpdateEditingSubcategorySubtypes(idx, e.target.value)}
-                            placeholder="e.g. Crewneck sweatshirt, Quarter-Zip, Collared Quarter-Zip, Zip-through Hoodie, Standard Hoodie"
-                            className="w-full border border-neutral-300 p-2 bg-white text-xs focus:outline-none focus:border-brand-charcoal"
-                          />
-                          {Array.isArray(sub.subtypes) && sub.subtypes.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-1.5">
-                              {sub.subtypes.map((st, sIdx) => (
+                        {/* Tier 3 Styles / Subtypes Interactive Section */}
+                        <div className="space-y-2 pt-2 border-t border-neutral-200/70">
+                          <div className="flex items-center justify-between">
+                            <label className="block text-[9px] font-bold uppercase tracking-widest text-neutral-600">
+                              Styles / Subtypes (Tier 3 Options)
+                            </label>
+                            <span className="text-[10px] text-neutral-400 font-mono">
+                              {Array.isArray(sub.subtypes) ? sub.subtypes.length : 0} styles defined
+                            </span>
+                          </div>
+
+                          {/* Style Chips Display with Delete (X) button */}
+                          <div className="flex flex-wrap gap-1.5 min-h-[34px] p-2 bg-white border border-neutral-200 rounded-xs items-center">
+                            {Array.isArray(sub.subtypes) && sub.subtypes.length > 0 ? (
+                              sub.subtypes.map((st, sIdx) => (
                                 <span 
                                   key={sIdx}
-                                  className="text-[10px] px-2 py-0.5 bg-white border border-neutral-300 rounded-xs text-neutral-700 font-medium"
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 text-brand-charcoal text-xs font-medium rounded-xs border border-neutral-300 transition-colors"
                                 >
-                                  • {st}
+                                  <span>{st}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveStyleChipInModal(idx, sIdx)}
+                                    className="text-neutral-400 hover:text-red-600 transition-colors p-0.5 cursor-pointer"
+                                    title={`Remove ${st}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
                                 </span>
-                              ))}
-                            </div>
-                          )}
+                              ))
+                            ) : (
+                              <span className="text-xs text-neutral-400 italic">
+                                No styles defined yet. Type one below and click "+ Add Style" or hit Enter.
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Quick Add Style Input Bar */}
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={styleInputs[idx] || ''}
+                              onChange={(e) => setStyleInputs({ ...styleInputs, [idx]: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddStyleToSubcategoryInModal(idx);
+                                }
+                              }}
+                              placeholder="Type a style (e.g. Crewneck) or paste comma-separated list..."
+                              className="flex-1 border border-neutral-300 p-2 bg-white text-xs focus:outline-none focus:border-brand-charcoal"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddStyleToSubcategoryInModal(idx)}
+                              disabled={!(styleInputs[idx] || '').trim()}
+                              className="px-4 py-2 bg-brand-charcoal hover:bg-black text-white text-xs font-bold uppercase tracking-wider rounded-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              + Add Style
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
