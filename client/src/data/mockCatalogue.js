@@ -5,13 +5,43 @@ export const categories = [
     "slug": "tops",
     "displayOrder": 1,
     "subcategories": [
-      "T-Shirts",
-      "Long Sleeve Tees",
-      "Long Sleeve Henleys",
-      "Short Sleeve Henleys",
-      "Knitwear Polos",
-      "Oxford shirts",
-      "Sweatshirts & Hoodies"
+      {
+        "name": "T-Shirts",
+        "subtypes": [
+          "Regular Fit Tee",
+          "Oversize Fit Tee"
+        ]
+      },
+      {
+        "name": "Long Sleeve Tees",
+        "subtypes": []
+      },
+      {
+        "name": "Long Sleeve Henleys",
+        "subtypes": []
+      },
+      {
+        "name": "Short Sleeve Henleys",
+        "subtypes": []
+      },
+      {
+        "name": "Knitwear Polos",
+        "subtypes": []
+      },
+      {
+        "name": "Oxford shirts",
+        "subtypes": []
+      },
+      {
+        "name": "Sweatshirts & Hoodies",
+        "subtypes": [
+          "Crewneck sweatshirt",
+          "Quarter-Zip",
+          "Collared Quarter-Zip",
+          "Zip-through Hoodie",
+          "Standard Hoodie"
+        ]
+      }
     ]
   },
   {
@@ -20,12 +50,44 @@ export const categories = [
     "slug": "bottoms",
     "displayOrder": 2,
     "subcategories": [
-      "Trousers & Chinos",
-      "Denim",
-      "Corduroy Trousers",
-      "Utility Pants",
-      "Sweatpants",
-      "Shorts"
+      {
+        "name": "Trousers & Chinos",
+        "subtypes": [
+          "Classic Tailored Pants",
+          "Improved Tailored Pants"
+        ]
+      },
+      {
+        "name": "Denim",
+        "subtypes": []
+      },
+      {
+        "name": "Corduroy Trousers",
+        "subtypes": []
+      },
+      {
+        "name": "Utility Pants",
+        "subtypes": [
+          "Utility pants in chinos",
+          "Utility pants in heavyweight cotton"
+        ]
+      },
+      {
+        "name": "Sweatpants",
+        "subtypes": [
+          "Cuffed",
+          "Open-Hem"
+        ]
+      },
+      {
+        "name": "Shorts",
+        "subtypes": [
+          "Sweatshorts",
+          "Chino Shorts",
+          "Utility Shorts",
+          "Pleated Shorts"
+        ]
+      }
     ]
   },
   {
@@ -34,9 +96,21 @@ export const categories = [
     "slug": "outerwear",
     "displayOrder": 3,
     "subcategories": [
-      "Overshirts & Shackets",
-      "Knitwear Cardigan",
-      "Track Suit"
+      {
+        "name": "Overshirts & Shackets",
+        "subtypes": [
+          "Denim",
+          "Corduroy"
+        ]
+      },
+      {
+        "name": "Knitwear Cardigan",
+        "subtypes": []
+      },
+      {
+        "name": "Track Suit",
+        "subtypes": []
+      }
     ]
   },
   {
@@ -45,19 +119,34 @@ export const categories = [
     "slug": "the-linen-shop",
     "displayOrder": 4,
     "subcategories": [
-      "Linen Tops",
-      "Pants",
-      "Shorts"
+      {
+        "name": "Linen Tops",
+        "subtypes": []
+      },
+      {
+        "name": "Pants",
+        "subtypes": []
+      },
+      {
+        "name": "Shorts",
+        "subtypes": []
+      }
     ]
   },
   {
-    "id": "care-essentials",
-    "name": "Care & Essentials",
-    "slug": "care-essentials",
+    "id": "care-accessories",
+    "name": "Care & Accessories",
+    "slug": "care-accessories",
     "displayOrder": 5,
     "subcategories": [
-      "Lint Rollers",
-      "Tote Bag"
+      {
+        "name": "Lint Rollers",
+        "subtypes": []
+      },
+      {
+        "name": "Tote Bag",
+        "subtypes": []
+      }
     ]
   },
   {
@@ -66,132 +155,34 @@ export const categories = [
     "slug": "two-piece-sets",
     "displayOrder": 6,
     "subcategories": [
-      "Linen Sets",
-      "Cotton Lounge Sets"
+      {
+        "name": "Linen Sets",
+        "subtypes": []
+      },
+      {
+        "name": "Cotton Lounge Sets",
+        "subtypes": []
+      }
     ]
   }
 ];
-
-export const subcategories = {
-  "tops": [
-    "T-Shirts",
-    "Long Sleeve Tees",
-    "Long Sleeve Henleys",
-    "Short Sleeve Henleys",
-    "Knitwear Polos",
-    "Oxford shirts",
-    "Sweatshirts & Hoodies"
-  ],
-  "bottoms": [
-    "Trousers & Chinos",
-    "Denim",
-    "Corduroy Trousers",
-    "Utility Pants",
-    "Sweatpants",
-    "Shorts"
-  ],
-  "outerwear": [
-    "Overshirts & Shackets",
-    "Knitwear Cardigan",
-    "Track Suit"
-  ],
-  "the-linen-shop": [
-    "Linen Tops",
-    "Pants",
-    "Shorts"
-  ],
-  "care-essentials": [
-    "Lint Rollers",
-    "Tote Bag"
-  ],
-  "sets": [
-    "Linen Sets",
-    "Cotton Lounge Sets"
-  ]
-};
 
 export const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
 export const products = [
   {
-    "id": "p-001",
-    "slug": "the-linen-two-piece-set",
-    "name": "The Linen Two-Piece Set",
-    "category": "the-linen-shop",
-    "subcategory": "Linen Tops",
-    "price": 45000,
-    "description": "An effortlessly refined linen set designed for breathability and comfort. The pieces work perfectly together or as versatile separates.",
-    "material": "100% Premium European Linen",
-    "fit": "Relaxed fit. We recommend your usual size.",
-    "care": "Machine wash cold on gentle cycle. Hang to dry. Warm iron if needed.",
-    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 days in Lagos.",
-    "images": {
-      "primary": "/images/products/linen-set-1.jpg",
-      "gallery": [
-        "/images/products/linen-set-2.jpg",
-        "/images/products/linen-set-3.jpg"
-      ]
-    },
-    "colors": [
-      "Cream",
-      "Black",
-      "Olive"
-    ],
-    "availableSizes": [
-      "S",
-      "M",
-      "L",
-      "XL"
-    ],
-    "featured": true,
-    "createdAt": "2023-10-01T00:00:00Z",
-    "inStock": true
-  },
-  {
-    "id": "p-002",
-    "slug": "heavyweight-cotton-lounge-set",
-    "name": "Heavyweight Cotton Lounge Set",
-    "category": "sets",
-    "subcategory": "Cotton Lounge Sets",
-    "price": 52000,
-    "description": "A structured yet comfortable lounge set crafted from heavyweight organic cotton. Perfect for travel or elevated weekend wear.",
-    "material": "100% Heavyweight Cotton",
-    "fit": "Relaxed fit with a slightly boxy drape.",
-    "care": "Machine wash cold. Tumble dry low.",
-    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 days in Lagos.",
-    "images": {
-      "primary": "/images/products/lounge-set-1.jpg",
-      "gallery": [
-        "/images/products/lounge-set-2.jpg"
-      ]
-    },
-    "colors": [
-      "Charcoal",
-      "Taupe"
-    ],
-    "availableSizes": [
-      "S",
-      "M",
-      "L",
-      "XL",
-      "XXL"
-    ],
-    "featured": false,
-    "createdAt": "2023-10-05T00:00:00Z",
-    "inStock": true
-  },
-  {
     "id": "p-003",
-    "slug": "the-essential-t-shirt",
+    "slug": "the-essential-regular-fit-tee",
     "name": "The Essential Regular Fit Tee",
     "category": "tops",
     "subcategory": "T-Shirts",
+    "subtype": "Regular Fit Tee",
     "price": 15000,
-    "description": "The foundation of any capsule wardrobe. A mid-weight, ultra-soft crewneck that retains its shape wash after wash.",
-    "material": "100% Heavyweight Cotton",
-    "fit": "Regular Fit Tee. Tailored silhouette.",
-    "care": "Machine wash cold with like colors.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "The foundation of any capsule wardrobe. A mid-weight, ultra-soft crewneck that retains its structure wash after wash.",
+    "material": "100% Heavyweight Supima Cotton (240 GSM)",
+    "fit": "Regular Fit Tee. Tailored silhouette through chest with clean shoulder lines.",
+    "care": "Machine wash cold with like colors. Tumble dry low or hang dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/essential-tee-1.jpg",
       "gallery": [
@@ -218,16 +209,17 @@ export const products = [
   },
   {
     "id": "p-019",
-    "slug": "heavyweight-oversize-pocket-tee",
+    "slug": "heavyweight-oversize-fit-tee",
     "name": "Heavyweight Oversize Fit Tee",
     "category": "tops",
     "subcategory": "T-Shirts",
+    "subtype": "Oversize Fit Tee",
     "price": 18000,
-    "description": "A sturdier alternative to our Essential Tee, featuring a dropped shoulder drape and single chest pocket.",
-    "material": "100% Heavyweight Cotton",
-    "fit": "Oversize Fit Tee. Relaxed boxy drape.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "A sturdier relaxed alternative to our Essential Tee, featuring a dropped-shoulder drape and single chest pocket.",
+    "material": "100% Heavyweight Organic Cotton (280 GSM)",
+    "fit": "Oversize Fit Tee. Boxy drape with dropped shoulder seams. Order true to size.",
+    "care": "Machine wash cold. Lay flat to dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/pocket-tee-1.jpg",
       "gallery": [
@@ -255,12 +247,13 @@ export const products = [
     "name": "Everyday Long Sleeve Tee",
     "category": "tops",
     "subcategory": "Long Sleeve Tees",
+    "subtype": "",
     "price": 18000,
-    "description": "A versatile long-sleeve crewneck ideal for layering or wearing solo during transitional weather.",
-    "material": "100% Organic Heavyweight Cotton",
-    "fit": "Regular fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "A versatile long-sleeve crewneck ideal for transitional weather layering or wearing solo with relaxed chinos.",
+    "material": "100% Heavyweight Cotton",
+    "fit": "Relaxed fit with ribbed cuffs and clean neckline.",
+    "care": "Machine wash cold. Tumble dry delicate.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/longsleeve-1.jpg",
       "gallery": [
@@ -288,12 +281,13 @@ export const products = [
     "name": "Waffle Long Sleeve Henley",
     "category": "tops",
     "subcategory": "Long Sleeve Henleys",
+    "subtype": "",
     "price": 22000,
-    "description": "A slub-cotton waffle henley featuring a three-button placket and raw-edge detailing for a subtly rugged look.",
+    "description": "A textured slub-cotton waffle henley featuring a three-button placket and raw-edge detailing for a subtly rugged aesthetic.",
     "material": "95% Heavyweight Cotton, 5% Elastane",
-    "fit": "Body-fit. Clean and structured.",
-    "care": "Machine wash cold. Lay flat to dry.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Body-fit. Contoured through torso without restriction.",
+    "care": "Machine wash cold inside out. Lay flat to dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/henley-1.jpg",
       "gallery": [
@@ -321,16 +315,17 @@ export const products = [
     "name": "Short Sleeve Ribbed Henley",
     "category": "tops",
     "subcategory": "Short Sleeve Henleys",
+    "subtype": "",
     "price": 20000,
     "description": "A modern short sleeve henley cut from breathable ribbed cotton with tonal mother-of-pearl buttons.",
-    "material": "100% Cotton",
-    "fit": "Body-fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "material": "100% Breathable Ribbed Cotton",
+    "fit": "Body-fit. Clean athletic contour.",
+    "care": "Machine wash cold. Do not tumble dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
-      "primary": "/images/products/henley-1.jpg",
+      "primary": "/images/products/henley-2.jpg",
       "gallery": [
-        "/images/products/henley-2.jpg"
+        "/images/products/henley-1.jpg"
       ]
     },
     "colors": [
@@ -354,12 +349,13 @@ export const products = [
     "name": "Fine Merino Knitwear Polo",
     "category": "tops",
     "subcategory": "Knitwear Polos",
+    "subtype": "",
     "price": 28000,
-    "description": "An elevated take on the classic polo. Made from fine merino wool blend, offering breathability and natural drape.",
+    "description": "An elevated take on the classic polo. Made from fine merino wool blend, offering breathability and natural wrinkle resistance.",
     "material": "70% Merino Wool, 30% Silk Knitwear",
-    "fit": "Relaxed fit.",
-    "care": "Hand wash cold or dry clean.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed fit with ribbed hem and buttonless open collar.",
+    "care": "Hand wash cold or dry clean only. Dry flat.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/polo-1.jpg",
       "gallery": [
@@ -387,12 +383,13 @@ export const products = [
     "name": "Classic Oxford Button-Down Shirt",
     "category": "tops",
     "subcategory": "Oxford shirts",
+    "subtype": "",
     "price": 29000,
-    "description": "Crafted from durable basket-weave Oxford cotton. Features an iconic button-down collar and chest pocket.",
-    "material": "100% Oxford Cotton",
-    "fit": "Relaxed classic fit.",
-    "care": "Machine wash cold. Warm iron.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "Crafted from heavyweight basket-weave Oxford cotton. Features an authentic rolled button-down collar and chest pocket.",
+    "material": "100% Heavyweight Oxford Cotton",
+    "fit": "Relaxed classic fit. Easy to wear tucked or untucked.",
+    "care": "Machine wash cold. Warm iron while slightly damp.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/overshirt-1.jpg",
       "gallery": [
@@ -418,15 +415,16 @@ export const products = [
   {
     "id": "p-008",
     "slug": "vintage-crewneck-sweatshirt",
-    "name": "Crewneck Sweatshirt",
+    "name": "Vintage Crewneck Sweatshirt",
     "category": "tops",
     "subcategory": "Sweatshirts & Hoodies",
+    "subtype": "Crewneck sweatshirt",
     "price": 32000,
-    "description": "A vintage-inspired crewneck sweatshirt with modern proportions. Features ribbed cuffs and a sturdy neckline.",
-    "material": "100% Heavyweight Cotton",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "A vintage-inspired sweatshirt with modern proportions. Features ribbed side gussets and a sturdy neckline.",
+    "material": "100% Heavyweight Cotton (450 GSM Loopback Fleece)",
+    "fit": "Relaxed fit with a slightly boxy drape.",
+    "care": "Machine wash cold inside out. Hang to dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/sweatshirt-1.jpg",
       "gallery": [
@@ -450,16 +448,17 @@ export const products = [
   },
   {
     "id": "p-009",
-    "slug": "ribbed-quarter-zip-sweatshirt",
+    "slug": "ribbed-quarter-zip",
     "name": "Ribbed Quarter-Zip",
     "category": "tops",
     "subcategory": "Sweatshirts & Hoodies",
+    "subtype": "Quarter-Zip",
     "price": 42000,
     "description": "A sophisticated layering piece featuring a chunky metal zipper and a textured ribbed knit collar.",
     "material": "80% Cotton, 20% Wool Knitwear",
-    "fit": "Relaxed fit.",
-    "care": "Hand wash or delicate cycle.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed fit. Ideal for layering over fine tees.",
+    "care": "Hand wash cold or delicate dry clean. Lay flat to dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/quarterzip-1.jpg",
       "gallery": [
@@ -482,16 +481,17 @@ export const products = [
   },
   {
     "id": "p-021",
-    "slug": "collared-quarter-zip-sweatshirt",
+    "slug": "collared-quarter-zip",
     "name": "Collared Quarter-Zip",
     "category": "tops",
     "subcategory": "Sweatshirts & Hoodies",
+    "subtype": "Collared Quarter-Zip",
     "price": 44000,
-    "description": "Clean polo-style collar with a brass quarter-zip. Tailored from dense brushed fleece.",
-    "material": "100% Heavyweight Cotton",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "Features a structured turn-down collar and concealed zipper placket in brushed French terry cotton.",
+    "material": "100% Heavyweight Cotton (420 GSM)",
+    "fit": "Relaxed fit with clean tailored shoulders.",
+    "care": "Machine wash cold. Do not tumble dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/quarterzip-2.jpg",
       "gallery": [
@@ -515,16 +515,17 @@ export const products = [
   },
   {
     "id": "p-007",
-    "slug": "standard-heavyweight-hoodie",
+    "slug": "standard-hoodie",
     "name": "Standard Hoodie",
     "category": "tops",
     "subcategory": "Sweatshirts & Hoodies",
+    "subtype": "Standard Hoodie",
     "price": 35000,
-    "description": "A clean, logo-free pullover hoodie with a double-lined hood and hidden side-seam kangaroo pockets.",
-    "material": "100% French Terry Heavyweight Cotton",
-    "fit": "Oversized fit.",
+    "description": "A clean, logo-free pullover hoodie with a double-lined hood and hidden side-seam pockets.",
+    "material": "100% Heavyweight Cotton (450 GSM French Terry)",
+    "fit": "Oversized fit. Dropped shoulders with roomy kangaroo pocket.",
     "care": "Machine wash cold. Tumble dry low.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/hoodie-1.jpg",
       "gallery": [
@@ -554,12 +555,13 @@ export const products = [
     "name": "Zip-through Hoodie",
     "category": "tops",
     "subcategory": "Sweatshirts & Hoodies",
+    "subtype": "Zip-through Hoodie",
     "price": 38000,
-    "description": "Full-zip hoodie with matte hardware, custom puller, and heavyweight fleece construction.",
+    "description": "Full-zip front with custom matte black metal hardware, dual pouch pockets, and dense ribbed trims.",
     "material": "100% Heavyweight Cotton",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed fit. Boxy drape through torso.",
+    "care": "Machine wash cold inside out.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/hoodie-2.jpg",
       "gallery": [
@@ -587,12 +589,13 @@ export const products = [
     "name": "Classic Tailored Pants",
     "category": "bottoms",
     "subcategory": "Trousers & Chinos",
+    "subtype": "Classic Tailored Pants",
     "price": 38000,
-    "description": "Sharp enough for the boardroom, relaxed enough for evening dining. Single front pleat with a crisp taper.",
+    "description": "Sharp enough for the office, relaxed enough for dinner. Features single forward pleats and clean waistband extension.",
     "material": "Cotton Twill & Viscose Blend",
     "fit": "Tailored fit. Mid-rise waist.",
     "care": "Dry clean recommended.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/trousers-1.jpg",
       "gallery": [
@@ -620,12 +623,13 @@ export const products = [
     "name": "Improved Tailored Pants",
     "category": "bottoms",
     "subcategory": "Trousers & Chinos",
+    "subtype": "Improved Tailored Pants",
     "price": 34000,
-    "description": "An updated chino trouser with an elasticated waistband interior for flexible luxury movement.",
-    "material": "100% Heavyweight Cotton Chino",
-    "fit": "Relaxed casual fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "An elevated chino trouser engineered with subtle internal waistband stretch and a modern slight taper.",
+    "material": "100% Heavyweight Cotton Chino Twill",
+    "fit": "Relaxed casual fit. True to size.",
+    "care": "Machine wash cold. Warm iron.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/chinos-1.jpg",
       "gallery": [
@@ -654,12 +658,13 @@ export const products = [
     "name": "Japanese Selvedge Denim Jeans",
     "category": "bottoms",
     "subcategory": "Denim",
+    "subtype": "",
     "price": 55000,
-    "description": "Authentic 13.5oz red-line selvedge denim that gracefully conforms to your wear patterns over time.",
+    "description": "Authentic 13.5oz red-line raw selvedge denim that will uniquely fade and mold to your body over time.",
     "material": "100% Japanese Selvedge Denim",
-    "fit": "Relaxed straight fit.",
-    "care": "Wash cold inside out. Hang dry.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed straight fit with a slight break over footwear.",
+    "care": "Wash sparingly inside out in cold water. Hang dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/jeans-1.jpg",
       "gallery": [
@@ -667,7 +672,8 @@ export const products = [
       ]
     },
     "colors": [
-      "Raw Indigo"
+      "Raw Indigo",
+      "Washed Black"
     ],
     "availableSizes": [
       "M",
@@ -679,49 +685,18 @@ export const products = [
     "inStock": true
   },
   {
-    "id": "p-015",
-    "slug": "washed-black-denim-jeans",
-    "name": "Washed Black Denim Jeans",
-    "category": "bottoms",
-    "subcategory": "Denim",
-    "price": 45000,
-    "description": "Versatile vintage washed black denim with a broken-in drape from the first wear.",
-    "material": "99% Cotton Denim, 1% Elastane",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
-    "images": {
-      "primary": "/images/products/jeans-black-1.jpg",
-      "gallery": [
-        "/images/products/jeans-black-2.jpg"
-      ]
-    },
-    "colors": [
-      "Washed Black"
-    ],
-    "availableSizes": [
-      "S",
-      "M",
-      "L",
-      "XL",
-      "XXL"
-    ],
-    "featured": false,
-    "createdAt": "2023-09-10T00:00:00Z",
-    "inStock": true
-  },
-  {
     "id": "p-025",
     "slug": "wide-wale-corduroy-trousers",
     "name": "Corduroy Trousers",
     "category": "bottoms",
     "subcategory": "Corduroy Trousers",
+    "subtype": "",
     "price": 46000,
-    "description": "Plush 8-wale corduroy trousers designed with a gentle taper, deep slash pockets, and rich velvet-like luster.",
-    "material": "100% Cotton Corduroy",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold inside out.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "Plush 8-wale cotton corduroy trousers cut with a relaxed straight leg and deep slash pockets.",
+    "material": "100% Heavyweight Cotton Corduroy",
+    "fit": "Relaxed fit. Sits comfortably on natural waist.",
+    "care": "Machine wash cold inside out. Hang dry. Do not iron directly on cords.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/trousers-2.jpg",
       "gallery": [
@@ -749,12 +724,13 @@ export const products = [
     "name": "Utility Pants in Chinos",
     "category": "bottoms",
     "subcategory": "Utility Pants",
+    "subtype": "Utility pants in chinos",
     "price": 42000,
-    "description": "Refined cargo pockets engineered to stay flat against the leg for a sleek silhouette.",
+    "description": "Streamlined cargo pockets engineered to stay flat against the thigh for an uncluttered profile.",
     "material": "100% Cotton Chino Twill",
-    "fit": "Relaxed straight fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed fit with clean ankle taper.",
+    "care": "Machine wash cold. Tumble dry low.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/cargo-1.jpg",
       "gallery": [
@@ -783,12 +759,13 @@ export const products = [
     "name": "Utility Pants in Heavyweight Cotton",
     "category": "bottoms",
     "subcategory": "Utility Pants",
+    "subtype": "Utility pants in heavyweight cotton",
     "price": 44000,
-    "description": "Crafted from rugged heavyweight cotton canvas with reinforced knee paneling and drawstring hem.",
-    "material": "100% Heavyweight Cotton",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "Constructed from heavy military-spec cotton canvas with articulated knees and drawstring hems.",
+    "material": "100% Heavyweight Cotton Canvas",
+    "fit": "Relaxed straight fit with adjustable hem drawcords.",
+    "care": "Machine wash cold with like colors.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/cargo-2.jpg",
       "gallery": [
@@ -816,12 +793,13 @@ export const products = [
     "name": "Cuffed French Terry Sweatpants",
     "category": "bottoms",
     "subcategory": "Sweatpants",
+    "subtype": "Cuffed",
     "price": 29000,
-    "description": "Heavyweight loungewear finished with snug ribbed cuffs and an external braided drawcord.",
-    "material": "100% Heavyweight Cotton",
-    "fit": "Relaxed tapered fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "Dense loopback cotton sweatpants finished with snug ribbed cuffs and braided drawcords.",
+    "material": "100% Heavyweight Cotton (420 GSM Loopback)",
+    "fit": "Relaxed fit with tapered cuffed ankles.",
+    "care": "Machine wash cold. Hang dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/joggers-1.jpg",
       "gallery": [
@@ -850,12 +828,13 @@ export const products = [
     "name": "Open-Hem Lounge Sweatpants",
     "category": "bottoms",
     "subcategory": "Sweatpants",
+    "subtype": "Open-Hem",
     "price": 32000,
-    "description": "Modern straight-leg sweatpants with a clean, uncuffed open hem that falls effortlessly over sneakers.",
-    "material": "100% Heavyweight Cotton",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "Modern straight-leg sweatpants featuring a clean, unribbed open hem that drapes over luxury sneakers.",
+    "material": "100% Heavyweight Cotton Fleece",
+    "fit": "Relaxed straight leg fit with open hem drape.",
+    "care": "Machine wash cold. Tumble dry delicate.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/joggers-2.jpg",
       "gallery": [
@@ -883,12 +862,13 @@ export const products = [
     "name": "Heavyweight Sweatshorts",
     "category": "bottoms",
     "subcategory": "Shorts",
+    "subtype": "Sweatshorts",
     "price": 22000,
-    "description": "Comfortable French terry shorts designed for off-duty days with deep pockets and an elastic drawstring.",
-    "material": "100% Heavyweight Cotton",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "Comfortable French terry shorts designed for warm-weather lounge with deep pockets and elastic waistband.",
+    "material": "100% Heavyweight Cotton French Terry",
+    "fit": "Relaxed fit. 6.5-inch inseam hitting above knee.",
+    "care": "Machine wash cold. Hang dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/shorts-1.jpg",
       "gallery": [
@@ -915,12 +895,13 @@ export const products = [
     "name": "Chino Shorts",
     "category": "bottoms",
     "subcategory": "Shorts",
+    "subtype": "Chino Shorts",
     "price": 24000,
-    "description": "Tailored chino shorts with a 7-inch inseam that hits cleanly above the knee.",
+    "description": "Tailored casual shorts cut from breathable cotton twill with welted back pockets.",
     "material": "100% Cotton Twill",
-    "fit": "Relaxed tailored fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed fit with a 7-inch inseam.",
+    "care": "Machine wash cold. Warm iron.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/shorts-2.jpg",
       "gallery": [
@@ -943,21 +924,55 @@ export const products = [
     "inStock": true
   },
   {
-    "id": "p-029",
-    "slug": "pleated-linen-shorts",
-    "name": "Pleated Shorts",
+    "id": "p-037",
+    "slug": "ripstop-utility-shorts",
+    "name": "Utility Shorts",
     "category": "bottoms",
     "subcategory": "Shorts",
-    "price": 26000,
-    "description": "Elevated double-pleated shorts tailored from pure European flax linen.",
-    "material": "100% Premium European Linen",
-    "fit": "Relaxed fit.",
+    "subtype": "Utility Shorts",
+    "price": 25000,
+    "description": "Rugged ripstop utility shorts fitted with low-profile bellows pockets and quick-dry nylon blend.",
+    "material": "100% Heavyweight Cotton Ripstop",
+    "fit": "Relaxed fit. Roomy leg opening.",
     "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/shorts-1.jpg",
       "gallery": [
         "/images/products/shorts-2.jpg"
+      ]
+    },
+    "colors": [
+      "Olive",
+      "Black"
+    ],
+    "availableSizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "featured": false,
+    "createdAt": "2023-05-14T00:00:00Z",
+    "inStock": true
+  },
+  {
+    "id": "p-029",
+    "slug": "pleated-shorts",
+    "name": "Pleated Shorts",
+    "category": "bottoms",
+    "subcategory": "Shorts",
+    "subtype": "Pleated Shorts",
+    "price": 26000,
+    "description": "Double front pleats tailored from pure European flax linen for high-summer sophistication.",
+    "material": "100% Premium European Linen",
+    "fit": "Relaxed fit. Elegant drape.",
+    "care": "Machine wash cold gentle cycle. Warm iron.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
+    "images": {
+      "primary": "/images/products/shorts-2.jpg",
+      "gallery": [
+        "/images/products/shorts-1.jpg"
       ]
     },
     "colors": [
@@ -980,12 +995,13 @@ export const products = [
     "name": "Selvedge Denim Overshirt",
     "category": "outerwear",
     "subcategory": "Overshirts & Shackets",
+    "subtype": "Denim",
     "price": 48000,
-    "description": "A rugged yet refined overshirt with twin chest flap pockets. Functions as a light jacket or middle layer.",
+    "description": "A rugged yet refined overshirt with twin chest flap pockets. Functions effortlessly as a light jacket.",
     "material": "100% Cotton Denim",
-    "fit": "Relaxed boxy fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed boxy fit designed for layering over hoodies or tees.",
+    "care": "Machine wash cold inside out. Hang dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/overshirt-1.jpg",
       "gallery": [
@@ -1009,16 +1025,17 @@ export const products = [
   },
   {
     "id": "p-030",
-    "slug": "corduroy-shacket",
+    "slug": "heavyweight-corduroy-shacket",
     "name": "Corduroy Shacket",
     "category": "outerwear",
     "subcategory": "Overshirts & Shackets",
+    "subtype": "Corduroy",
     "price": 54000,
-    "description": "Warm, textural corduroy overshirt with horn buttons and satin-lined sleeves for effortless on/off layering.",
+    "description": "Warm, textural wide-wale corduroy overshirt jacket featuring horn buttons and satin-lined sleeve interiors.",
     "material": "100% Cotton Corduroy",
-    "fit": "Oversized fit.",
-    "care": "Machine wash cold delicate.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Oversized fit. Cut generous through body.",
+    "care": "Dry clean or machine wash cold delicate. Do not tumble dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/overshirt-2.jpg",
       "gallery": [
@@ -1046,12 +1063,13 @@ export const products = [
     "name": "Chunky Knitwear Cardigan",
     "category": "outerwear",
     "subcategory": "Knitwear Cardigan",
+    "subtype": "",
     "price": 58000,
-    "description": "A textural masterpiece. This chunky knit cardigan provides deep warmth, ribbed trims, and real horn buttons.",
+    "description": "A textural masterpiece. This chunky knit cardigan provides deep warmth, ribbed trims, and authentic horn buttons.",
     "material": "100% Merino Wool Knitwear",
-    "fit": "Relaxed fit.",
-    "care": "Hand wash only. Dry flat.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed fit with ribbed cuffs and hem.",
+    "care": "Hand wash only in cold water with wool detergent. Dry flat.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/chunky-sweater-1.jpg",
       "gallery": [
@@ -1078,12 +1096,13 @@ export const products = [
     "name": "Fleece Lounge Track Suit",
     "category": "outerwear",
     "subcategory": "Track Suit",
+    "subtype": "",
     "price": 62000,
-    "description": "Two-piece matching heavyweight tracksuit with minimalist zipper jacket and tapered coordinating sweatpants.",
-    "material": "100% Heavyweight Cotton",
+    "description": "Matching two-piece heavyweight tracksuit with minimalist zipper jacket and tapered coordinating sweatpants.",
+    "material": "100% Heavyweight Cotton Fleece",
     "fit": "Relaxed fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "care": "Machine wash cold. Hang dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/lounge-set-2.jpg",
       "gallery": [
@@ -1111,12 +1130,13 @@ export const products = [
     "name": "The Relaxed Linen Shirt",
     "category": "the-linen-shop",
     "subcategory": "Linen Tops",
+    "subtype": "",
     "price": 34000,
-    "description": "Breathable camp-collar shirt cut from airy, garment-washed linen that drapes naturally in warm climates.",
+    "description": "Breathable camp-collar shirt cut from airy, garment-washed linen that drapes naturally in tropical climates.",
     "material": "100% Premium European Linen",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold. Hang dry.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed fit with vented straight hem.",
+    "care": "Machine wash cold on gentle cycle. Hang to dry. Warm iron if desired.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/linen-set-2.jpg",
       "gallery": [
@@ -1145,12 +1165,13 @@ export const products = [
     "name": "The Relaxed Linen Pants",
     "category": "the-linen-shop",
     "subcategory": "Pants",
+    "subtype": "",
     "price": 38000,
     "description": "Easy drawstring trousers made from pure European flax. Keeps you cool all day with an elegant drape.",
     "material": "100% Premium European Linen",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed fit with internal drawstring waistband.",
+    "care": "Machine wash cold on gentle cycle. Hang dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/linen-set-3.jpg",
       "gallery": [
@@ -1178,12 +1199,13 @@ export const products = [
     "name": "The Linen Drawstring Shorts",
     "category": "the-linen-shop",
     "subcategory": "Shorts",
+    "subtype": "",
     "price": 26000,
     "description": "Laid-back resort shorts featuring an elastic drawstring waistband and deep side pockets.",
     "material": "100% Premium European Linen",
-    "fit": "Relaxed fit.",
-    "care": "Machine wash cold.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "fit": "Relaxed fit. Hits comfortably above knee.",
+    "care": "Machine wash cold gentle cycle. Hang dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/shorts-1.jpg",
       "gallery": [
@@ -1206,17 +1228,53 @@ export const products = [
     "inStock": true
   },
   {
+    "id": "p-001",
+    "slug": "the-linen-two-piece-set",
+    "name": "The Linen Two-Piece Set",
+    "category": "the-linen-shop",
+    "subcategory": "Linen Tops",
+    "subtype": "",
+    "price": 45000,
+    "description": "An effortlessly refined linen set designed for breathability and comfort. The pieces work together or as versatile separates.",
+    "material": "100% Premium European Linen",
+    "fit": "Relaxed fit. We recommend ordering your usual size.",
+    "care": "Machine wash cold on gentle cycle. Hang to dry. Warm iron if needed.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
+    "images": {
+      "primary": "/images/products/linen-set-1.jpg",
+      "gallery": [
+        "/images/products/linen-set-2.jpg",
+        "/images/products/linen-set-3.jpg"
+      ]
+    },
+    "colors": [
+      "Cream",
+      "Black",
+      "Olive"
+    ],
+    "availableSizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "featured": true,
+    "createdAt": "2023-10-01T00:00:00Z",
+    "inStock": true
+  },
+  {
     "id": "p-035",
     "slug": "natural-cedar-wool-lint-roller",
     "name": "Natural Cedar & Wool Lint Roller",
-    "category": "care-essentials",
+    "category": "care-accessories",
     "subcategory": "Lint Rollers",
+    "subtype": "",
     "price": 12000,
-    "description": "An heirloom garment care essential. Turned natural cedar handle with extra-sticky adhesive sheets to keep knitwear lint-free.",
-    "material": "Natural Cedar Wood & Adhesive",
-    "fit": "Standard One Size",
-    "care": "Wipe handle with a damp cloth.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "description": "An heirloom garment care tool. Turned natural cedar wood handle with extra-sticky adhesive sheets to keep garments immaculate.",
+    "material": "Turned Natural Cedar Wood & Adhesive Sheets",
+    "fit": "Standard One Size Tool",
+    "care": "Wipe wooden handle with a damp cloth. Store in dry place.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/sweater-1.jpg",
       "gallery": [
@@ -1237,14 +1295,15 @@ export const products = [
     "id": "p-036",
     "slug": "heavyweight-canvas-tote-bag",
     "name": "Heavyweight Canvas Tote Bag",
-    "category": "care-essentials",
+    "category": "care-accessories",
     "subcategory": "Tote Bag",
+    "subtype": "",
     "price": 16000,
     "description": "Heavyweight 16oz cotton canvas tote with reinforced box-stitched handles and internal key loop.",
-    "material": "100% Heavyweight Cotton Canvas",
-    "fit": "One Size (42cm x 38cm)",
-    "care": "Spot clean only.",
-    "shipping": "Free delivery on orders above ₦200,000.",
+    "material": "100% Heavyweight Cotton Canvas (16oz)",
+    "fit": "One Size (Dimensions: 42cm H x 38cm W x 10cm D)",
+    "care": "Spot clean with mild soap and warm water. Air dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
       "primary": "/images/products/pocket-tee-1.jpg",
       "gallery": [
@@ -1260,6 +1319,40 @@ export const products = [
     ],
     "featured": true,
     "createdAt": "2023-11-16T00:00:00Z",
+    "inStock": true
+  },
+  {
+    "id": "p-002",
+    "slug": "heavyweight-cotton-lounge-set",
+    "name": "Heavyweight Cotton Lounge Set",
+    "category": "sets",
+    "subcategory": "Cotton Lounge Sets",
+    "subtype": "",
+    "price": 52000,
+    "description": "A structured yet comfortable lounge set crafted from heavyweight organic cotton. Perfect for travel or elevated weekend wear.",
+    "material": "100% Heavyweight Organic Cotton (420 GSM)",
+    "fit": "Relaxed fit with a slightly boxy drape.",
+    "care": "Machine wash cold. Tumble dry low.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
+    "images": {
+      "primary": "/images/products/lounge-set-1.jpg",
+      "gallery": [
+        "/images/products/lounge-set-2.jpg"
+      ]
+    },
+    "colors": [
+      "Charcoal",
+      "Taupe"
+    ],
+    "availableSizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "featured": false,
+    "createdAt": "2023-10-05T00:00:00Z",
     "inStock": true
   }
 ];

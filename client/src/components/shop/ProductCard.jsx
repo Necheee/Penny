@@ -51,9 +51,15 @@ export default function ProductCard({ product }) {
       </div>
       
       {/* Typography refined: uppercase, tracking-wider for name. Serif for price. */}
-      <h3 className="text-xs font-bold tracking-[0.1em] uppercase text-brand-charcoal mb-1">
+      <h3 className="text-xs font-bold tracking-[0.1em] uppercase text-brand-charcoal mb-0.5 line-clamp-1 truncate" title={product.name}>
         {product.name}
       </h3>
+
+      {product.subtype && (
+        <p className="text-[10px] text-brand-taupe font-medium uppercase tracking-wider mb-1 line-clamp-1">
+          {product.subtype}
+        </p>
+      )}
       
       <p className="text-sm text-brand-charcoal/70 mb-3 font-serif">
         ₦ {product.price.toLocaleString()}

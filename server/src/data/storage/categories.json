@@ -5,13 +5,43 @@
     "slug": "tops",
     "displayOrder": 1,
     "subcategories": [
-      "T-Shirts",
-      "Long Sleeve Tees",
-      "Long Sleeve Henleys",
-      "Short Sleeve Henleys",
-      "Knitwear Polos",
-      "Oxford shirts",
-      "Sweatshirts & Hoodies"
+      {
+        "name": "T-Shirts",
+        "subtypes": [
+          "Regular Fit Tee",
+          "Oversize Fit Tee"
+        ]
+      },
+      {
+        "name": "Long Sleeve Tees",
+        "subtypes": []
+      },
+      {
+        "name": "Long Sleeve Henleys",
+        "subtypes": []
+      },
+      {
+        "name": "Short Sleeve Henleys",
+        "subtypes": []
+      },
+      {
+        "name": "Knitwear Polos",
+        "subtypes": []
+      },
+      {
+        "name": "Oxford shirts",
+        "subtypes": []
+      },
+      {
+        "name": "Sweatshirts & Hoodies",
+        "subtypes": [
+          "Crewneck sweatshirt",
+          "Quarter-Zip",
+          "Collared Quarter-Zip",
+          "Zip-through Hoodie",
+          "Standard Hoodie"
+        ]
+      }
     ]
   },
   {
@@ -20,12 +50,44 @@
     "slug": "bottoms",
     "displayOrder": 2,
     "subcategories": [
-      "Trousers & Chinos",
-      "Denim",
-      "Corduroy Trousers",
-      "Utility Pants",
-      "Sweatpants",
-      "Shorts"
+      {
+        "name": "Trousers & Chinos",
+        "subtypes": [
+          "Classic Tailored Pants",
+          "Improved Tailored Pants"
+        ]
+      },
+      {
+        "name": "Denim",
+        "subtypes": []
+      },
+      {
+        "name": "Corduroy Trousers",
+        "subtypes": []
+      },
+      {
+        "name": "Utility Pants",
+        "subtypes": [
+          "Utility pants in chinos",
+          "Utility pants in heavyweight cotton"
+        ]
+      },
+      {
+        "name": "Sweatpants",
+        "subtypes": [
+          "Cuffed",
+          "Open-Hem"
+        ]
+      },
+      {
+        "name": "Shorts",
+        "subtypes": [
+          "Sweatshorts",
+          "Chino Shorts",
+          "Utility Shorts",
+          "Pleated Shorts"
+        ]
+      }
     ]
   },
   {
@@ -34,9 +96,21 @@
     "slug": "outerwear",
     "displayOrder": 3,
     "subcategories": [
-      "Overshirts & Shackets",
-      "Knitwear Cardigan",
-      "Track Suit"
+      {
+        "name": "Overshirts & Shackets",
+        "subtypes": [
+          "Denim",
+          "Corduroy"
+        ]
+      },
+      {
+        "name": "Knitwear Cardigan",
+        "subtypes": []
+      },
+      {
+        "name": "Track Suit",
+        "subtypes": []
+      }
     ]
   },
   {
@@ -45,19 +119,34 @@
     "slug": "the-linen-shop",
     "displayOrder": 4,
     "subcategories": [
-      "Linen Tops",
-      "Pants",
-      "Shorts"
+      {
+        "name": "Linen Tops",
+        "subtypes": []
+      },
+      {
+        "name": "Pants",
+        "subtypes": []
+      },
+      {
+        "name": "Shorts",
+        "subtypes": []
+      }
     ]
   },
   {
-    "id": "care-essentials",
-    "name": "Care & Essentials",
-    "slug": "care-essentials",
+    "id": "care-accessories",
+    "name": "Care & Accessories",
+    "slug": "care-accessories",
     "displayOrder": 5,
     "subcategories": [
-      "Lint Rollers",
-      "Tote Bag"
+      {
+        "name": "Lint Rollers",
+        "subtypes": []
+      },
+      {
+        "name": "Tote Bag",
+        "subtypes": []
+      }
     ]
   },
   {
@@ -66,8 +155,14 @@
     "slug": "two-piece-sets",
     "displayOrder": 6,
     "subcategories": [
-      "Linen Sets",
-      "Cotton Lounge Sets"
+      {
+        "name": "Linen Sets",
+        "subtypes": []
+      },
+      {
+        "name": "Cotton Lounge Sets",
+        "subtypes": []
+      }
     ]
   }
 ]

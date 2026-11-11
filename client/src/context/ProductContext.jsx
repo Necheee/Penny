@@ -10,7 +10,28 @@ export function ProductProvider({ children }) {
     const saved = localStorage.getItem('penny_products');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingIds = new Set(parsed.map(p => p.id));
+          const updated = parsed.map(p => {
+            const initP = initialProducts.find(ip => ip.id === p.id);
+            return {
+              ...initP,
+              ...p,
+              subtype: p.subtype || initP?.subtype || '',
+              material: p.material || initP?.material || '100% Cotton',
+              fit: p.fit || initP?.fit || 'Relaxed fit',
+              care: p.care || initP?.care || 'Machine wash cold.',
+              shipping: p.shipping || initP?.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+            };
+          });
+          initialProducts.forEach(ip => {
+            if (!existingIds.has(ip.id)) {
+              updated.push(ip);
+            }
+          });
+          return updated;
+        }
       } catch (e) {
         console.error("Failed to parse saved products", e);
       }
@@ -29,20 +50,28 @@ export function ProductProvider({ children }) {
           const merged = parsed.map((c) => {
             const initial = initialCategories.find(ic => ic.id === c.id || ic.slug === c.slug);
             const initialSubs = initial?.subcategories || [];
-            const currentSubs = Array.isArray(c.subcategories) ? c.subcategories : [];
-            const subSet = new Set(currentSubs.map(s => s.toLowerCase()));
-            const combinedSubs = [...currentSubs];
-            initialSubs.forEach(sub => {
-              if (!subSet.has(sub.toLowerCase())) {
-                combinedSubs.push(sub);
+            
+            const normInitSubs = initialSubs.map(s => typeof s === 'string' ? { name: s, subtypes: [] } : s);
+            const normCurrentSubs = (Array.isArray(c.subcategories) ? c.subcategories : []).map(s => typeof s === 'string' ? { name: s, subtypes: [] } : s);
+            
+            const subMap = new Map();
+            normInitSubs.forEach(s => subMap.set(s.name.toLowerCase(), { ...s }));
+            normCurrentSubs.forEach(s => {
+              const existing = subMap.get(s.name.toLowerCase());
+              if (existing) {
+                const combinedSubtypes = Array.from(new Set([...(existing.subtypes || []), ...(s.subtypes || [])]));
+                subMap.set(s.name.toLowerCase(), { ...existing, subtypes: combinedSubtypes });
+              } else {
+                subMap.set(s.name.toLowerCase(), { ...s });
               }
             });
+
             return {
               ...c,
               name: initial?.name || c.name,
               slug: c.slug || initial?.slug || c.id,
               displayOrder: c.displayOrder || initial?.displayOrder || 1,
-              subcategories: combinedSubs
+              subcategories: Array.from(subMap.values())
             };
           });
           initialCategories.forEach(ic => {

@@ -63,6 +63,7 @@ export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialCategory = searchParams.get('category') || 'all';
   const initialSubcategory = searchParams.get('subcategory') || 'all';
+  const initialSubtype = searchParams.get('subtype') || 'all';
   const initialMaterial = searchParams.get('material') || 'all';
   const initialFit = searchParams.get('fit') || 'all';
   const initialColorFamily = searchParams.get('colorFamily') || 'all';
@@ -70,6 +71,7 @@ export default function Shop() {
   const { products, categories } = useProducts();
   const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [activeSubcategory, setActiveSubcategory] = useState(initialSubcategory);
+  const [activeSubtype, setActiveSubtype] = useState(initialSubtype);
   const [activeMaterial, setActiveMaterial] = useState(initialMaterial);
   const [activeFit, setActiveFit] = useState(initialFit);
   const [activeColorFamily, setActiveColorFamily] = useState(initialColorFamily);
@@ -88,21 +90,43 @@ export default function Shop() {
     return categoriesList.find(c => c.id === activeCategory || c.slug === activeCategory);
   }, [activeCategory, categoriesList]);
 
-  // Available subcategories for the active category
+  // Available subcategories for the active category (normalized)
   const activeSubcategories = useMemo(() => {
-    return currentCategory?.subcategories || [];
+    const raw = currentCategory?.subcategories || [];
+    return raw.map(sub => {
+      if (typeof sub === 'string') {
+        return { name: sub, subtypes: [] };
+      }
+      return {
+        name: sub.name || '',
+        subtypes: Array.isArray(sub.subtypes) ? sub.subtypes : []
+      };
+    });
   }, [currentCategory]);
+
+  // Current active subcategory object
+  const currentSubcategoryObj = useMemo(() => {
+    if (!activeSubcategory || activeSubcategory === 'all') return null;
+    return activeSubcategories.find(s => s.name.toLowerCase() === activeSubcategory.toLowerCase());
+  }, [activeSubcategory, activeSubcategories]);
+
+  // Available subtypes under the active subcategory
+  const activeSubtypes = useMemo(() => {
+    return currentSubcategoryObj?.subtypes || [];
+  }, [currentSubcategoryObj]);
 
   // Sync state with URL params
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category') || 'all';
     const subcategoryFromUrl = searchParams.get('subcategory') || 'all';
+    const subtypeFromUrl = searchParams.get('subtype') || 'all';
     const materialFromUrl = searchParams.get('material') || 'all';
     const fitFromUrl = searchParams.get('fit') || 'all';
     const colorFamilyFromUrl = searchParams.get('colorFamily') || 'all';
 
     setActiveCategory(categoryFromUrl);
     setActiveSubcategory(subcategoryFromUrl);
+    setActiveSubtype(subtypeFromUrl);
     setActiveMaterial(materialFromUrl);
     setActiveFit(fitFromUrl);
     setActiveColorFamily(colorFamilyFromUrl);
@@ -123,13 +147,16 @@ export default function Shop() {
   const handleCategoryChange = (catId) => {
     setActiveCategory(catId);
     setActiveSubcategory('all');
+    setActiveSubtype('all');
     const params = new URLSearchParams(searchParams);
     if (catId === 'all') {
       params.delete('category');
       params.delete('subcategory');
+      params.delete('subtype');
     } else {
       params.set('category', catId);
       params.delete('subcategory');
+      params.delete('subtype');
     }
     setSearchParams(params);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -140,7 +167,24 @@ export default function Shop() {
   const handleSubcategoryChange = (subName) => {
     const target = (activeSubcategory.toLowerCase() === (subName || '').toLowerCase()) ? 'all' : subName;
     setActiveSubcategory(target);
-    updateParam('subcategory', target);
+    setActiveSubtype('all');
+    const params = new URLSearchParams(searchParams);
+    if (!target || target === 'all') {
+      params.delete('subcategory');
+      params.delete('subtype');
+    } else {
+      params.set('subcategory', target);
+      params.delete('subtype');
+    }
+    setSearchParams(params);
+    setIsMobileFilterOpen(false);
+  };
+
+  // Update URL when subtype changes
+  const handleSubtypeChange = (subtypeName) => {
+    const target = (activeSubtype.toLowerCase() === (subtypeName || '').toLowerCase()) ? 'all' : subtypeName;
+    setActiveSubtype(target);
+    updateParam('subtype', target);
     setIsMobileFilterOpen(false);
   };
 
@@ -169,6 +213,7 @@ export default function Shop() {
   const handleClearAllFilters = () => {
     setActiveCategory('all');
     setActiveSubcategory('all');
+    setActiveSubtype('all');
     setActiveMaterial('all');
     setActiveFit('all');
     setActiveColorFamily('all');
@@ -181,7 +226,7 @@ export default function Shop() {
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...(products || [])];
 
-    // Filter by Category
+    // 1. Filter by Category
     if (activeCategory !== 'all') {
       const matchedCat = categoriesList.find(c => c.id === activeCategory || c.slug === activeCategory);
       result = result.filter(p => 
@@ -190,12 +235,22 @@ export default function Shop() {
       );
     }
 
-    // Filter by Subcategory
+    // 2. Filter by Subcategory
     if (activeSubcategory && activeSubcategory !== 'all') {
       result = result.filter(p => p.subcategory?.toLowerCase() === activeSubcategory.toLowerCase());
     }
 
-    // Filter by Material
+    // 3. Filter by Subtype (Tier 3)
+    if (activeSubtype && activeSubtype !== 'all') {
+      const q = activeSubtype.toLowerCase();
+      result = result.filter(p => 
+        p.subtype?.toLowerCase() === q ||
+        p.name?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q)
+      );
+    }
+
+    // 4. Filter by Material
     if (activeMaterial && activeMaterial !== 'all') {
       const matDef = MATERIAL_OPTIONS.find(m => m.id === activeMaterial);
       if (matDef?.match) {
@@ -206,7 +261,7 @@ export default function Shop() {
       }
     }
 
-    // Filter by Fit
+    // 5. Filter by Fit
     if (activeFit && activeFit !== 'all') {
       const fitDef = FIT_OPTIONS.find(f => f.id === activeFit);
       if (fitDef?.match) {
@@ -217,7 +272,7 @@ export default function Shop() {
       }
     }
 
-    // Filter by Color Family
+    // 6. Filter by Color Family
     if (activeColorFamily && activeColorFamily !== 'all') {
       const family = COLOR_FAMILIES.find(f => f.id === activeColorFamily);
       if (family) {
@@ -233,13 +288,14 @@ export default function Shop() {
       }
     }
 
-    // Filter by Search query
+    // 7. Filter by Search query
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter(p => 
         p.name?.toLowerCase().includes(q) ||
         p.category?.toLowerCase().includes(q) ||
         p.subcategory?.toLowerCase().includes(q) ||
+        p.subtype?.toLowerCase().includes(q) ||
         p.description?.toLowerCase().includes(q) ||
         p.material?.toLowerCase().includes(q) ||
         p.fit?.toLowerCase().includes(q) ||
@@ -259,19 +315,20 @@ export default function Shop() {
     }
 
     return result;
-  }, [activeCategory, activeSubcategory, activeMaterial, activeFit, activeColorFamily, sortOption, products, searchQuery, categoriesList]);
+  }, [activeCategory, activeSubcategory, activeSubtype, activeMaterial, activeFit, activeColorFamily, sortOption, products, searchQuery, categoriesList]);
 
   // Count active non-category filters
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (activeCategory !== 'all') count++;
     if (activeSubcategory !== 'all') count++;
+    if (activeSubtype !== 'all') count++;
     if (activeMaterial !== 'all') count++;
     if (activeFit !== 'all') count++;
     if (activeColorFamily !== 'all') count++;
     if (searchQuery) count++;
     return count;
-  }, [activeCategory, activeSubcategory, activeMaterial, activeFit, activeColorFamily, searchQuery]);
+  }, [activeCategory, activeSubcategory, activeSubtype, activeMaterial, activeFit, activeColorFamily, searchQuery]);
 
   // Product counts by subcategory in active category
   const subcategoryCounts = useMemo(() => {
@@ -293,6 +350,20 @@ export default function Shop() {
     return map;
   }, [products, activeCategory, categoriesList]);
 
+  // Product counts by subtype in active subcategory
+  const subtypeCounts = useMemo(() => {
+    const map = {};
+    if (!products || !activeSubcategory || activeSubcategory === 'all') return map;
+    const inSubcategory = products.filter(p => p.subcategory?.toLowerCase() === activeSubcategory.toLowerCase());
+    inSubcategory.forEach(p => {
+      if (p.subtype) {
+        const key = p.subtype.toLowerCase();
+        map[key] = (map[key] || 0) + 1;
+      }
+    });
+    return map;
+  }, [products, activeSubcategory]);
+
   const sortOptions = [
     { id: 'featured', label: 'Featured' },
     { id: 'newest', label: 'New Arrivals' },
@@ -303,26 +374,26 @@ export default function Shop() {
   const currentSortLabel = sortOptions.find(o => o.id === sortOption)?.label;
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col min-h-screen bg-white w-full max-w-full overflow-x-hidden">
       {/* Page Header */}
-      <div className="bg-brand-beige/20 py-10 md:py-16 px-6 border-b border-brand-charcoal/5">
+      <div className="bg-brand-beige/20 py-10 md:py-16 px-4 md:px-6 border-b border-brand-charcoal/5 w-full">
         <div className="max-w-4xl mx-auto text-center space-y-2">
           <p className="text-[10px] md:text-xs font-bold uppercase tracking-[0.25em] text-brand-taupe">
             Curated Capsule Wardrobe
           </p>
-          <h1 className="text-3xl md:text-5xl font-serif text-brand-charcoal tracking-wide">
+          <h1 className="text-2xl md:text-5xl font-serif text-brand-charcoal tracking-wide break-words">
             {searchQuery 
               ? `Search: "${searchQuery}"`
               : activeCategory === 'all' 
                 ? 'The Complete Collection' 
                 : currentCategory?.name || 'The Collection'}
           </h1>
-          <p className="text-xs md:text-sm text-neutral-500 font-sans max-w-xl mx-auto pt-1">
+          <p className="text-xs md:text-sm text-neutral-500 font-sans max-w-xl mx-auto pt-1 leading-relaxed">
             {activeCategory === 'tops' ? 'Foundational tees, structured henleys, knitwear polos & heavyweight fleece.' :
              activeCategory === 'bottoms' ? 'Tailored trousers, raw selvedge denim, corduroy & relaxed utility bottoms.' :
              activeCategory === 'outerwear' ? 'Refined shackets, knitwear cardigans & elevated lounge track suits.' :
              activeCategory === 'the-linen-shop' ? 'Pure 100% European flax linen garments crafted for effortless breathability.' :
-             activeCategory === 'care-essentials' ? 'Heirloom tools and sustainable accessories designed to extend garment longevity.' :
+             activeCategory === 'care-accessories' ? 'Heirloom tools and sustainable accessories designed to extend garment longevity.' :
              'Minimalist garments designed to work harmoniously together across seasons.'}
           </p>
         </div>
@@ -335,7 +406,7 @@ export default function Shop() {
                 params.delete('search');
                 setSearchParams(params);
               }}
-              className="text-xs uppercase font-bold tracking-widest text-brand-charcoal underline underline-offset-4 hover:text-brand-taupe transition-colors"
+              className="text-xs uppercase font-bold tracking-widest text-brand-charcoal underline underline-offset-4 hover:text-brand-taupe transition-colors cursor-pointer"
             >
               Clear Search Filter
             </button>
@@ -344,13 +415,13 @@ export default function Shop() {
       </div>
 
       {/* Main Shop Container */}
-      <div className="flex flex-col md:flex-row max-w-[1400px] mx-auto w-full px-4 md:px-8 py-8 md:py-12 gap-8 md:gap-12">
+      <div className="flex flex-col md:flex-row max-w-[1400px] mx-auto w-full px-4 md:px-8 py-8 md:py-12 gap-8 md:gap-12 overflow-hidden">
         
         {/* Mobile Filter Toggle & Sort Bar */}
-        <div className="md:hidden flex justify-between items-center border-b border-brand-charcoal/10 pb-4">
+        <div className="md:hidden flex justify-between items-center border-b border-brand-charcoal/10 pb-4 w-full">
           <button 
             onClick={() => setIsMobileFilterOpen(true)}
-            className="flex items-center space-x-2 text-xs font-bold tracking-wider uppercase text-brand-charcoal px-3 py-2 border border-neutral-300 rounded-xs bg-neutral-50"
+            className="flex items-center space-x-2 text-xs font-bold tracking-wider uppercase text-brand-charcoal px-3 py-2 border border-neutral-300 rounded-xs bg-neutral-50 cursor-pointer"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             <span>Filters {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ''}</span>
@@ -359,7 +430,7 @@ export default function Shop() {
           <div className="relative">
             <button 
               onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-              className="flex items-center space-x-1.5 text-xs font-bold tracking-wider uppercase text-brand-charcoal px-3 py-2 border border-neutral-300 rounded-xs bg-neutral-50"
+              className="flex items-center space-x-1.5 text-xs font-bold tracking-wider uppercase text-brand-charcoal px-3 py-2 border border-neutral-300 rounded-xs bg-neutral-50 cursor-pointer"
             >
               <span>Sort: {currentSortLabel}</span>
               <ChevronDown className="w-3.5 h-3.5" />
@@ -377,7 +448,7 @@ export default function Shop() {
                     <button
                       key={opt.id}
                       onClick={() => { setSortOption(opt.id); setIsSortDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-3 text-xs tracking-wider uppercase transition-colors ${sortOption === opt.id ? 'bg-brand-beige/30 font-bold' : 'hover:bg-brand-beige/10'}`}
+                      className={`w-full text-left px-4 py-3 text-xs tracking-wider uppercase transition-colors cursor-pointer ${sortOption === opt.id ? 'bg-brand-beige/30 font-bold' : 'hover:bg-brand-beige/10'}`}
                     >
                       {opt.label}
                     </button>
@@ -390,29 +461,31 @@ export default function Shop() {
 
         {/* Sidebar Desktop Filters */}
         <div className="hidden md:block md:w-64 flex-shrink-0">
-          <div className="sticky top-24 space-y-8 pr-4">
+          <div className="sticky top-24 space-y-8 pr-2">
             
-            {/* 1. Category Tree */}
+            {/* 1. Category Tree with Subcategories & Subtypes */}
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-brand-taupe">Categories</h3>
                 {activeCategory !== 'all' && (
                   <button 
                     onClick={() => handleCategoryChange('all')}
-                    className="text-[10px] uppercase font-bold text-neutral-400 hover:text-black tracking-wider"
+                    className="text-[10px] uppercase font-bold text-neutral-400 hover:text-black tracking-wider cursor-pointer"
                   >
                     View All
                   </button>
                 )}
               </div>
-              <ul className="space-y-2.5">
+              <ul className="space-y-3">
                 {categoriesList.map((cat) => {
                   const isCatActive = activeCategory === cat.id || (cat.slug && activeCategory === cat.slug);
+                  const subs = (cat.subcategories || []).map(s => typeof s === 'string' ? { name: s, subtypes: [] } : s);
+
                   return (
-                    <li key={cat.id}>
+                    <li key={cat.id} className="space-y-1.5">
                       <button
                         onClick={() => handleCategoryChange(cat.id)}
-                        className={`text-xs tracking-wider uppercase transition-colors block text-left w-full py-1 ${
+                        className={`text-xs tracking-wider uppercase transition-colors block text-left w-full py-1 cursor-pointer ${
                           isCatActive
                             ? 'font-bold text-brand-charcoal pl-2 border-l-2 border-brand-charcoal'
                             : 'text-neutral-500 hover:text-brand-charcoal'
@@ -420,6 +493,63 @@ export default function Shop() {
                       >
                         {cat.name}
                       </button>
+
+                      {/* Tier 2 Subcategories in Sidebar */}
+                      {isCatActive && subs.length > 0 && (
+                        <ul className="pl-3 border-l border-brand-charcoal/15 space-y-1.5 pt-1">
+                          <li>
+                            <button
+                              onClick={() => handleSubcategoryChange('all')}
+                              className={`text-[11px] tracking-wider uppercase block text-left cursor-pointer ${
+                                activeSubcategory === 'all'
+                                  ? 'font-bold text-brand-charcoal underline underline-offset-4'
+                                  : 'text-neutral-400 hover:text-brand-charcoal'
+                              }`}
+                            >
+                              All {cat.name}
+                            </button>
+                          </li>
+                          {subs.map((sub) => {
+                            const isSubActive = activeSubcategory.toLowerCase() === sub.name.toLowerCase();
+                            const subSubtypes = sub.subtypes || [];
+
+                            return (
+                              <li key={sub.name} className="space-y-1">
+                                <button
+                                  onClick={() => handleSubcategoryChange(sub.name)}
+                                  className={`text-[11px] tracking-wider uppercase block text-left cursor-pointer ${
+                                    isSubActive
+                                      ? 'font-bold text-brand-charcoal underline underline-offset-4'
+                                      : 'text-neutral-500 hover:text-brand-charcoal'
+                                  }`}
+                                >
+                                  {sub.name}
+                                </button>
+
+                                {/* Tier 3 Subtypes in Sidebar */}
+                                {isSubActive && subSubtypes.length > 0 && (
+                                  <ul className="pl-2 border-l border-brand-charcoal/20 space-y-1 pt-0.5">
+                                    {subSubtypes.map((st) => (
+                                      <li key={st}>
+                                        <button
+                                          onClick={() => handleSubtypeChange(st)}
+                                          className={`text-[10px] tracking-wide block text-left cursor-pointer ${
+                                            activeSubtype.toLowerCase() === st.toLowerCase()
+                                              ? 'font-bold text-brand-charcoal bg-neutral-100 px-1.5 py-0.5 rounded-xs'
+                                              : 'text-neutral-400 hover:text-brand-charcoal'
+                                          }`}
+                                        >
+                                          • {st}
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </li>
                   );
                 })}
@@ -433,7 +563,7 @@ export default function Shop() {
                 {activeMaterial !== 'all' && (
                   <button 
                     onClick={() => handleMaterialChange('all')}
-                    className="text-[10px] uppercase font-bold text-neutral-400 hover:text-black tracking-wider"
+                    className="text-[10px] uppercase font-bold text-neutral-400 hover:text-black tracking-wider cursor-pointer"
                   >
                     Reset
                   </button>
@@ -446,7 +576,7 @@ export default function Shop() {
                     <button
                       key={mat.id}
                       onClick={() => handleMaterialChange(mat.id)}
-                      className={`text-[11px] px-2.5 py-1 rounded-xs tracking-wide transition-all border ${
+                      className={`text-[11px] px-2.5 py-1 rounded-xs tracking-wide transition-all border cursor-pointer ${
                         isSelected
                           ? 'bg-brand-charcoal text-white border-brand-charcoal font-bold shadow-xs'
                           : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:text-black'
@@ -466,7 +596,7 @@ export default function Shop() {
                 {activeFit !== 'all' && (
                   <button 
                     onClick={() => handleFitChange('all')}
-                    className="text-[10px] uppercase font-bold text-neutral-400 hover:text-black tracking-wider"
+                    className="text-[10px] uppercase font-bold text-neutral-400 hover:text-black tracking-wider cursor-pointer"
                   >
                     Reset
                   </button>
@@ -479,7 +609,7 @@ export default function Shop() {
                     <button
                       key={f.id}
                       onClick={() => handleFitChange(f.id)}
-                      className={`text-[11px] px-2.5 py-1 rounded-xs tracking-wide transition-all border ${
+                      className={`text-[11px] px-2.5 py-1 rounded-xs tracking-wide transition-all border cursor-pointer ${
                         isSelected
                           ? 'bg-brand-charcoal text-white border-brand-charcoal font-bold shadow-xs'
                           : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:text-black'
@@ -499,7 +629,7 @@ export default function Shop() {
                 {activeColorFamily !== 'all' && (
                   <button 
                     onClick={() => handleColorFamilyChange('all')}
-                    className="text-[10px] uppercase font-bold text-neutral-400 hover:text-black tracking-wider"
+                    className="text-[10px] uppercase font-bold text-neutral-400 hover:text-black tracking-wider cursor-pointer"
                   >
                     Reset
                   </button>
@@ -512,7 +642,7 @@ export default function Shop() {
                     <button
                       key={fam.id}
                       onClick={() => handleColorFamilyChange(fam.id)}
-                      className={`w-full text-left p-2 rounded-xs border transition-all ${
+                      className={`w-full text-left p-2 rounded-xs border transition-all cursor-pointer ${
                         isSelected 
                           ? 'border-brand-charcoal bg-neutral-50 shadow-xs' 
                           : 'border-neutral-200 hover:border-neutral-300 bg-white'
@@ -550,7 +680,7 @@ export default function Shop() {
                   <li key={opt.id}>
                     <button
                       onClick={() => setSortOption(opt.id)}
-                      className={`text-xs flex items-center space-x-2 tracking-wide transition-colors ${sortOption === opt.id ? 'font-bold text-brand-charcoal' : 'text-neutral-500 hover:text-brand-charcoal'}`}
+                      className={`text-xs flex items-center space-x-2 tracking-wide transition-colors cursor-pointer ${sortOption === opt.id ? 'font-bold text-brand-charcoal' : 'text-neutral-500 hover:text-brand-charcoal'}`}
                     >
                       {sortOption === opt.id && <Check className="w-3.5 h-3.5 text-brand-charcoal" />}
                       <span className={sortOption === opt.id ? '' : 'pl-5.5'}>{opt.label}</span>
@@ -566,7 +696,7 @@ export default function Shop() {
                 <button
                   type="button"
                   onClick={handleClearAllFilters}
-                  className="w-full py-2 px-3 border border-neutral-300 text-neutral-600 hover:text-black hover:border-black text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors rounded-xs"
+                  className="w-full py-2 px-3 border border-neutral-300 text-neutral-600 hover:text-black hover:border-black text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors rounded-xs cursor-pointer"
                 >
                   <RotateCcw className="w-3 h-3" /> Clear All Filters
                 </button>
@@ -580,7 +710,6 @@ export default function Shop() {
         <AnimatePresence>
           {isMobileFilterOpen && (
             <div className="fixed inset-0 z-50 flex md:hidden">
-              {/* Backdrop */}
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -589,7 +718,6 @@ export default function Shop() {
                 className="fixed inset-0 bg-black/50 backdrop-blur-xs"
               />
 
-              {/* Drawer Content */}
               <motion.div 
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
@@ -597,7 +725,6 @@ export default function Shop() {
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                 className="relative ml-auto w-full max-w-xs bg-white h-full shadow-2xl flex flex-col z-50 overflow-hidden"
               >
-                {/* Header */}
                 <div className="p-4 border-b border-neutral-200 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <SlidersHorizontal className="w-4 h-4 text-brand-charcoal" />
@@ -605,13 +732,12 @@ export default function Shop() {
                   </div>
                   <button 
                     onClick={() => setIsMobileFilterOpen(false)}
-                    className="p-1 text-neutral-400 hover:text-black"
+                    className="p-1 text-neutral-400 hover:text-black cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                {/* Scrollable Filters */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                   {/* Category */}
                   <div>
@@ -621,7 +747,7 @@ export default function Shop() {
                         <button
                           key={cat.id}
                           onClick={() => handleCategoryChange(cat.id)}
-                          className={`text-xs p-2 rounded-xs border text-left truncate transition-colors ${
+                          className={`text-xs p-2 rounded-xs border text-left truncate transition-colors cursor-pointer ${
                             activeCategory === cat.id ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-neutral-50 text-neutral-700 border-neutral-200'
                           }`}
                         >
@@ -631,6 +757,62 @@ export default function Shop() {
                     </div>
                   </div>
 
+                  {/* Subcategory */}
+                  {activeSubcategories.length > 0 && (
+                    <div>
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-brand-taupe mb-2">Subcategory</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          onClick={() => handleSubcategoryChange('all')}
+                          className={`text-xs px-2.5 py-1.5 rounded-xs border cursor-pointer ${
+                            activeSubcategory === 'all' ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-700 border-neutral-200'
+                          }`}
+                        >
+                          All {currentCategory?.name}
+                        </button>
+                        {activeSubcategories.map(sub => (
+                          <button
+                            key={sub.name}
+                            onClick={() => handleSubcategoryChange(sub.name)}
+                            className={`text-xs px-2.5 py-1.5 rounded-xs border cursor-pointer ${
+                              activeSubcategory.toLowerCase() === sub.name.toLowerCase() ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-700 border-neutral-200'
+                            }`}
+                          >
+                            {sub.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subtype (Tier 3) */}
+                  {activeSubtypes.length > 0 && (
+                    <div>
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-brand-taupe mb-2">{activeSubcategory} Style</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          onClick={() => handleSubtypeChange('all')}
+                          className={`text-xs px-2.5 py-1.5 rounded-xs border cursor-pointer ${
+                            activeSubtype === 'all' ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-700 border-neutral-200'
+                          }`}
+                        >
+                          All {activeSubcategory}
+                        </button>
+                        {activeSubtypes.map(st => (
+                          <button
+                            key={st}
+                            onClick={() => handleSubtypeChange(st)}
+                            className={`text-xs px-2.5 py-1.5 rounded-xs border cursor-pointer ${
+                              activeSubtype.toLowerCase() === st.toLowerCase() ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-700 border-neutral-200'
+                            }`}
+                          >
+                            {st}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Material */}
                   <div>
                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-brand-taupe mb-2">Material</h4>
@@ -639,7 +821,7 @@ export default function Shop() {
                         <button
                           key={mat.id}
                           onClick={() => handleMaterialChange(mat.id)}
-                          className={`text-xs px-2.5 py-1.5 rounded-xs border transition-colors ${
+                          className={`text-xs px-2.5 py-1.5 rounded-xs border transition-colors cursor-pointer ${
                             activeMaterial === mat.id ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-700 border-neutral-200'
                           }`}
                         >
@@ -657,7 +839,7 @@ export default function Shop() {
                         <button
                           key={f.id}
                           onClick={() => handleFitChange(f.id)}
-                          className={`text-xs px-2.5 py-1.5 rounded-xs border transition-colors ${
+                          className={`text-xs px-2.5 py-1.5 rounded-xs border transition-colors cursor-pointer ${
                             activeFit === f.id ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-700 border-neutral-200'
                           }`}
                         >
@@ -675,7 +857,7 @@ export default function Shop() {
                         <button
                           key={fam.id}
                           onClick={() => handleColorFamilyChange(fam.id)}
-                          className={`w-full text-left p-2 text-xs border rounded-xs flex items-center justify-between ${
+                          className={`w-full text-left p-2 text-xs border rounded-xs flex items-center justify-between cursor-pointer ${
                             activeColorFamily === fam.id ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-700 border-neutral-200'
                           }`}
                         >
@@ -687,17 +869,16 @@ export default function Shop() {
                   </div>
                 </div>
 
-                {/* Footer Buttons */}
                 <div className="p-4 border-t border-neutral-200 bg-neutral-50 flex gap-2">
                   <button
                     onClick={handleClearAllFilters}
-                    className="flex-1 py-2.5 border border-neutral-300 text-xs font-bold uppercase tracking-wider text-neutral-700 hover:bg-neutral-100 rounded-xs"
+                    className="flex-1 py-2.5 border border-neutral-300 text-xs font-bold uppercase tracking-wider text-neutral-700 hover:bg-neutral-100 rounded-xs cursor-pointer"
                   >
                     Reset
                   </button>
                   <button
                     onClick={() => setIsMobileFilterOpen(false)}
-                    className="flex-2 py-2.5 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black rounded-xs shadow-xs"
+                    className="flex-2 py-2.5 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black rounded-xs shadow-xs cursor-pointer"
                   >
                     View ({filteredAndSortedProducts.length}) Results
                   </button>
@@ -707,20 +888,20 @@ export default function Shop() {
           )}
         </AnimatePresence>
 
-        {/* Product Grid Area */}
-        <div className="flex-grow">
+        {/* Product Grid Column */}
+        <div className="flex-1 min-w-0 max-w-full overflow-hidden">
           
           {/* 1. Quick Category Navigation Pills (When viewing All Products) */}
           {activeCategory === 'all' && (
-            <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6 hide-scrollbar border-b border-brand-charcoal/10">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 shrink-0 mr-1">
+            <div className="flex flex-wrap items-center gap-2 pb-4 mb-6 border-b border-brand-charcoal/10">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mr-1">
                 Browse:
               </span>
               {categoriesList.map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => handleCategoryChange(cat.id)}
-                  className={`px-3.5 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors rounded-full whitespace-nowrap shrink-0 ${
+                  className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors rounded-full whitespace-nowrap cursor-pointer ${
                     activeCategory === cat.id
                       ? 'bg-brand-charcoal text-white font-bold shadow-xs'
                       : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-black'
@@ -732,41 +913,85 @@ export default function Shop() {
             </div>
           )}
 
-          {/* 2. Subcategory Quick Filter Pills Bar (When Category is selected) */}
+          {/* 2. Tier 2: Subcategory Pills Bar (When Category is selected) */}
           {activeCategory !== 'all' && activeSubcategories.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6 hide-scrollbar border-b border-brand-charcoal/10">
-              <button
-                onClick={() => handleSubcategoryChange('all')}
-                className={`px-4 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors rounded-full whitespace-nowrap shrink-0 ${
-                  activeSubcategory === 'all'
-                    ? 'bg-brand-charcoal text-white font-bold shadow-xs'
-                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-black'
-                }`}
-              >
-                All {currentCategory?.name || 'Items'}
-              </button>
-              {activeSubcategories.map((sub) => {
-                const isSelected = activeSubcategory.toLowerCase() === sub.toLowerCase();
-                const count = subcategoryCounts[sub.toLowerCase()];
-                return (
+            <div className="space-y-3 pb-4 mb-6 border-b border-brand-charcoal/10">
+              {/* Row 1: Subcategories */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => handleSubcategoryChange('all')}
+                  className={`px-3.5 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors rounded-full whitespace-nowrap cursor-pointer ${
+                    activeSubcategory === 'all'
+                      ? 'bg-brand-charcoal text-white font-bold shadow-xs'
+                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-black'
+                  }`}
+                >
+                  All {currentCategory?.name || 'Items'}
+                </button>
+                {activeSubcategories.map((sub) => {
+                  const isSelected = activeSubcategory.toLowerCase() === sub.name.toLowerCase();
+                  const count = subcategoryCounts[sub.name.toLowerCase()];
+                  return (
+                    <button
+                      key={sub.name}
+                      onClick={() => handleSubcategoryChange(sub.name)}
+                      className={`px-3.5 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors rounded-full whitespace-nowrap inline-flex items-center gap-1.5 cursor-pointer ${
+                        isSelected
+                          ? 'bg-brand-charcoal text-white font-bold shadow-xs'
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-black'
+                      }`}
+                    >
+                      <span>{sub.name}</span>
+                      {typeof count === 'number' && (
+                        <span className={`text-[10px] ${isSelected ? 'text-neutral-300' : 'text-neutral-400'}`}>
+                          ({count})
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Row 2: Tier 3 Sub-types (When subcategory has specific styles/variations) */}
+              {activeSubtypes.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 pl-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mr-1">
+                    {activeSubcategory} Style:
+                  </span>
                   <button
-                    key={sub}
-                    onClick={() => handleSubcategoryChange(sub)}
-                    className={`px-4 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors rounded-full whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 ${
-                      isSelected
-                        ? 'bg-brand-charcoal text-white font-bold shadow-xs'
-                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-black'
+                    onClick={() => handleSubtypeChange('all')}
+                    className={`px-2.5 py-1 text-[11px] font-medium tracking-wide rounded-xs transition-colors cursor-pointer border ${
+                      activeSubtype === 'all'
+                        ? 'bg-neutral-800 text-white border-neutral-800 font-bold'
+                        : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
                     }`}
                   >
-                    <span>{sub}</span>
-                    {typeof count === 'number' && (
-                      <span className={`text-[10px] ${isSelected ? 'text-neutral-300' : 'text-neutral-400'}`}>
-                        ({count})
-                      </span>
-                    )}
+                    All {activeSubcategory}
                   </button>
-                );
-              })}
+                  {activeSubtypes.map((st) => {
+                    const isSelected = activeSubtype.toLowerCase() === st.toLowerCase();
+                    const count = subtypeCounts[st.toLowerCase()];
+                    return (
+                      <button
+                        key={st}
+                        onClick={() => handleSubtypeChange(st)}
+                        className={`px-2.5 py-1 text-[11px] font-medium tracking-wide rounded-xs transition-colors inline-flex items-center gap-1 cursor-pointer border ${
+                          isSelected
+                            ? 'bg-neutral-800 text-white border-neutral-800 font-bold'
+                            : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:text-black'
+                        }`}
+                      >
+                        <span>{st}</span>
+                        {typeof count === 'number' && (
+                          <span className={`text-[9px] ${isSelected ? 'text-neutral-300' : 'text-neutral-400'}`}>
+                            ({count})
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -795,12 +1020,27 @@ export default function Shop() {
               {/* Active Subcategory Tag */}
               {activeSubcategory !== 'all' && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-neutral-200 text-neutral-800 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                  <span>Sub: {activeSubcategory}</span>
+                  <span>{activeSubcategory}</span>
                   <button 
                     type="button" 
                     onClick={() => handleSubcategoryChange('all')}
                     className="hover:text-black cursor-pointer ml-0.5"
                     title="Remove Subcategory filter"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              {/* Active Subtype Tag */}
+              {activeSubtype !== 'all' && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-neutral-800 text-white rounded-full text-[10px] font-bold uppercase tracking-wider">
+                  <span>Style: {activeSubtype}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => handleSubtypeChange('all')}
+                    className="hover:text-neutral-300 cursor-pointer ml-0.5"
+                    title="Remove Style filter"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -871,7 +1111,7 @@ export default function Shop() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-charcoal"></div>
             </div>
           ) : filteredAndSortedProducts.length === 0 ? (
-            <div className="py-24 text-center max-w-md mx-auto space-y-4">
+            <div className="py-24 text-center max-w-md mx-auto space-y-4 px-4">
               <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto text-neutral-400">
                 <Sparkles className="w-5 h-5" />
               </div>
@@ -883,14 +1123,14 @@ export default function Shop() {
                 <button
                   type="button"
                   onClick={handleClearAllFilters}
-                  className="px-5 py-2.5 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors rounded-xs shadow-xs"
+                  className="px-5 py-2.5 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors rounded-xs shadow-xs cursor-pointer"
                 >
                   Reset All Filters
                 </button>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-12 md:gap-x-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 w-full">
               {filteredAndSortedProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}

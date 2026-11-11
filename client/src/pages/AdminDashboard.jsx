@@ -351,14 +351,20 @@ export default function AdminDashboard() {
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
     const firstCat = categoryList[0];
+    const firstSub = firstCat?.subcategories?.[0];
+    const firstSubName = typeof firstSub === 'string' ? firstSub : firstSub?.name || '';
+    const firstSubtypes = typeof firstSub === 'object' && Array.isArray(firstSub?.subtypes) ? firstSub.subtypes : [];
     setProductForm({
       name: '',
       category: firstCat?.id || 'tops',
-      subcategory: firstCat?.subcategories?.[0] || '',
+      subcategory: firstSubName,
+      subtype: firstSubtypes[0] || '',
       price: '',
       description: '',
-      material: '100% Cotton',
+      material: '100% Heavyweight Cotton',
       fit: 'Relaxed fit',
+      care: 'Machine wash cold inside out. Hang dry.',
+      shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
       featured: false,
       inStock: true,
       colors: ['Black', 'White'],
@@ -377,10 +383,13 @@ export default function AdminDashboard() {
       name: product.name,
       category: product.category,
       subcategory: product.subcategory || '',
+      subtype: product.subtype || '',
       price: product.price,
       description: product.description || '',
       material: product.material || '100% Cotton',
       fit: product.fit || 'Relaxed fit',
+      care: product.care || 'Machine wash cold inside out. Hang dry.',
+      shipping: product.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
       featured: !!product.featured,
       inStock: product.inStock !== false,
       colors: product.colors || ['Black'],
@@ -495,10 +504,13 @@ export default function AdminDashboard() {
         name: productForm.name,
         category: productForm.category,
         subcategory: finalSubcategory,
+        subtype: productForm.subtype || '',
         price: Number(productForm.price),
         description: productForm.description,
         material: productForm.material,
         fit: productForm.fit,
+        care: productForm.care || 'Machine wash cold inside out. Hang dry.',
+        shipping: productForm.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
         featured: productForm.featured,
         inStock: productForm.inStock,
         colors: productForm.colors,
@@ -515,12 +527,13 @@ export default function AdminDashboard() {
         name: productForm.name,
         category: productForm.category,
         subcategory: finalSubcategory || 'New Arrival',
+        subtype: productForm.subtype || '',
         price: Number(productForm.price),
         description: productForm.description || 'Premium menswear essential.',
         material: productForm.material || '100% Cotton',
-        fit: productForm.fit || 'True to size.',
-        care: 'Machine wash cold.',
-        shipping: 'Free delivery on orders above ₦200,000.',
+        fit: productForm.fit || 'Relaxed fit.',
+        care: productForm.care || 'Machine wash cold inside out. Hang dry.',
+        shipping: productForm.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
         featured: productForm.featured,
         inStock: productForm.inStock,
         colors: productForm.colors,
@@ -1154,22 +1167,37 @@ export default function AdminDashboard() {
                       {/* Subcategory Badges */}
                       <div className="flex flex-wrap gap-2 mb-3">
                         {subs.length > 0 ? (
-                          subs.map((sub) => (
-                            <span 
-                              key={sub}
-                              className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#F7F7F5] border border-neutral-200 text-brand-charcoal text-xs font-medium rounded-sm"
-                            >
-                              <span>{sub}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSubcategoryFromCat(cat.id, sub)}
-                                className="text-neutral-400 hover:text-red-600 transition-colors ml-0.5 cursor-pointer"
-                                title={`Delete ${sub}`}
+                          subs.map((subItem) => {
+                            const subName = typeof subItem === 'string' ? subItem : subItem?.name;
+                            const subSubtypes = typeof subItem === 'object' && Array.isArray(subItem?.subtypes) ? subItem.subtypes : [];
+                            return (
+                              <div 
+                                key={subName}
+                                className="inline-flex flex-col gap-1 p-2 bg-[#F7F7F5] border border-neutral-200 text-brand-charcoal text-xs rounded-sm max-w-xs"
                               >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </span>
-                          ))
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold text-[11px] uppercase tracking-wide">{subName}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSubcategoryFromCat(cat.id, subName)}
+                                    className="text-neutral-400 hover:text-red-600 transition-colors ml-0.5 cursor-pointer"
+                                    title={`Delete ${subName}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                {subSubtypes.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 pt-1">
+                                    {subSubtypes.map((st) => (
+                                      <span key={st} className="text-[9px] px-1.5 py-0.5 bg-white border border-neutral-200 rounded-xs text-neutral-600">
+                                        • {st}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
                         ) : (
                           <span className="text-xs text-neutral-400 italic">
                             No subcategories added yet. Add one below to give shoppers subcategory filter tabs.
@@ -2239,56 +2267,103 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Subcategory Selection / Creator */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                  Subcategory
-                </label>
-                {!isAddingCustomSub ? (
-                  <div className="flex gap-2">
-                    <select
-                      value={productForm.subcategory}
-                      onChange={(e) => {
-                        if (e.target.value === '__NEW_SUB__') {
-                          setIsAddingCustomSub(true);
+              {/* Subcategory & Subtype (Tier 3) Selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    Subcategory *
+                  </label>
+                  {!isAddingCustomSub ? (
+                    <div className="flex gap-2">
+                      <select
+                        value={productForm.subcategory}
+                        onChange={(e) => {
+                          if (e.target.value === '__NEW_SUB__') {
+                            setIsAddingCustomSub(true);
+                            setCustomSubcategoryInput('');
+                          } else {
+                            const newSub = e.target.value;
+                            const catObj = categoryList.find(c => c.id === productForm.category || c.slug === productForm.category);
+                            const subObj = (catObj?.subcategories || []).find(s => (typeof s === 'string' ? s : s?.name) === newSub);
+                            const availableSubtypes = typeof subObj === 'object' && Array.isArray(subObj?.subtypes) ? subObj.subtypes : [];
+                            setProductForm({ 
+                              ...productForm, 
+                              subcategory: newSub,
+                              subtype: availableSubtypes[0] || ''
+                            });
+                          }
+                        }}
+                        className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white text-xs"
+                      >
+                        <option value="">(None / General)</option>
+                        {categoryList
+                          .find(c => c.id === productForm.category || c.slug === productForm.category)
+                          ?.subcategories?.map((sub) => {
+                            const subName = typeof sub === 'string' ? sub : sub?.name;
+                            return <option key={subName} value={subName}>{subName}</option>;
+                          })}
+                        <option value="__NEW_SUB__">+ Add New Subcategory...</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customSubcategoryInput}
+                        onChange={(e) => setCustomSubcategoryInput(e.target.value)}
+                        placeholder="Type new subcategory name..."
+                        className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal text-xs"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingCustomSub(false);
                           setCustomSubcategoryInput('');
-                        } else {
-                          setProductForm({ ...productForm, subcategory: e.target.value });
-                        }
-                      }}
-                      className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white text-xs"
-                    >
-                      <option value="">(None / General)</option>
-                      {categoryList
-                        .find(c => c.id === productForm.category || c.slug === productForm.category)
-                        ?.subcategories?.map((sub) => (
-                          <option key={sub} value={sub}>{sub}</option>
-                        ))}
-                      <option value="__NEW_SUB__">+ Add New Subcategory for this Category...</option>
-                    </select>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={customSubcategoryInput}
-                      onChange={(e) => setCustomSubcategoryInput(e.target.value)}
-                      placeholder="Type new subcategory name..."
-                      className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal text-xs"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAddingCustomSub(false);
-                        setCustomSubcategoryInput('');
-                      }}
-                      className="px-3 py-2 border border-neutral-300 text-neutral-600 text-xs uppercase font-bold hover:bg-neutral-100"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
+                        }}
+                        className="px-3 py-2 border border-neutral-300 text-neutral-600 text-xs uppercase font-bold hover:bg-neutral-100"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Subtype / Style Category */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    Style / Sub-Category (Tier 3)
+                  </label>
+                  {(() => {
+                    const catObj = categoryList.find(c => c.id === productForm.category || c.slug === productForm.category);
+                    const subObj = (catObj?.subcategories || []).find(s => (typeof s === 'string' ? s : s?.name) === productForm.subcategory);
+                    const availableSubtypes = typeof subObj === 'object' && Array.isArray(subObj?.subtypes) ? subObj.subtypes : [];
+
+                    return (
+                      <div className="space-y-1">
+                        <select
+                          value={productForm.subtype}
+                          onChange={(e) => setProductForm({ ...productForm, subtype: e.target.value })}
+                          className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white text-xs"
+                        >
+                          <option value="">(None / General)</option>
+                          {availableSubtypes.map((st) => (
+                            <option key={st} value={st}>{st}</option>
+                          ))}
+                        </select>
+                        {availableSubtypes.length === 0 && (
+                          <input
+                            type="text"
+                            value={productForm.subtype}
+                            onChange={(e) => setProductForm({ ...productForm, subtype: e.target.value })}
+                            placeholder="Optional custom sub-style..."
+                            className="w-full border border-neutral-200 p-1.5 focus:outline-none focus:border-brand-charcoal text-[11px] bg-neutral-50/50"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
               {/* Material & Fit Fields */}
@@ -2529,16 +2604,135 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                  Description
-                </label>
-                <textarea
-                  rows={3}
-                  value={productForm.description}
-                  onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                  className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none"
-                />
+              {/* STOREFRONT PRODUCT ACCORDION TABS */}
+              <div className="space-y-4 pt-2 border-t border-neutral-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-charcoal">
+                    Storefront Accordion Tabs (Customer Facing)
+                  </h4>
+                  <span className="text-[10px] text-neutral-400">
+                    Populates the 5 product detail drawers on the storefront
+                  </span>
+                </div>
+
+                {/* 1. Description */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    1. Garment Description *
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={productForm.description}
+                    onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                    placeholder="Enter garment narrative, construction details, and aesthetic purpose..."
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs"
+                    required
+                  />
+                </div>
+
+                {/* 2. Details & Material */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    2. Details & Material
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={productForm.material}
+                    onChange={(e) => setProductForm({ ...productForm, material: e.target.value })}
+                    placeholder="e.g. Cotton Twill & Viscose Blend, 100% Premium European Linen"
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {['Cotton Twill & Viscose Blend', '100% Premium European Linen', '100% Heavyweight Cotton (450 GSM Loopback)', '100% Japanese Selvedge Denim', '100% Heavyweight Cotton Corduroy', '70% Merino Wool, 30% Silk Knitwear'].map(mat => (
+                      <button
+                        type="button"
+                        key={mat}
+                        onClick={() => setProductForm({ ...productForm, material: mat })}
+                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
+                      >
+                        +{mat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Fit & Sizing */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    3. Fit & Sizing
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={productForm.fit}
+                    onChange={(e) => setProductForm({ ...productForm, fit: e.target.value })}
+                    placeholder="e.g. Tailored fit. Mid-rise waist. / Relaxed boxy drape with dropped shoulders."
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {['Tailored fit. Mid-rise waist.', 'Relaxed fit with a slightly boxy drape.', 'Oversized fit. Dropped shoulders.', 'Body-fit. Clean athletic contour.', 'True to size with clean ankle taper.'].map(f => (
+                      <button
+                        type="button"
+                        key={f}
+                        onClick={() => setProductForm({ ...productForm, fit: f })}
+                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
+                      >
+                        +{f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Garment Care */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    4. Garment Care
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={productForm.care}
+                    onChange={(e) => setProductForm({ ...productForm, care: e.target.value })}
+                    placeholder="e.g. Dry clean recommended. / Machine wash cold inside out. Hang dry."
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {['Dry clean recommended.', 'Machine wash cold inside out. Hang dry.', 'Hand wash only in cold water. Dry flat.', 'Wash sparingly inside out in cold water.'].map(c => (
+                      <button
+                        type="button"
+                        key={c}
+                        onClick={() => setProductForm({ ...productForm, care: c })}
+                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
+                      >
+                        +{c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 5. Shipping & Returns */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    5. Shipping & Returns
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={productForm.shipping}
+                    onChange={(e) => setProductForm({ ...productForm, shipping: e.target.value })}
+                    placeholder="e.g. Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos."
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {['Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.', '7-day hassle-free return and exchange policy.'].map(s => (
+                      <button
+                        type="button"
+                        key={s}
+                        onClick={() => setProductForm({ ...productForm, shipping: s })}
+                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
+                      >
+                        +{s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Toggles */}
