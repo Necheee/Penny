@@ -139,30 +139,28 @@ export async function initCloudDatabase() {
       console.log('[DATABASE] Seeded bank details to Neon Cloud!');
     }
 
-    // Seed categories with subcategories
-    const catRes = await client.query('SELECT COUNT(*) FROM categories');
-    if (parseInt(catRes.rows[0].count) === 0) {
-      const catFile = path.resolve(__dirname, '../data/storage/categories.json');
-      if (fs.existsSync(catFile)) {
-        const catData = JSON.parse(fs.readFileSync(catFile, 'utf-8'));
-        for (const cat of catData) {
-          await client.query(`
-            INSERT INTO categories (id, name, slug, display_order, subcategories)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (id) DO UPDATE SET
-              name = EXCLUDED.name,
-              slug = EXCLUDED.slug,
-              subcategories = EXCLUDED.subcategories
-          `, [
-            cat.id,
-            cat.name,
-            cat.slug || cat.id,
-            cat.displayOrder || 1,
-            JSON.stringify(cat.subcategories || [])
-          ]);
-        }
-        console.log(`[DATABASE] Seeded ${catData.length} categories with subcategories to Neon Cloud!`);
+    // Seed / sync categories with subcategories
+    const catFile = path.resolve(__dirname, '../data/storage/categories.json');
+    if (fs.existsSync(catFile)) {
+      const catData = JSON.parse(fs.readFileSync(catFile, 'utf-8'));
+      for (const cat of catData) {
+        await client.query(`
+          INSERT INTO categories (id, name, slug, display_order, subcategories)
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            slug = EXCLUDED.slug,
+            display_order = EXCLUDED.display_order,
+            subcategories = EXCLUDED.subcategories
+        `, [
+          cat.id,
+          cat.name,
+          cat.slug || cat.id,
+          cat.displayOrder || 1,
+          JSON.stringify(cat.subcategories || [])
+        ]);
       }
+      console.log(`[DATABASE] Synced ${catData.length} categories with subcategories to Neon Cloud!`);
     }
 
     client.release();

@@ -25,15 +25,33 @@ export function ProductProvider({ children }) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((c) => {
+          const existingIds = new Set(parsed.map(c => c.id || c.slug));
+          const merged = parsed.map((c) => {
             const initial = initialCategories.find(ic => ic.id === c.id || ic.slug === c.slug);
+            const initialSubs = initial?.subcategories || [];
+            const currentSubs = Array.isArray(c.subcategories) ? c.subcategories : [];
+            const subSet = new Set(currentSubs.map(s => s.toLowerCase()));
+            const combinedSubs = [...currentSubs];
+            initialSubs.forEach(sub => {
+              if (!subSet.has(sub.toLowerCase())) {
+                combinedSubs.push(sub);
+              }
+            });
             return {
               ...c,
-              subcategories: Array.isArray(c.subcategories) && c.subcategories.length > 0
-                ? c.subcategories
-                : (initial?.subcategories || [])
+              name: initial?.name || c.name,
+              slug: c.slug || initial?.slug || c.id,
+              displayOrder: c.displayOrder || initial?.displayOrder || 1,
+              subcategories: combinedSubs
             };
           });
+          initialCategories.forEach(ic => {
+            if (!existingIds.has(ic.id) && !existingIds.has(ic.slug)) {
+              merged.push(ic);
+            }
+          });
+          merged.sort((a, b) => (a.displayOrder || 1) - (b.displayOrder || 1));
+          return merged;
         }
       } catch (e) {
         console.error("Failed to parse saved categories", e);

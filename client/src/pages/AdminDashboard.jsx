@@ -2291,6 +2291,142 @@ export default function AdminDashboard() {
                 )}
               </div>
 
+              {/* Material & Fit Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    Material / Fabric
+                  </label>
+                  <input
+                    type="text"
+                    value={productForm.material}
+                    onChange={(e) => setProductForm({ ...productForm, material: e.target.value })}
+                    placeholder="e.g. 100% Premium European Linen"
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal text-xs mb-1.5"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {['Linen', 'Heavyweight Cotton', 'Denim', 'Corduroy', 'Knitwear'].map(mat => (
+                      <button
+                        type="button"
+                        key={mat}
+                        onClick={() => setProductForm({ ...productForm, material: mat })}
+                        className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
+                      >
+                        +{mat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    Fit / Silhouette
+                  </label>
+                  <input
+                    type="text"
+                    value={productForm.fit}
+                    onChange={(e) => setProductForm({ ...productForm, fit: e.target.value })}
+                    placeholder="e.g. Relaxed fit / Oversized"
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal text-xs mb-1.5"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {['Body-fit', 'Relaxed', 'Oversized', 'Tailored', 'Regular Fit'].map(f => (
+                      <button
+                        type="button"
+                        key={f}
+                        onClick={() => setProductForm({ ...productForm, fit: f })}
+                        className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
+                      >
+                        +{f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Colors Picker */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1.5">
+                  Available Colors ({productForm.colors?.length || 0} selected)
+                </label>
+                <div className="space-y-2 bg-neutral-50/70 p-3 border border-neutral-200 rounded-xs">
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Core Neutrals</span>
+                    <div className="flex flex-wrap gap-1">
+                      {['Black', 'White', 'Cream', 'Beige', 'Ash/Grey', 'Charcoal', 'Taupe', 'Sand'].map(c => {
+                        const isSelected = productForm.colors?.includes(c);
+                        return (
+                          <button
+                            type="button"
+                            key={c}
+                            onClick={() => {
+                              const curr = productForm.colors || [];
+                              const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
+                              setProductForm({ ...productForm, colors: updated });
+                            }}
+                            className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
+                              isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
+                            }`}
+                          >
+                            {isSelected ? '✓ ' : ''}{c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Earth Tones</span>
+                    <div className="flex flex-wrap gap-1">
+                      {['Olive', 'Forest Green', 'Camel', 'Coffee Brown', 'Khaki'].map(c => {
+                        const isSelected = productForm.colors?.includes(c);
+                        return (
+                          <button
+                            type="button"
+                            key={c}
+                            onClick={() => {
+                              const curr = productForm.colors || [];
+                              const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
+                              setProductForm({ ...productForm, colors: updated });
+                            }}
+                            className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
+                              isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
+                            }`}
+                          >
+                            {isSelected ? '✓ ' : ''}{c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Seasonal Accents</span>
+                    <div className="flex flex-wrap gap-1">
+                      {['Burgundy', 'Burnt Orange', 'Baby Pink', 'Sky Blue', 'Striped Sky Blue', 'Navy'].map(c => {
+                        const isSelected = productForm.colors?.includes(c);
+                        return (
+                          <button
+                            type="button"
+                            key={c}
+                            onClick={() => {
+                              const curr = productForm.colors || [];
+                              const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
+                              setProductForm({ ...productForm, colors: updated });
+                            }}
+                            className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
+                              isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
+                            }`}
+                          >
+                            {isSelected ? '✓ ' : ''}{c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Interactive Image Dropzone & Preview */}
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">

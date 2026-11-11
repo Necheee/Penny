@@ -62,6 +62,40 @@ router.get('/', async (req, res) => {
           });
         });
         categories = Array.from(map.values());
+
+        // Ensure all initial categories and default subcategories exist in DB
+        for (const ic of initialCategories) {
+          if (!map.has(ic.id)) {
+            map.set(ic.id, ic);
+            pool.query(`
+              INSERT INTO categories (id, name, slug, display_order, subcategories)
+              VALUES ($1, $2, $3, $4, $5)
+              ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                slug = EXCLUDED.slug,
+                display_order = EXCLUDED.display_order,
+                subcategories = EXCLUDED.subcategories
+            `, [ic.id, ic.name, ic.slug, ic.displayOrder, JSON.stringify(ic.subcategories || [])]).catch(() => {});
+          } else {
+            const existing = map.get(ic.id);
+            const currentSubs = new Set((existing.subcategories || []).map(s => s.toLowerCase()));
+            let changed = false;
+            (ic.subcategories || []).forEach(sub => {
+              if (!currentSubs.has(sub.toLowerCase())) {
+                existing.subcategories.push(sub);
+                changed = true;
+              }
+            });
+            if (changed) {
+              pool.query('UPDATE categories SET subcategories = $1 WHERE id = $2', [
+                JSON.stringify(existing.subcategories),
+                existing.id
+              ]).catch(() => {});
+            }
+          }
+        }
+
+        categories = Array.from(map.values()).sort((a, b) => (a.displayOrder || 1) - (b.displayOrder || 1));
         writeJsonFile('categories.json', categories);
       }
     }

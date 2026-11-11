@@ -1,54 +1,73 @@
 [
   {
-    "id": "sets",
-    "name": "Two-Piece Sets",
-    "slug": "two-piece-sets",
-    "displayOrder": 1,
-    "subcategories": [
-      "Linen Sets",
-      "Cotton Lounge Sets"
-    ]
-  },
-  {
     "id": "tops",
     "name": "Tops",
     "slug": "tops",
-    "displayOrder": 2,
+    "displayOrder": 1,
     "subcategories": [
       "T-Shirts",
-      "Henleys",
-      "Polos",
-      "Long-Sleeve Shirts",
-      "Hoodies",
-      "Sweatshirts",
-      "Quarter-Zips",
-      "Sweaters",
-      "Overshirts"
+      "Long Sleeve Tees",
+      "Long Sleeve Henleys",
+      "Short Sleeve Henleys",
+      "Knitwear Polos",
+      "Oxford shirts",
+      "Sweatshirts & Hoodies"
     ]
   },
   {
     "id": "bottoms",
     "name": "Bottoms",
     "slug": "bottoms",
-    "displayOrder": 3,
+    "displayOrder": 2,
     "subcategories": [
-      "Trousers",
-      "Chinos",
-      "Jeans",
-      "Shorts",
-      "Joggers",
-      "Cargo Pants"
+      "Trousers & Chinos",
+      "Denim",
+      "Corduroy Trousers",
+      "Utility Pants",
+      "Sweatpants",
+      "Shorts"
     ]
   },
   {
     "id": "outerwear",
     "name": "Outerwear",
     "slug": "outerwear",
+    "displayOrder": 3,
+    "subcategories": [
+      "Overshirts & Shackets",
+      "Knitwear Cardigan",
+      "Track Suit"
+    ]
+  },
+  {
+    "id": "the-linen-shop",
+    "name": "The Linen Shop",
+    "slug": "the-linen-shop",
     "displayOrder": 4,
     "subcategories": [
-      "Jackets",
-      "Coats",
-      "Overcoats"
+      "Linen Tops",
+      "Pants",
+      "Shorts"
+    ]
+  },
+  {
+    "id": "care-essentials",
+    "name": "Care & Essentials",
+    "slug": "care-essentials",
+    "displayOrder": 5,
+    "subcategories": [
+      "Lint Rollers",
+      "Tote Bag"
+    ]
+  },
+  {
+    "id": "sets",
+    "name": "Two-Piece Sets",
+    "slug": "two-piece-sets",
+    "displayOrder": 6,
+    "subcategories": [
+      "Linen Sets",
+      "Cotton Lounge Sets"
     ]
   }
 ]
