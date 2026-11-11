@@ -42,60 +42,32 @@ router.get('/', async (req, res) => {
       `);
       const dbRes = await pool.query('SELECT * FROM categories ORDER BY display_order ASC');
       if (dbRes.rows && dbRes.rows.length > 0) {
-        const map = new Map();
-        categories.forEach(c => map.set(c.id, c));
-        dbRes.rows.forEach(r => {
+        categories = dbRes.rows.map(r => {
           let subs = [];
           if (Array.isArray(r.subcategories)) {
             subs = r.subcategories;
           } else if (typeof r.subcategories === 'string') {
             try { subs = JSON.parse(r.subcategories); } catch {}
-          } else if (map.get(r.id)?.subcategories) {
-            subs = map.get(r.id).subcategories;
           }
-          map.set(r.id, {
+          return {
             id: r.id,
             name: r.name,
             slug: r.slug || r.id,
-            displayOrder: r.display_order || map.get(r.id)?.displayOrder || 1,
+            displayOrder: r.display_order || 1,
             subcategories: Array.isArray(subs) ? subs : [],
-          });
-        });
-        categories = Array.from(map.values());
-
-        // Ensure all initial categories and default subcategories exist in DB
+          };
+        }).sort((a, b) => (a.displayOrder || 1) - (b.displayOrder || 1));
+        writeJsonFile('categories.json', categories);
+      } else {
+        // Table is empty! First-time seed initial categories into database
         for (const ic of initialCategories) {
-          if (!map.has(ic.id)) {
-            map.set(ic.id, ic);
-            pool.query(`
-              INSERT INTO categories (id, name, slug, display_order, subcategories)
-              VALUES ($1, $2, $3, $4, $5)
-              ON CONFLICT (id) DO UPDATE SET
-                name = EXCLUDED.name,
-                slug = EXCLUDED.slug,
-                display_order = EXCLUDED.display_order,
-                subcategories = EXCLUDED.subcategories
-            `, [ic.id, ic.name, ic.slug, ic.displayOrder, JSON.stringify(ic.subcategories || [])]).catch(() => {});
-          } else {
-            const existing = map.get(ic.id);
-            const currentSubs = new Set((existing.subcategories || []).map(s => s.toLowerCase()));
-            let changed = false;
-            (ic.subcategories || []).forEach(sub => {
-              if (!currentSubs.has(sub.toLowerCase())) {
-                existing.subcategories.push(sub);
-                changed = true;
-              }
-            });
-            if (changed) {
-              pool.query('UPDATE categories SET subcategories = $1 WHERE id = $2', [
-                JSON.stringify(existing.subcategories),
-                existing.id
-              ]).catch(() => {});
-            }
-          }
+          await pool.query(`
+            INSERT INTO categories (id, name, slug, display_order, subcategories)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (id) DO NOTHING
+          `, [ic.id, ic.name, ic.slug, ic.displayOrder || 1, JSON.stringify(ic.subcategories || [])]).catch(() => {});
         }
-
-        categories = Array.from(map.values()).sort((a, b) => (a.displayOrder || 1) - (b.displayOrder || 1));
+        categories = [...initialCategories];
         writeJsonFile('categories.json', categories);
       }
     }
@@ -319,21 +291,16 @@ router.delete('/:id/subcategories/:subName', async (req, res) => {
 
 /**
  * DELETE /api/categories/:id
- * Remove a category
+ * Remove a category permanently
  */
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const index = categories.findIndex(c => c.id === id || c.slug === id);
-
-    if (index === -1) {
-      return res.status(404).json({
-        success: false,
-        message: `Category '${id}' not found.`,
-      });
-    }
-
-    const removed = categories.splice(index, 1)[0];
+    const removed = index !== -1 ? categories.splice(index, 1)[0] : { id };
+    
+    // Always filter to ensure completely removed
+    categories = categories.filter(c => c.id !== id && c.slug !== id);
     writeJsonFile('categories.json', categories);
 
     try {
@@ -357,6 +324,32 @@ router.delete('/:id', async (req, res) => {
       message: 'Failed to delete category.',
     });
   }
+});
+
+/**
+ * GET /api/categories/presets/all
+ * Retrieve custom garment presets
+ */
+router.get('/presets/all', (req, res) => {
+  const presets = readJsonFile('presets.json', {}) || {};
+  return res.status(200).json({
+    success: true,
+    data: presets
+  });
+});
+
+/**
+ * POST /api/categories/presets/all
+ * Save updated garment presets
+ */
+router.post('/presets/all', (req, res) => {
+  const updatedPresets = req.body || {};
+  writeJsonFile('presets.json', updatedPresets);
+  return res.status(200).json({
+    success: true,
+    message: 'Garment presets saved successfully.',
+    data: updatedPresets
+  });
 });
 
 /**

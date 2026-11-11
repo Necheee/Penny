@@ -29,14 +29,16 @@ import {
   ExternalLink,
   Copy,
   Sparkles,
-  Zap
+  Zap,
+  Settings,
+  RotateCcw
 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 import { printOrderReceipt } from '../utils/printReceipt';
 import { generateOrderReceiptEmailHtml, generateInquiryReplyEmailHtml } from '../utils/emailPreviewGenerator';
 
 // Curated 1-Click Accordion & Garment Presets to eliminate repetitive product entry
-const GARMENT_PRESETS = {
+const DEFAULT_GARMENT_PRESETS = {
   // --- SWEATSHIRTS & HOODIES ---
   'Sweatshirts & Hoodies': {
     description: 'Constructed from heavy 450 GSM French Terry loopback cotton. Features reinforced double-needle stitching, dense ribbed trims, and an elevated drape tailored for year-round luxury layering.',
@@ -646,13 +648,172 @@ export default function AdminDashboard() {
     return matchesSearch && matchesCategory && matchesSubcategory;
   });
 
+  // Dynamic customizable garment presets state (customizable & editable by admin)
+  const [garmentPresets, setGarmentPresets] = useState(() => {
+    try {
+      const saved = localStorage.getItem('penny_garment_presets');
+      if (saved) {
+        return { ...DEFAULT_GARMENT_PRESETS, ...JSON.parse(saved) };
+      }
+    } catch (e) {
+      console.error('Failed to parse saved presets', e);
+    }
+    return DEFAULT_GARMENT_PRESETS;
+  });
+
+  // Sync presets from backend if available
+  useEffect(() => {
+    async function loadBackendPresets() {
+      try {
+        const res = await fetch('/api/categories/presets/all');
+        const data = await res.json();
+        if (data.success && data.data && Object.keys(data.data).length > 0) {
+          setGarmentPresets(prev => {
+            const merged = { ...prev, ...data.data };
+            localStorage.setItem('penny_garment_presets', JSON.stringify(merged));
+            return merged;
+          });
+        }
+      } catch (err) {}
+    }
+    loadBackendPresets();
+  }, []);
+
+  // Save preset helper
+  const handleSaveGarmentPreset = async (presetKey, presetData) => {
+    const updated = {
+      ...garmentPresets,
+      [presetKey]: {
+        ...(garmentPresets[presetKey] || {}),
+        ...presetData
+      }
+    };
+    setGarmentPresets(updated);
+    localStorage.setItem('penny_garment_presets', JSON.stringify(updated));
+
+    try {
+      await fetch('/api/categories/presets/all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch {}
+  };
+
+  // Reset preset helper to original defaults
+  const handleResetGarmentPreset = async (presetKey) => {
+    const defaultData = DEFAULT_GARMENT_PRESETS[presetKey] || DEFAULT_GARMENT_PRESETS['Sweatshirts & Hoodies'];
+    const updated = {
+      ...garmentPresets,
+      [presetKey]: { ...defaultData }
+    };
+    setGarmentPresets(updated);
+    localStorage.setItem('penny_garment_presets', JSON.stringify(updated));
+
+    try {
+      await fetch('/api/categories/presets/all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch {}
+    return defaultData;
+  };
+
+  // Preset Editor Modal State
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+  const [editingPresetKey, setEditingPresetKey] = useState('Sweatshirts & Hoodies');
+  const [isCustomPresetKey, setIsCustomPresetKey] = useState(false);
+  const [customPresetNameInput, setCustomPresetNameInput] = useState('');
+  const [presetForm, setPresetForm] = useState({
+    description: '',
+    material: '',
+    fit: '',
+    care: '',
+    shipping: '',
+    colors: [],
+    sizes: []
+  });
+  const [presetFeedback, setPresetFeedback] = useState('');
+  const [presetSaveMessage, setPresetSaveMessage] = useState('');
+
+  const handleOpenPresetModal = (initialKey) => {
+    const key = initialKey || editingPresetKey || 'Sweatshirts & Hoodies';
+    const found = garmentPresets[key] || DEFAULT_GARMENT_PRESETS[key] || DEFAULT_GARMENT_PRESETS['Sweatshirts & Hoodies'];
+    setEditingPresetKey(key);
+    setIsCustomPresetKey(false);
+    setCustomPresetNameInput('');
+    setPresetForm({
+      description: found.description || '',
+      material: found.material || '',
+      fit: found.fit || '',
+      care: found.care || '',
+      shipping: found.shipping || '',
+      colors: found.colors ? [...found.colors] : ['Black'],
+      sizes: found.sizes ? [...found.sizes] : ['S', 'M', 'L', 'XL']
+    });
+    setPresetFeedback('');
+    setIsPresetModalOpen(true);
+  };
+
+  const handlePresetSelectChange = (key) => {
+    if (key === '__NEW__') {
+      setIsCustomPresetKey(true);
+      setCustomPresetNameInput('');
+      setPresetForm({
+        description: '',
+        material: '',
+        fit: '',
+        care: 'Machine wash cold inside out. Hang dry.',
+        shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+        colors: ['Black', 'White'],
+        sizes: ['S', 'M', 'L', 'XL']
+      });
+      return;
+    }
+    setIsCustomPresetKey(false);
+    setEditingPresetKey(key);
+    const found = garmentPresets[key] || DEFAULT_GARMENT_PRESETS[key] || DEFAULT_GARMENT_PRESETS['Sweatshirts & Hoodies'];
+    setPresetForm({
+      description: found.description || '',
+      material: found.material || '',
+      fit: found.fit || '',
+      care: found.care || '',
+      shipping: found.shipping || '',
+      colors: found.colors ? [...found.colors] : ['Black'],
+      sizes: found.sizes ? [...found.sizes] : ['S', 'M', 'L', 'XL']
+    });
+    setPresetFeedback('');
+  };
+
+  const handleSaveCurrentAsPreset = (targetKey) => {
+    const key = targetKey || productForm.subcategory || productForm.category;
+    if (!key) {
+      alert('Please select or enter a subcategory first.');
+      return;
+    }
+    const newPresetData = {
+      description: productForm.description || '',
+      material: productForm.material || '',
+      fit: productForm.fit || '',
+      care: productForm.care || '',
+      shipping: productForm.shipping || '',
+      colors: productForm.colors || [],
+      sizes: productForm.availableSizes || []
+    };
+    handleSaveGarmentPreset(key, newPresetData);
+    setPresetSaveMessage(`Saved default preset for "${key}"! Future auto-fills will use this.`);
+    setTimeout(() => setPresetSaveMessage(''), 4000);
+  };
+
   // Apply Garment Preset to Product Form (Auto-fill Accordion Tabs & Colors/Sizes)
   const handleApplyGarmentPreset = (specificKey) => {
     const key = specificKey || productForm.subtype || productForm.subcategory || productForm.category;
-    const preset = (key && GARMENT_PRESETS[key]) || 
-                   (productForm.subcategory && GARMENT_PRESETS[productForm.subcategory]) || 
-                   (productForm.category && GARMENT_PRESETS[productForm.category]) || 
-                   GARMENT_PRESETS['Sweatshirts & Hoodies'];
+    const preset = (key && garmentPresets[key]) || 
+                   (productForm.subcategory && garmentPresets[productForm.subcategory]) || 
+                   (productForm.category && garmentPresets[productForm.category]) || 
+                   garmentPresets['Sweatshirts & Hoodies'] ||
+                   DEFAULT_GARMENT_PRESETS['Sweatshirts & Hoodies'];
 
     if (preset) {
       setProductForm(prev => ({
@@ -675,7 +836,7 @@ export default function AdminDashboard() {
     const firstSub = firstCat?.subcategories?.[0];
     const firstSubName = typeof firstSub === 'string' ? firstSub : firstSub?.name || '';
     const firstSubtypes = typeof firstSub === 'object' && Array.isArray(firstSub?.subtypes) ? firstSub.subtypes : [];
-    const preset = (firstSubName && GARMENT_PRESETS[firstSubName]) || GARMENT_PRESETS['T-Shirts'];
+    const preset = (firstSubName && garmentPresets[firstSubName]) || garmentPresets['T-Shirts'] || DEFAULT_GARMENT_PRESETS['T-Shirts'];
 
     setProductForm({
       name: '',
@@ -1416,57 +1577,80 @@ export default function AdminDashboard() {
       {/* TAB 3: CATEGORIES */}
       {activeTab === 'categories' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Add Category Form */}
-          <div className="bg-white p-6 border border-neutral-200 rounded-sm shadow-xs h-fit space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-brand-charcoal">
-              Create New Category
-            </h3>
-            <form onSubmit={handleAddCategory} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                  Category Name *
-                </label>
-                <input
-                  type="text"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="e.g. Footwear"
-                  className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
-                  required
-                />
+          {/* Left Column: Add Category Form & Presets Manager */}
+          <div className="space-y-6">
+            <div className="bg-white p-6 border border-neutral-200 rounded-sm shadow-xs space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-brand-charcoal">
+                Create New Category
+              </h3>
+              <form onSubmit={handleAddCategory} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    Category Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="e.g. Footwear"
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    URL Slug (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newCategorySlug}
+                    onChange={(e) => setNewCategorySlug(e.target.value)}
+                    placeholder="e.g. footwear"
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    Initial Subcategories (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newCategorySubcategories}
+                    onChange={(e) => setNewCategorySubcategories(e.target.value)}
+                    placeholder="e.g. Loafers, Mules, Sandals (comma-separated)"
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
+                  />
+                  <p className="text-[10px] text-neutral-400 mt-1">Separate with commas, or add them individually below anytime.</p>
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-brand-charcoal text-white py-2.5 font-bold uppercase tracking-wider text-xs hover:bg-black transition-colors cursor-pointer"
+                >
+                  Add Category
+                </button>
+              </form>
+            </div>
+
+            {/* Auto-Fill Presets Manager Card */}
+            <div className="bg-neutral-50 p-6 border border-neutral-200 rounded-sm shadow-xs space-y-3">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-brand-charcoal" />
+                <h3 className="text-sm font-bold uppercase tracking-wider text-brand-charcoal">
+                  Garment Auto-Fill Presets
+                </h3>
               </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                  URL Slug (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newCategorySlug}
-                  onChange={(e) => setNewCategorySlug(e.target.value)}
-                  placeholder="e.g. footwear"
-                  className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                  Initial Subcategories (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newCategorySubcategories}
-                  onChange={(e) => setNewCategorySubcategories(e.target.value)}
-                  placeholder="e.g. Loafers, Mules, Sandals (comma-separated)"
-                  className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
-                />
-                <p className="text-[10px] text-neutral-400 mt-1">Separate with commas, or add them individually below anytime.</p>
-              </div>
+              <p className="text-xs text-neutral-500 leading-relaxed">
+                Customize the 5 customer-facing tabs (Description, Materials, Fit, Care, Shipping) automatically populated across your product catalogue.
+              </p>
               <button
-                type="submit"
-                className="w-full bg-brand-charcoal text-white py-2.5 font-bold uppercase tracking-wider text-xs hover:bg-black transition-colors"
+                type="button"
+                onClick={() => handleOpenPresetModal()}
+                className="w-full py-2.5 bg-brand-charcoal hover:bg-black text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 rounded-xs shadow-xs cursor-pointer transition-colors"
               >
-                Add Category
+                <Settings className="w-3.5 h-3.5" />
+                Manage & Edit Presets
               </button>
-            </form>
+            </div>
           </div>
 
           {/* Existing Categories & Subcategories List */}
@@ -2644,7 +2828,10 @@ export default function AdminDashboard() {
                             const catObj = categoryList.find(c => c.id === productForm.category || c.slug === productForm.category);
                             const subObj = (catObj?.subcategories || []).find(s => (typeof s === 'string' ? s : s?.name) === newSub);
                             const availableSubtypes = typeof subObj === 'object' && Array.isArray(subObj?.subtypes) ? subObj.subtypes : [];
-                            const preset = (newSub && GARMENT_PRESETS[newSub]) || GARMENT_PRESETS[productForm.category];
+                            const preset = (newSub && garmentPresets[newSub]) || 
+                                           garmentPresets[productForm.category] || 
+                                           DEFAULT_GARMENT_PRESETS[newSub] || 
+                                           DEFAULT_GARMENT_PRESETS[productForm.category];
 
                             setProductForm(prev => ({ 
                               ...prev, 
@@ -2752,16 +2939,27 @@ export default function AdminDashboard() {
                     </p>
                   </div>
 
-                  {/* 1-Click Auto-Fill Preset Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleApplyGarmentPreset()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-charcoal hover:bg-black text-white text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors shadow-xs cursor-pointer"
-                    title="Instantly auto-fill all 5 tabs and colors based on selected subcategory"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                    ⚡ Auto-Fill Preset
-                  </button>
+                  {/* Action Buttons: Edit Presets & 1-Click Auto-Fill */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPresetModal(productForm.subcategory || productForm.category)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-neutral-100 text-neutral-800 text-[10px] font-bold uppercase tracking-wider rounded-xs border border-neutral-300 transition-colors shadow-xs cursor-pointer"
+                      title="Edit, customize, or create custom presets"
+                    >
+                      <Settings className="w-3.5 h-3.5 text-neutral-500" />
+                      ⚙️ Edit Presets
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyGarmentPreset()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-charcoal hover:bg-black text-white text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors shadow-xs cursor-pointer"
+                      title="Instantly auto-fill all 5 tabs and colors based on selected subcategory"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      ⚡ Auto-Fill Preset
+                    </button>
+                  </div>
                 </div>
 
                 {/* Quick Preset Selector Buttons for Instant Populating */}
@@ -2775,23 +2973,7 @@ export default function AdminDashboard() {
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {[
-                      'Sweatshirts & Hoodies',
-                      'T-Shirts',
-                      'Trousers & Chinos',
-                      'Sweatpants',
-                      'Shorts',
-                      'The Linen Shop',
-                      'Denim',
-                      'Corduroy Trousers',
-                      'Utility Pants',
-                      'Overshirts & Shackets',
-                      'Knitwear Polos',
-                      'Knitwear Cardigan',
-                      'Oxford shirts',
-                      'Track Suit',
-                      'Care & Accessories'
-                    ].map((presetName) => (
+                    {Object.keys(garmentPresets).slice(0, 16).map((presetName) => (
                       <button
                         type="button"
                         key={presetName}
@@ -2921,6 +3103,24 @@ export default function AdminDashboard() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Save Current as Default Preset Quick Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-neutral-200">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveCurrentAsPreset()}
+                    className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-neutral-600 hover:text-black hover:underline cursor-pointer"
+                    title="Saves whatever text is currently in these 5 tabs as the default preset for this garment"
+                  >
+                    <Save className="w-3.5 h-3.5 text-emerald-600" />
+                    💾 Save Current Text as Default Preset for "{productForm.subcategory || productForm.category || 'General'}"
+                  </button>
+                  {presetSaveMessage && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-xs animate-fade-in">
+                      ✓ {presetSaveMessage}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -3212,6 +3412,249 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOMIZE GARMENT PRESETS MODAL */}
+      {isPresetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-neutral-200 shadow-2xl p-6 md:p-8">
+            <div className="flex justify-between items-center border-b border-neutral-200 pb-4 mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-brand-charcoal" />
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-brand-charcoal">
+                    Customize Auto-Fill Garment Presets
+                  </h2>
+                </div>
+                <p className="text-[11px] text-neutral-500 mt-1">
+                  Edit the default text and materials auto-filled into products for each garment category.
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsPresetModalOpen(false)}
+                className="text-xs uppercase font-bold text-neutral-400 hover:text-black cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Selector: Choose which preset to edit */}
+            <div className="space-y-4">
+              <div className="bg-neutral-50 p-3 border border-neutral-200 rounded-xs space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500">
+                  Select Preset Template to Edit:
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <select
+                    value={isCustomPresetKey ? '__NEW__' : editingPresetKey}
+                    onChange={(e) => handlePresetSelectChange(e.target.value)}
+                    className="w-full border border-neutral-300 p-2 bg-white text-xs font-medium focus:outline-none focus:border-brand-charcoal"
+                  >
+                    {Object.keys(garmentPresets).map((presetKey) => (
+                      <option key={presetKey} value={presetKey}>
+                        {presetKey}
+                      </option>
+                    ))}
+                    <option value="__NEW__">+ Create New Custom Preset...</option>
+                  </select>
+
+                  {!isCustomPresetKey && DEFAULT_GARMENT_PRESETS[editingPresetKey] && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (confirm(`Reset "${editingPresetKey}" preset back to factory default?`)) {
+                          const def = await handleResetGarmentPreset(editingPresetKey);
+                          setPresetForm({
+                            description: def.description || '',
+                            material: def.material || '',
+                            fit: def.fit || '',
+                            care: def.care || '',
+                            shipping: def.shipping || '',
+                            colors: def.colors ? [...def.colors] : ['Black'],
+                            sizes: def.sizes ? [...def.sizes] : ['S', 'M', 'L', 'XL']
+                          });
+                          setPresetFeedback(`Reset "${editingPresetKey}" to factory defaults.`);
+                          setTimeout(() => setPresetFeedback(''), 3000);
+                        }
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-neutral-300 bg-white hover:bg-neutral-100 text-[10px] font-bold uppercase tracking-wider text-neutral-600 rounded-xs shrink-0 cursor-pointer"
+                      title="Reset this preset to default"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Reset to Default
+                    </button>
+                  )}
+                </div>
+
+                {isCustomPresetKey && (
+                  <div className="pt-2 border-t border-neutral-200">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                      New Preset / Subcategory Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={customPresetNameInput}
+                      onChange={(e) => setCustomPresetNameInput(e.target.value)}
+                      placeholder="e.g. Linen Blend Camp Shirt, Knitted Vest, etc."
+                      className="w-full border border-neutral-300 p-2 bg-white text-xs focus:outline-none focus:border-brand-charcoal"
+                      autoFocus
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Feedback Alert */}
+              {presetFeedback && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2 rounded-xs">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{presetFeedback}</span>
+                </div>
+              )}
+
+              {/* Editable Preset Fields */}
+              <div className="space-y-3">
+                {/* 1. Description */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    1. Garment Description Template
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={presetForm.description}
+                    onChange={(e) => setPresetForm({ ...presetForm, description: e.target.value })}
+                    placeholder="Enter default narrative, styling details, construction..."
+                    className="w-full border border-neutral-200 p-2.5 text-xs focus:outline-none focus:border-brand-charcoal resize-none"
+                  />
+                </div>
+
+                {/* 2. Details & Material */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    2. Details & Material Template
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={presetForm.material}
+                    onChange={(e) => setPresetForm({ ...presetForm, material: e.target.value })}
+                    placeholder="e.g. 100% Combed Compact Cotton (280 GSM), 100% Pure European Flax Linen"
+                    className="w-full border border-neutral-200 p-2.5 text-xs focus:outline-none focus:border-brand-charcoal resize-none"
+                  />
+                </div>
+
+                {/* 3. Fit & Sizing */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    3. Fit & Sizing Template
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={presetForm.fit}
+                    onChange={(e) => setPresetForm({ ...presetForm, fit: e.target.value })}
+                    placeholder="e.g. Tailored relaxed drape. Mid-rise waist."
+                    className="w-full border border-neutral-200 p-2.5 text-xs focus:outline-none focus:border-brand-charcoal resize-none"
+                  />
+                </div>
+
+                {/* 4. Garment Care */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    4. Garment Care Template
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={presetForm.care}
+                    onChange={(e) => setPresetForm({ ...presetForm, care: e.target.value })}
+                    placeholder="e.g. Machine wash cold inside out with like colors. Hang dry."
+                    className="w-full border border-neutral-200 p-2.5 text-xs focus:outline-none focus:border-brand-charcoal resize-none"
+                  />
+                </div>
+
+                {/* 5. Shipping & Returns */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    5. Shipping & Returns Template
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={presetForm.shipping}
+                    onChange={(e) => setPresetForm({ ...presetForm, shipping: e.target.value })}
+                    placeholder="e.g. Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos."
+                    className="w-full border border-neutral-200 p-2.5 text-xs focus:outline-none focus:border-brand-charcoal resize-none"
+                  />
+                </div>
+
+                {/* Colors (Comma separated) */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    Default Auto-Selected Colors (comma separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={Array.isArray(presetForm.colors) ? presetForm.colors.join(', ') : ''}
+                    onChange={(e) => {
+                      const cols = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                      setPresetForm({ ...presetForm, colors: cols });
+                    }}
+                    placeholder="e.g. Black, White, Cream, Olive"
+                    className="w-full border border-neutral-200 p-2 text-xs focus:outline-none focus:border-brand-charcoal"
+                  />
+                </div>
+
+                {/* Sizes (Comma separated) */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    Default Auto-Selected Sizes (comma separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={Array.isArray(presetForm.sizes) ? presetForm.sizes.join(', ') : ''}
+                    onChange={(e) => {
+                      const szs = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                      setPresetForm({ ...presetForm, sizes: szs });
+                    }}
+                    placeholder="e.g. S, M, L, XL, XXL or 30, 32, 34, 36"
+                    className="w-full border border-neutral-200 p-2 text-xs focus:outline-none focus:border-brand-charcoal"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="pt-4 flex justify-between items-center border-t border-neutral-200">
+                <button
+                  type="button"
+                  onClick={() => setIsPresetModalOpen(false)}
+                  className="px-4 py-2 border border-neutral-300 text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 cursor-pointer"
+                >
+                  Done
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const finalKey = isCustomPresetKey ? customPresetNameInput.trim() : editingPresetKey;
+                    if (!finalKey) {
+                      alert('Please provide a name for this preset.');
+                      return;
+                    }
+                    await handleSaveGarmentPreset(finalKey, presetForm);
+                    setPresetFeedback(`✓ Saved custom preset for "${finalKey}"! Future auto-fills will use this exact copy.`);
+                    if (isCustomPresetKey) {
+                      setEditingPresetKey(finalKey);
+                      setIsCustomPresetKey(false);
+                      setCustomPresetNameInput('');
+                    }
+                    setTimeout(() => setPresetFeedback(''), 4000);
+                  }}
+                  className="px-5 py-2 bg-brand-charcoal hover:bg-black text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 rounded-xs shadow-xs cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  Save Preset Changes
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

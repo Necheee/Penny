@@ -39,54 +39,27 @@ export function ProductProvider({ children }) {
     return initialProducts;
   });
 
-  // Load categories from localStorage or fallback
+  // Load categories from localStorage or fallback (respects permanent deletions)
   const [categories, setCategories] = useState(() => {
+    let deletedIds = new Set();
+    try {
+      const deletedSaved = localStorage.getItem('penny_deleted_categories');
+      if (deletedSaved) deletedIds = new Set(JSON.parse(deletedSaved));
+    } catch {}
+
     const saved = localStorage.getItem('penny_categories');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map(c => c.id || c.slug));
-          const merged = parsed.map((c) => {
-            const initial = initialCategories.find(ic => ic.id === c.id || ic.slug === c.slug);
-            const initialSubs = initial?.subcategories || [];
-            
-            const normInitSubs = initialSubs.map(s => typeof s === 'string' ? { name: s, subtypes: [] } : s);
-            const normCurrentSubs = (Array.isArray(c.subcategories) ? c.subcategories : []).map(s => typeof s === 'string' ? { name: s, subtypes: [] } : s);
-            
-            const subMap = new Map();
-            normInitSubs.forEach(s => subMap.set(s.name.toLowerCase(), { ...s }));
-            normCurrentSubs.forEach(s => {
-              const existing = subMap.get(s.name.toLowerCase());
-              if (existing) {
-                const combinedSubtypes = Array.from(new Set([...(existing.subtypes || []), ...(s.subtypes || [])]));
-                subMap.set(s.name.toLowerCase(), { ...existing, subtypes: combinedSubtypes });
-              } else {
-                subMap.set(s.name.toLowerCase(), { ...s });
-              }
-            });
-
-            return {
-              ...c,
-              name: initial?.name || c.name,
-              slug: c.slug || initial?.slug || c.id,
-              displayOrder: c.displayOrder || initial?.displayOrder || 1,
-              subcategories: Array.from(subMap.values())
-            };
-          });
-          initialCategories.forEach(ic => {
-            if (!existingIds.has(ic.id) && !existingIds.has(ic.slug)) {
-              merged.push(ic);
-            }
-          });
-          merged.sort((a, b) => (a.displayOrder || 1) - (b.displayOrder || 1));
-          return merged;
+          const filtered = parsed.filter(c => !deletedIds.has(c.id) && !deletedIds.has(c.slug));
+          return filtered;
         }
       } catch (e) {
         console.error("Failed to parse saved categories", e);
       }
     }
-    return initialCategories;
+    return initialCategories.filter(c => !deletedIds.has(c.id) && !deletedIds.has(c.slug));
   });
 
   const [sizes] = useState(initialSizes);
@@ -200,23 +173,15 @@ export function ProductProvider({ children }) {
             setProducts(liveProducts);
           }
           if (Array.isArray(liveCategories) && liveCategories.length > 0) {
-            setCategories((prevCategories) => {
-              const map = new Map();
-              prevCategories.forEach(c => map.set(c.id, c));
-              liveCategories.forEach(c => {
-                const prev = map.get(c.id) || {};
-                map.set(c.id, {
-                  ...prev,
-                  ...c,
-                  subcategories: (Array.isArray(c.subcategories) && c.subcategories.length > 0)
-                    ? c.subcategories
-                    : (prev.subcategories || [])
-                });
-              });
-              const merged = Array.from(map.values());
-              localStorage.setItem('penny_categories', JSON.stringify(merged));
-              return merged;
-            });
+            let deletedIds = new Set();
+            try {
+              const deletedSaved = localStorage.getItem('penny_deleted_categories');
+              if (deletedSaved) deletedIds = new Set(JSON.parse(deletedSaved));
+            } catch {}
+
+            const activeLive = liveCategories.filter(c => !deletedIds.has(c.id) && !deletedIds.has(c.slug));
+            setCategories(activeLive);
+            localStorage.setItem('penny_categories', JSON.stringify(activeLive));
           }
         }
       } catch (err) {
@@ -271,6 +236,17 @@ export function ProductProvider({ children }) {
 
   // 6. Category & Subcategory Management
   const addCategory = async (newCat) => {
+    // If it was previously recorded as deleted, restore it
+    try {
+      const deletedSaved = localStorage.getItem('penny_deleted_categories');
+      if (deletedSaved) {
+        const deletedIds = new Set(JSON.parse(deletedSaved));
+        deletedIds.delete(newCat.id);
+        if (newCat.slug) deletedIds.delete(newCat.slug);
+        localStorage.setItem('penny_deleted_categories', JSON.stringify(Array.from(deletedIds)));
+      }
+    } catch {}
+
     const catWithSubs = {
       ...newCat,
       subcategories: Array.isArray(newCat.subcategories) ? newCat.subcategories : []
@@ -293,6 +269,17 @@ export function ProductProvider({ children }) {
   };
 
   const deleteCategory = async (catId) => {
+    // Record in deleted categories set so it NEVER resurrects
+    try {
+      const deletedSaved = localStorage.getItem('penny_deleted_categories');
+      const deletedIds = new Set(deletedSaved ? JSON.parse(deletedSaved) : []);
+      deletedIds.add(catId);
+      const targetCat = categories.find(c => c.id === catId || c.slug === catId);
+      if (targetCat?.id) deletedIds.add(targetCat.id);
+      if (targetCat?.slug) deletedIds.add(targetCat.slug);
+      localStorage.setItem('penny_deleted_categories', JSON.stringify(Array.from(deletedIds)));
+    } catch {}
+
     setCategories((prev) => {
       const updated = prev.filter((c) => c.id !== catId && c.slug !== catId);
       localStorage.setItem('penny_categories', JSON.stringify(updated));
