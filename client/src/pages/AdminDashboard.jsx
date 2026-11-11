@@ -26,11 +26,310 @@ import {
   Reply,
   Send,
   Inbox,
-  ExternalLink
+  ExternalLink,
+  Copy,
+  Sparkles,
+  Zap
 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 import { printOrderReceipt } from '../utils/printReceipt';
 import { generateOrderReceiptEmailHtml, generateInquiryReplyEmailHtml } from '../utils/emailPreviewGenerator';
+
+// Curated 1-Click Accordion & Garment Presets to eliminate repetitive product entry
+const GARMENT_PRESETS = {
+  // --- SWEATSHIRTS & HOODIES ---
+  'Sweatshirts & Hoodies': {
+    description: 'Constructed from heavy 450 GSM French Terry loopback cotton. Features reinforced double-needle stitching, dense ribbed trims, and an elevated drape tailored for year-round luxury layering.',
+    material: '100% Heavyweight Cotton (450 GSM Loopback French Terry)',
+    fit: 'Relaxed athletic drape with dropped shoulders and structured silhouette.',
+    care: 'Machine wash cold inside out with like colors. Do not tumble dry. Reshape and lay flat to dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos; 3-5 days nationwide.',
+    colors: ['Black', 'Ash/Grey', 'Cream', 'Olive', 'Navy', 'Coffee Brown'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+  'Crewneck sweatshirt': {
+    description: 'A timeless staple crafted from 450 GSM loopback cotton. Styled with a classic crew collar, ribbed V-inset, and clean cuffs designed to hold shape through daily wear.',
+    material: '100% Heavyweight Cotton (450 GSM Loopback)',
+    fit: 'Relaxed fit with dropped shoulders and ergonomic silhouette.',
+    care: 'Machine wash cold inside out. Reshape while damp and line dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Ash/Grey', 'Black', 'Cream', 'Olive'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+  'Quarter-Zip': {
+    description: 'Sophisticated leisurewear featuring a custom antique silver quarter-zip hardware, high stand collar, and substantial brushed cotton fleece for effortless smart-casual layering.',
+    material: '100% Brushed Cotton Fleece (420 GSM)',
+    fit: 'Tailored casual fit. Clean contour through chest and arms.',
+    care: 'Machine wash cold on gentle cycle. Zip up before washing. Hang dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'Navy', 'Cream', 'Coffee Brown'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+  'Collared Quarter-Zip': {
+    description: 'Elevated polo-collar styling merged with a heavy quarter-zip pullover. Combines refined sartorial structure with the comfort of luxury heavyweight fleece.',
+    material: '100% Heavyweight Cotton (420 GSM Loopback Fleece)',
+    fit: 'Tailored relaxed fit with structured foldover collar.',
+    care: 'Machine wash cold inside out. Flat dry or hang in shade.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'Camel', 'Navy', 'Forest Green'],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+  'Zip-through Hoodie': {
+    description: 'Full double-ended metallic zipper hoodie built with heavy 450 GSM fleece, deep lined hood, and reinforced split kangaroo pockets for versatile modern styling.',
+    material: '100% Heavyweight Loopback Cotton (450 GSM)',
+    fit: 'Relaxed boxy silhouette with dropped shoulders.',
+    care: 'Machine wash cold inside out. Zip fully before washing. Hang dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'Ash/Grey', 'Charcoal', 'Olive'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+  'Standard Hoodie': {
+    description: 'Our signature pullover hoodie constructed with a double-layered hood (no drawstrings for a clean minimalist aesthetic), seamless ribbing, and substantial 450 GSM loopback cotton.',
+    material: '100% Heavyweight Loopback Cotton (450 GSM)',
+    fit: 'Relaxed fit with dropped shoulders and roomy hood.',
+    care: 'Machine wash cold inside out. Hang dry to maintain shape and weight.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'Ash/Grey', 'Cream', 'Burgundy', 'Olive'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+
+  // --- T-SHIRTS ---
+  'T-Shirts': {
+    description: 'Engineered from ultra-dense 280 GSM combed compact cotton. Features a snug 1.25" bound rib collar that retains tension and never sags over time.',
+    material: '100% Combed Compact Cotton (280 GSM)',
+    fit: 'Tailored relaxed drape. True to size.',
+    care: 'Machine wash cold inside out. Warm iron on reverse. Do not tumble dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'White', 'Cream', 'Ash/Grey', 'Olive', 'Coffee Brown'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+  'Regular Fit Tee': {
+    description: 'The definitive daily t-shirt. Cut in a classic regular profile with clean sleeves, tailored chest, and high-density 260 GSM combed cotton jersey.',
+    material: '100% Combed Cotton Jersey (260 GSM)',
+    fit: 'Regular fit. True to size with a clean silhouette.',
+    care: 'Machine wash cold inside out. Hang dry in shade.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'White', 'Ash/Grey', 'Navy'],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+  'Oversize Fit Tee': {
+    description: 'Modern oversized silhouette with dropped shoulders, elongated sleeves, and a boxy wide torso drape crafted in ultra-heavy 300 GSM cotton.',
+    material: '100% Heavyweight Combed Cotton (300 GSM)',
+    fit: 'Oversized boxy drape. Cut wide with dropped shoulders.',
+    care: 'Machine wash cold inside out. Do not tumble dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'White', 'Cream', 'Coffee Brown', 'Burnt Orange'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+
+  // --- LONG SLEEVES & POLOS ---
+  'Long Sleeve Tees': {
+    description: 'Heavyweight long sleeve tee with tight ribbed cuffs and double-stitched hem. Ideal for solo styling or under tailored outerwear.',
+    material: '100% Combed Cotton (280 GSM)',
+    fit: 'Relaxed fit with ribbed cuffs for clean arm stacking.',
+    care: 'Machine wash cold inside out. Hang dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'White', 'Olive', 'Charcoal'],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+  'Long Sleeve Henleys': {
+    description: 'Waffle-knit or ribbed cotton henley featuring a 3-button mother-of-pearl placket and clean banded collar for timeless heritage styling.',
+    material: '100% Slub or Waffle Knit Cotton (270 GSM)',
+    fit: 'Athletic body-fit contour with soft stretch.',
+    care: 'Machine wash cold on gentle cycle. Lay flat to dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Cream', 'Black', 'Ash/Grey', 'Olive'],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+  'Short Sleeve Henleys': {
+    description: 'Refined short sleeve henley offering subtle textured placket detail, tailored biceps, and breathable high-twist cotton.',
+    material: '100% Breathable Combed Cotton (240 GSM)',
+    fit: 'Tailored fit through chest and arms.',
+    care: 'Machine wash cold. Hang dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['White', 'Black', 'Sand', 'Navy'],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+  'Knitwear Polos': {
+    description: 'Artisanal fine-gauge knit polo featuring a soft open Johnny collar or 3-button placket, ribbed hem, and a luxurious mercerized cotton-silk handfeel.',
+    material: '80% Mercerized Cotton, 20% Mulberry Silk Knit',
+    fit: 'Tailored European drape. Clean waist taper.',
+    care: 'Hand wash in cold water or dry clean. Reshape and dry flat.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Cream', 'Coffee Brown', 'Black', 'Forest Green', 'Navy'],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+  'Oxford shirts': {
+    description: 'Classic heavy Oxford cotton cloth shirt tailored with a graceful button-down roll collar, box pleat, and locker loop. Transitions effortlessly from work to evening.',
+    material: '100% Heavy Oxford Cotton Cloth (Pinpoint weave)',
+    fit: 'Tailored regular silhouette with natural movement.',
+    care: 'Machine wash warm. Warm iron while slightly damp.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['White', 'Sky Blue', 'Striped Sky Blue', 'Baby Pink'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+
+  // --- BOTTOMS ---
+  'Trousers & Chinos': {
+    description: 'Precision-tailored trousers crafted with a mid-rise waist, concealed hook-and-bar closure, deep pleats, and a sharp crease designed for both formal and casual settings.',
+    material: 'Cotton Twill & Viscose Blend with subtle stretch',
+    fit: 'Tailored fit. Mid-rise waist with clean ankle break.',
+    care: 'Dry clean recommended, or gentle machine wash cold and warm iron.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'Khaki', 'Olive', 'Beige', 'Navy', 'Coffee Brown'],
+    sizes: ['30', '32', '34', '36', '38']
+  },
+  'Classic Tailored Pants': {
+    description: 'Traditional formal tailoring with single front pleats, angled side pockets, and a refined straight-leg cut.',
+    material: 'Premium Cotton Twill & Viscose Blend',
+    fit: 'Tailored fit. Classic mid-rise waist with straight leg.',
+    care: 'Dry clean recommended.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'Charcoal', 'Navy', 'Camel'],
+    sizes: ['30', '32', '34', '36', '38']
+  },
+  'Improved Tailored Pants': {
+    description: 'Modernized sartorial trousers featuring hidden elasticized side-tabs, double inward pleats, and a relaxed taper.',
+    material: 'High-Twist Wool & Cotton Blend',
+    fit: 'Relaxed tailored silhouette with contemporary ankle crop.',
+    care: 'Dry clean only.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'Olive', 'Taupe', 'Coffee Brown'],
+    sizes: ['30', '32', '34', '36', '38']
+  },
+  'Denim': {
+    description: 'Woven on vintage shuttle looms from 13.5oz raw selvedge denim. Develops custom fades and character unique to the wearer.',
+    material: '100% Cotton Selvedge Denim (13.5 oz)',
+    fit: 'Straight relaxed leg with subtle taper below knee.',
+    care: 'Wash sparingly inside out in cold water. Hang dry only.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'Navy', 'Sky Blue'],
+    sizes: ['30', '32', '34', '36', '38']
+  },
+  'Corduroy Trousers': {
+    description: 'Rich wide-wale corduroy trousers offering plush tactile warmth, deep front pleats, and a structured vintage drape.',
+    material: '100% Heavyweight Cotton Corduroy (8-wale)',
+    fit: 'Relaxed straight fit with gentle drape.',
+    care: 'Machine wash cold inside out. Hang dry away from direct heat.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Coffee Brown', 'Camel', 'Olive', 'Black'],
+    sizes: ['30', '32', '34', '36', '38']
+  },
+  'Utility Pants': {
+    description: 'Modern utilitarian pant built with ergonomic cargo pocketing, reinforced knees, and adjustable ankle tabs for versatile styling.',
+    material: 'Heavyweight Cotton Canvas / Durable Chino Twill',
+    fit: 'Relaxed functional fit with adjustable leg cuffs.',
+    care: 'Machine wash cold. Tumble dry low or line dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Olive', 'Black', 'Khaki', 'Charcoal'],
+    sizes: ['30', '32', '34', '36', '38']
+  },
+  'Sweatpants': {
+    description: 'Heavy 450 GSM French Terry sweatpants with a deep elastic waistband, tonal thick drawstrings, and tailored paneling.',
+    material: '100% Heavyweight Cotton (450 GSM Loopback)',
+    fit: 'Relaxed silhouette. Clean elastic cuffed ankle or open straight hem.',
+    care: 'Machine wash cold inside out. Reshape and line dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Ash/Grey', 'Black', 'Cream', 'Olive', 'Coffee Brown'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+  'Shorts': {
+    description: 'Tailored warm-weather shorts featuring a clean 6.5" inseam, comfortable rise, and premium hardware.',
+    material: 'Heavyweight Cotton Twill or Loopback French Terry',
+    fit: 'Relaxed 6.5" inseam resting just above the knee.',
+    care: 'Machine wash cold with like colors. Hang dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'Khaki', 'Ash/Grey', 'Navy', 'Olive'],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+
+  // --- OUTERWEAR ---
+  'Overshirts & Shackets': {
+    description: 'Substantial overshirt built to be worn as a light jacket. Features twin chest flap pockets, horn buttons, and heavy structured fabric.',
+    material: '100% Heavy Cotton Twill, Corduroy, or Denim (380 GSM)',
+    fit: 'Boxy overshirt cut designed to layer over t-shirts and knitwear.',
+    care: 'Dry clean or machine wash cold on delicate. Hang dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Olive', 'Coffee Brown', 'Black', 'Navy', 'Camel'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+  'Knitwear Cardigan': {
+    description: 'Textured cable or ribbed cardigan knit from merino wool blend. Features horn buttons, ribbed shawl collar, and patch pockets.',
+    material: '70% Merino Wool, 30% Silk / Cashmere blend',
+    fit: 'Relaxed cozy silhouette with ribbed hem and cuffs.',
+    care: 'Hand wash cold with wool detergent. Dry flat on a towel.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Cream', 'Coffee Brown', 'Charcoal', 'Burgundy'],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+  'Track Suit': {
+    description: 'Complete luxury leisure matching set featuring tailored zip jacket and matching sweatpants engineered from matching 450 GSM French Terry.',
+    material: '100% Heavyweight French Terry Cotton (450 GSM)',
+    fit: 'Relaxed athletic drape with tailored cuffs.',
+    care: 'Machine wash cold inside out. Hang dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Black', 'Ash/Grey', 'Olive', 'Navy'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+
+  // --- THE LINEN SHOP ---
+  'The Linen Shop': {
+    description: 'Woven from 100% certified Normandy flax linen. Naturally breathable, thermo-regulating, and pre-washed for immediate softness and effortless drape.',
+    material: '100% Pure European Flax Linen (Pre-washed)',
+    fit: 'Relaxed breezy silhouette with gentle tropical drape.',
+    care: 'Machine wash cold on gentle cycle. Hang to dry. Embrace natural linen creases or steam lightly.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['White', 'Cream', 'Beige', 'Sky Blue', 'Olive', 'Black'],
+    sizes: ['S', 'M', 'L', 'XL', 'XXL']
+  },
+  'Linen tops': {
+    description: 'Breathable pure linen button-up or camp-collar shirt. Designed for tropical elegance with mother-of-pearl buttons and airy drape.',
+    material: '100% Pure European Flax Linen',
+    fit: 'Relaxed resort fit with camp collar.',
+    care: 'Machine wash cold on delicate. Hang dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['White', 'Beige', 'Sky Blue', 'Olive'],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+  'Pants': {
+    description: 'Breezy pure linen trousers with an elasticated drawstring waistband, deep slant pockets, and a relaxed wide-straight leg.',
+    material: '100% Pure European Flax Linen (190 GSM)',
+    fit: 'Relaxed straight leg with drawstring waist.',
+    care: 'Machine wash cold gentle. Line dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['White', 'Beige', 'Black', 'Olive'],
+    sizes: ['30', '32', '34', '36', '38']
+  },
+
+  // --- CARE & ACCESSORIES ---
+  'Care & Accessories': {
+    description: 'Essential wardrobe care implements and accessories engineered to extend the longevity of your premium garment investment.',
+    material: 'Sustainable Cotton Canvas, Recycled Poly, or Beechwood',
+    fit: 'Universal / One Size',
+    care: 'Wipe clean with a damp cloth.',
+    shipping: 'Free delivery on orders above ₦200,000. Standard delivery applies.',
+    colors: ['Black', 'Cream', 'White'],
+    sizes: ['One Size']
+  },
+  'Lint Rollers': {
+    description: 'Extra-sticky adhesive sheets on an ergonomic beechwood handle. Effortlessly lifts lint, dust, and pet hair without damaging fine wool or cotton fibers.',
+    material: 'Recycled Paper Adhesive Sheets & Ergonomic Handle',
+    fit: 'Compact travel / dressing table size (60 sheets)',
+    care: 'Peel and discard used sheet. Store in protective sleeve.',
+    shipping: 'Ships immediately with any clothing order.',
+    colors: ['White', 'Black'],
+    sizes: ['One Size']
+  },
+  'Tote Bag': {
+    description: 'Heavy-duty 16oz cotton canvas tote bag with reinforced handles, interior zip pocket, and screen-printed Penny typographic branding.',
+    material: '100% Heavyweight Cotton Canvas (16 oz)',
+    fit: 'Spacious daily carry (40cm x 38cm x 12cm)',
+    care: 'Spot clean with mild soapy water. Air dry.',
+    shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+    colors: ['Cream', 'Black'],
+    sizes: ['One Size']
+  }
+};
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -347,29 +646,78 @@ export default function AdminDashboard() {
     return matchesSearch && matchesCategory && matchesSubcategory;
   });
 
-  // Open Add Product Modal
+  // Apply Garment Preset to Product Form (Auto-fill Accordion Tabs & Colors/Sizes)
+  const handleApplyGarmentPreset = (specificKey) => {
+    const key = specificKey || productForm.subtype || productForm.subcategory || productForm.category;
+    const preset = (key && GARMENT_PRESETS[key]) || 
+                   (productForm.subcategory && GARMENT_PRESETS[productForm.subcategory]) || 
+                   (productForm.category && GARMENT_PRESETS[productForm.category]) || 
+                   GARMENT_PRESETS['Sweatshirts & Hoodies'];
+
+    if (preset) {
+      setProductForm(prev => ({
+        ...prev,
+        description: preset.description || prev.description,
+        material: preset.material || prev.material,
+        fit: preset.fit || prev.fit,
+        care: preset.care || prev.care,
+        shipping: preset.shipping || prev.shipping,
+        colors: preset.colors?.length ? [...preset.colors] : prev.colors,
+        availableSizes: preset.sizes?.length ? [...preset.sizes] : prev.availableSizes
+      }));
+    }
+  };
+
+  // Open Add Product Modal with instant high-quality menswear preset
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
     const firstCat = categoryList[0];
     const firstSub = firstCat?.subcategories?.[0];
     const firstSubName = typeof firstSub === 'string' ? firstSub : firstSub?.name || '';
     const firstSubtypes = typeof firstSub === 'object' && Array.isArray(firstSub?.subtypes) ? firstSub.subtypes : [];
+    const preset = (firstSubName && GARMENT_PRESETS[firstSubName]) || GARMENT_PRESETS['T-Shirts'];
+
     setProductForm({
       name: '',
       category: firstCat?.id || 'tops',
       subcategory: firstSubName,
       subtype: firstSubtypes[0] || '',
       price: '',
-      description: '',
-      material: '100% Heavyweight Cotton',
-      fit: 'Relaxed fit',
-      care: 'Machine wash cold inside out. Hang dry.',
-      shipping: 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+      description: preset.description,
+      material: preset.material,
+      fit: preset.fit,
+      care: preset.care,
+      shipping: preset.shipping,
       featured: false,
       inStock: true,
-      colors: ['Black', 'White'],
-      availableSizes: ['S', 'M', 'L', 'XL'],
+      colors: [...preset.colors],
+      availableSizes: [...preset.sizes],
       imageUrl: ''
+    });
+    setIsAddingCustomSub(false);
+    setCustomSubcategoryInput('');
+    setIsProductModalOpen(true);
+  };
+
+  // Duplicate / Clone Existing Product (1-Click Product Addition)
+  const handleDuplicateProduct = (product) => {
+    setEditingProduct(null); // Save will create a new product instead of updating
+    setProductForm({
+      name: `Copy of ${product.name}`,
+      category: product.category,
+      subcategory: product.subcategory || '',
+      subtype: product.subtype || '',
+      price: product.price,
+      description: product.description || '',
+      material: product.material || '100% Cotton',
+      fit: product.fit || 'Relaxed fit',
+      care: product.care || 'Machine wash cold inside out. Hang dry.',
+      shipping: product.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+      featured: !!product.featured,
+      inStock: product.inStock !== false,
+      colors: product.colors?.length ? [...product.colors] : ['Black'],
+      availableSizes: product.availableSizes?.length ? [...product.availableSizes] : ['S', 'M', 'L', 'XL'],
+      imageUrl: product.images?.primary || ''
     });
     setIsAddingCustomSub(false);
     setCustomSubcategoryInput('');
@@ -392,8 +740,8 @@ export default function AdminDashboard() {
       shipping: product.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
       featured: !!product.featured,
       inStock: product.inStock !== false,
-      colors: product.colors || ['Black'],
-      availableSizes: product.availableSizes || ['M', 'L'],
+      colors: product.colors?.length ? [...product.colors] : ['Black'],
+      availableSizes: product.availableSizes?.length ? [...product.availableSizes] : ['M', 'L'],
       imageUrl: product.images?.primary || ''
     });
     setIsAddingCustomSub(false);
@@ -1032,6 +1380,15 @@ export default function AdminDashboard() {
                       </td>
                       <td className="py-3 px-4 text-right space-x-2">
                         <button
+                          type="button"
+                          onClick={() => handleDuplicateProduct(p)}
+                          className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs"
+                          title="Duplicate / Clone Product (Instant copy of all tabs & details)"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleOpenEditProduct(p)}
                           className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs"
                           title="Edit Product"
@@ -1039,6 +1396,7 @@ export default function AdminDashboard() {
                           <Edit className="w-3.5 h-3.5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDeleteProduct(p.id)}
                           className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-xs"
                           title="Delete Product"
@@ -2286,11 +2644,22 @@ export default function AdminDashboard() {
                             const catObj = categoryList.find(c => c.id === productForm.category || c.slug === productForm.category);
                             const subObj = (catObj?.subcategories || []).find(s => (typeof s === 'string' ? s : s?.name) === newSub);
                             const availableSubtypes = typeof subObj === 'object' && Array.isArray(subObj?.subtypes) ? subObj.subtypes : [];
-                            setProductForm({ 
-                              ...productForm, 
+                            const preset = (newSub && GARMENT_PRESETS[newSub]) || GARMENT_PRESETS[productForm.category];
+
+                            setProductForm(prev => ({ 
+                              ...prev, 
                               subcategory: newSub,
-                              subtype: availableSubtypes[0] || ''
-                            });
+                              subtype: availableSubtypes[0] || '',
+                              ...((!prev.description || prev.description.length < 15) && preset ? {
+                                description: preset.description,
+                                material: preset.material,
+                                fit: preset.fit,
+                                care: preset.care,
+                                shipping: preset.shipping,
+                                colors: preset.colors || prev.colors,
+                                availableSizes: preset.sizes || prev.availableSizes
+                              } : {})
+                            }));
                           }
                         }}
                         className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white text-xs"
@@ -2366,26 +2735,109 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Material & Fit Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* STOREFRONT PRODUCT ACCORDION TABS (CUSTOMER FACING) */}
+              <div className="bg-neutral-50/80 border border-neutral-300 p-4 rounded-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-200 pb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-brand-charcoal">
+                        Storefront Accordion Tabs (Customer Facing)
+                      </h4>
+                      <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-brand-charcoal text-white rounded-xs">
+                        5 Drawers
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-neutral-500 mt-0.5">
+                      Populates the 5 product detail drawers on the storefront for this garment.
+                    </p>
+                  </div>
+
+                  {/* 1-Click Auto-Fill Preset Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyGarmentPreset()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-charcoal hover:bg-black text-white text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors shadow-xs cursor-pointer"
+                    title="Instantly auto-fill all 5 tabs and colors based on selected subcategory"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                    ⚡ Auto-Fill Preset
+                  </button>
+                </div>
+
+                {/* Quick Preset Selector Buttons for Instant Populating */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">
+                      Quick Populate from Garment Type:
+                    </span>
+                    <span className="text-[9px] text-neutral-400">
+                      Click any pill to populate all 5 tabs in 1 click
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      'Sweatshirts & Hoodies',
+                      'T-Shirts',
+                      'Trousers & Chinos',
+                      'Sweatpants',
+                      'Shorts',
+                      'The Linen Shop',
+                      'Denim',
+                      'Corduroy Trousers',
+                      'Utility Pants',
+                      'Overshirts & Shackets',
+                      'Knitwear Polos',
+                      'Knitwear Cardigan',
+                      'Oxford shirts',
+                      'Track Suit',
+                      'Care & Accessories'
+                    ].map((presetName) => (
+                      <button
+                        type="button"
+                        key={presetName}
+                        onClick={() => handleApplyGarmentPreset(presetName)}
+                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-1 bg-white hover:bg-neutral-200 text-neutral-700 border border-neutral-300 rounded-xs cursor-pointer transition-colors"
+                      >
+                        +{presetName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 1. Description */}
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    Material / Fabric
+                    1. Garment Description *
                   </label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={3}
+                    value={productForm.description}
+                    onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                    placeholder="Enter garment narrative, construction details, and aesthetic purpose..."
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs bg-white"
+                    required
+                  />
+                </div>
+
+                {/* 2. Details & Material */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    2. Details & Material
+                  </label>
+                  <textarea
+                    rows={2}
                     value={productForm.material}
                     onChange={(e) => setProductForm({ ...productForm, material: e.target.value })}
-                    placeholder="e.g. 100% Premium European Linen"
-                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal text-xs mb-1.5"
+                    placeholder="e.g. Cotton Twill & Viscose Blend, 100% Premium European Linen"
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5 bg-white"
                   />
                   <div className="flex flex-wrap gap-1">
-                    {['Linen', 'Heavyweight Cotton', 'Denim', 'Corduroy', 'Knitwear'].map(mat => (
+                    {['Cotton Twill & Viscose Blend', '100% Premium European Linen', '100% Heavyweight Cotton (450 GSM Loopback)', '100% Japanese Selvedge Denim', '100% Heavyweight Cotton Corduroy', '70% Merino Wool, 30% Silk Knitwear'].map(mat => (
                       <button
                         type="button"
                         key={mat}
                         onClick={() => setProductForm({ ...productForm, material: mat })}
-                        className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
+                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-white hover:bg-neutral-200 text-neutral-600 border border-neutral-200 rounded-xs cursor-pointer"
                       >
                         +{mat}
                       </button>
@@ -2393,110 +2845,223 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* 3. Fit & Sizing */}
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    Fit / Silhouette
+                    3. Fit & Sizing
                   </label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={2}
                     value={productForm.fit}
                     onChange={(e) => setProductForm({ ...productForm, fit: e.target.value })}
-                    placeholder="e.g. Relaxed fit / Oversized"
-                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal text-xs mb-1.5"
+                    placeholder="e.g. Tailored fit. Mid-rise waist. / Relaxed boxy drape with dropped shoulders."
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5 bg-white"
                   />
                   <div className="flex flex-wrap gap-1">
-                    {['Body-fit', 'Relaxed', 'Oversized', 'Tailored', 'Regular Fit'].map(f => (
+                    {['Tailored fit. Mid-rise waist.', 'Relaxed fit with a slightly boxy drape.', 'Oversized fit. Dropped shoulders.', 'Body-fit. Clean athletic contour.', 'True to size with clean ankle taper.'].map(f => (
                       <button
                         type="button"
                         key={f}
                         onClick={() => setProductForm({ ...productForm, fit: f })}
-                        className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
+                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-white hover:bg-neutral-200 text-neutral-600 border border-neutral-200 rounded-xs cursor-pointer"
                       >
                         +{f}
                       </button>
                     ))}
                   </div>
                 </div>
+
+                {/* 4. Garment Care */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    4. Garment Care
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={productForm.care}
+                    onChange={(e) => setProductForm({ ...productForm, care: e.target.value })}
+                    placeholder="e.g. Dry clean recommended. / Machine wash cold inside out. Hang dry."
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5 bg-white"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {['Dry clean recommended.', 'Machine wash cold inside out. Hang dry.', 'Hand wash only in cold water. Dry flat.', 'Wash sparingly inside out in cold water.'].map(c => (
+                      <button
+                        type="button"
+                        key={c}
+                        onClick={() => setProductForm({ ...productForm, care: c })}
+                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-white hover:bg-neutral-200 text-neutral-600 border border-neutral-200 rounded-xs cursor-pointer"
+                      >
+                        +{c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 5. Shipping & Returns */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
+                    5. Shipping & Returns
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={productForm.shipping}
+                    onChange={(e) => setProductForm({ ...productForm, shipping: e.target.value })}
+                    placeholder="e.g. Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos."
+                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5 bg-white"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {['Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.', '7-day hassle-free return and exchange policy.'].map(s => (
+                      <button
+                        type="button"
+                        key={s}
+                        onClick={() => setProductForm({ ...productForm, shipping: s })}
+                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-white hover:bg-neutral-200 text-neutral-600 border border-neutral-200 rounded-xs cursor-pointer"
+                      >
+                        +{s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              {/* Colors Picker */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1.5">
-                  Available Colors ({productForm.colors?.length || 0} selected)
-                </label>
-                <div className="space-y-2 bg-neutral-50/70 p-3 border border-neutral-200 rounded-xs">
-                  <div>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Core Neutrals</span>
-                    <div className="flex flex-wrap gap-1">
-                      {['Black', 'White', 'Cream', 'Beige', 'Ash/Grey', 'Charcoal', 'Taupe', 'Sand'].map(c => {
-                        const isSelected = productForm.colors?.includes(c);
-                        return (
-                          <button
-                            type="button"
-                            key={c}
-                            onClick={() => {
-                              const curr = productForm.colors || [];
-                              const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
-                              setProductForm({ ...productForm, colors: updated });
-                            }}
-                            className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
-                              isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
-                            }`}
-                          >
-                            {isSelected ? '✓ ' : ''}{c}
-                          </button>
-                        );
-                      })}
+              {/* SIZES & COLORS CONFIGURATION */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Sizes Picker */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1.5">
+                    Available Sizes ({productForm.availableSizes?.length || 0} selected)
+                  </label>
+                  <div className="space-y-2 bg-neutral-50/70 p-3 border border-neutral-200 rounded-xs">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Tops & Sets</span>
+                      <div className="flex flex-wrap gap-1">
+                        {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(sz => {
+                          const isSelected = productForm.availableSizes?.includes(sz);
+                          return (
+                            <button
+                              type="button"
+                              key={sz}
+                              onClick={() => {
+                                const curr = productForm.availableSizes || [];
+                                const updated = isSelected ? curr.filter(s => s !== sz) : [...curr, sz];
+                                setProductForm({ ...productForm, availableSizes: updated });
+                              }}
+                              className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
+                                isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
+                              }`}
+                            >
+                              {isSelected ? '✓ ' : ''}{sz}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Waist / Pants</span>
+                      <div className="flex flex-wrap gap-1">
+                        {['28', '30', '32', '34', '36', '38', '40', 'One Size'].map(sz => {
+                          const isSelected = productForm.availableSizes?.includes(sz);
+                          return (
+                            <button
+                              type="button"
+                              key={sz}
+                              onClick={() => {
+                                const curr = productForm.availableSizes || [];
+                                const updated = isSelected ? curr.filter(s => s !== sz) : [...curr, sz];
+                                setProductForm({ ...productForm, availableSizes: updated });
+                              }}
+                              className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
+                                isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
+                              }`}
+                            >
+                              {isSelected ? '✓ ' : ''}{sz}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  <div>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Earth Tones</span>
-                    <div className="flex flex-wrap gap-1">
-                      {['Olive', 'Forest Green', 'Camel', 'Coffee Brown', 'Khaki'].map(c => {
-                        const isSelected = productForm.colors?.includes(c);
-                        return (
-                          <button
-                            type="button"
-                            key={c}
-                            onClick={() => {
-                              const curr = productForm.colors || [];
-                              const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
-                              setProductForm({ ...productForm, colors: updated });
-                            }}
-                            className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
-                              isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
-                            }`}
-                          >
-                            {isSelected ? '✓ ' : ''}{c}
-                          </button>
-                        );
-                      })}
+                {/* Colors Picker */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1.5">
+                    Available Colors ({productForm.colors?.length || 0} selected)
+                  </label>
+                  <div className="space-y-2 bg-neutral-50/70 p-3 border border-neutral-200 rounded-xs">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Core Neutrals</span>
+                      <div className="flex flex-wrap gap-1">
+                        {['Black', 'White', 'Cream', 'Beige', 'Ash/Grey', 'Charcoal', 'Taupe', 'Sand'].map(c => {
+                          const isSelected = productForm.colors?.includes(c);
+                          return (
+                            <button
+                              type="button"
+                              key={c}
+                              onClick={() => {
+                                const curr = productForm.colors || [];
+                                const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
+                                setProductForm({ ...productForm, colors: updated });
+                              }}
+                              className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
+                                isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
+                              }`}
+                            >
+                              {isSelected ? '✓ ' : ''}{c}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Seasonal Accents</span>
-                    <div className="flex flex-wrap gap-1">
-                      {['Burgundy', 'Burnt Orange', 'Baby Pink', 'Sky Blue', 'Striped Sky Blue', 'Navy'].map(c => {
-                        const isSelected = productForm.colors?.includes(c);
-                        return (
-                          <button
-                            type="button"
-                            key={c}
-                            onClick={() => {
-                              const curr = productForm.colors || [];
-                              const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
-                              setProductForm({ ...productForm, colors: updated });
-                            }}
-                            className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
-                              isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
-                            }`}
-                          >
-                            {isSelected ? '✓ ' : ''}{c}
-                          </button>
-                        );
-                      })}
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Earth Tones</span>
+                      <div className="flex flex-wrap gap-1">
+                        {['Olive', 'Forest Green', 'Camel', 'Coffee Brown', 'Khaki'].map(c => {
+                          const isSelected = productForm.colors?.includes(c);
+                          return (
+                            <button
+                              type="button"
+                              key={c}
+                              onClick={() => {
+                                const curr = productForm.colors || [];
+                                const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
+                                setProductForm({ ...productForm, colors: updated });
+                              }}
+                              className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
+                                isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
+                              }`}
+                            >
+                              {isSelected ? '✓ ' : ''}{c}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Seasonal Accents</span>
+                      <div className="flex flex-wrap gap-1">
+                        {['Burgundy', 'Burnt Orange', 'Baby Pink', 'Sky Blue', 'Striped Sky Blue', 'Navy'].map(c => {
+                          const isSelected = productForm.colors?.includes(c);
+                          return (
+                            <button
+                              type="button"
+                              key={c}
+                              onClick={() => {
+                                const curr = productForm.colors || [];
+                                const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
+                                setProductForm({ ...productForm, colors: updated });
+                              }}
+                              className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
+                                isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
+                              }`}
+                            >
+                              {isSelected ? '✓ ' : ''}{c}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2601,137 +3166,6 @@ export default function AdminDashboard() {
                     placeholder="e.g. /images/products/linen-set-1.jpg"
                     className="w-full mt-1 border border-neutral-200 p-2 focus:outline-none focus:border-brand-charcoal text-[11px]"
                   />
-                </div>
-              </div>
-
-              {/* STOREFRONT PRODUCT ACCORDION TABS */}
-              <div className="space-y-4 pt-2 border-t border-neutral-200">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-charcoal">
-                    Storefront Accordion Tabs (Customer Facing)
-                  </h4>
-                  <span className="text-[10px] text-neutral-400">
-                    Populates the 5 product detail drawers on the storefront
-                  </span>
-                </div>
-
-                {/* 1. Description */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    1. Garment Description *
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={productForm.description}
-                    onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                    placeholder="Enter garment narrative, construction details, and aesthetic purpose..."
-                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs"
-                    required
-                  />
-                </div>
-
-                {/* 2. Details & Material */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    2. Details & Material
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={productForm.material}
-                    onChange={(e) => setProductForm({ ...productForm, material: e.target.value })}
-                    placeholder="e.g. Cotton Twill & Viscose Blend, 100% Premium European Linen"
-                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5"
-                  />
-                  <div className="flex flex-wrap gap-1">
-                    {['Cotton Twill & Viscose Blend', '100% Premium European Linen', '100% Heavyweight Cotton (450 GSM Loopback)', '100% Japanese Selvedge Denim', '100% Heavyweight Cotton Corduroy', '70% Merino Wool, 30% Silk Knitwear'].map(mat => (
-                      <button
-                        type="button"
-                        key={mat}
-                        onClick={() => setProductForm({ ...productForm, material: mat })}
-                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
-                      >
-                        +{mat}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 3. Fit & Sizing */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    3. Fit & Sizing
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={productForm.fit}
-                    onChange={(e) => setProductForm({ ...productForm, fit: e.target.value })}
-                    placeholder="e.g. Tailored fit. Mid-rise waist. / Relaxed boxy drape with dropped shoulders."
-                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5"
-                  />
-                  <div className="flex flex-wrap gap-1">
-                    {['Tailored fit. Mid-rise waist.', 'Relaxed fit with a slightly boxy drape.', 'Oversized fit. Dropped shoulders.', 'Body-fit. Clean athletic contour.', 'True to size with clean ankle taper.'].map(f => (
-                      <button
-                        type="button"
-                        key={f}
-                        onClick={() => setProductForm({ ...productForm, fit: f })}
-                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
-                      >
-                        +{f}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 4. Garment Care */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    4. Garment Care
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={productForm.care}
-                    onChange={(e) => setProductForm({ ...productForm, care: e.target.value })}
-                    placeholder="e.g. Dry clean recommended. / Machine wash cold inside out. Hang dry."
-                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5"
-                  />
-                  <div className="flex flex-wrap gap-1">
-                    {['Dry clean recommended.', 'Machine wash cold inside out. Hang dry.', 'Hand wash only in cold water. Dry flat.', 'Wash sparingly inside out in cold water.'].map(c => (
-                      <button
-                        type="button"
-                        key={c}
-                        onClick={() => setProductForm({ ...productForm, care: c })}
-                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
-                      >
-                        +{c}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 5. Shipping & Returns */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    5. Shipping & Returns
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={productForm.shipping}
-                    onChange={(e) => setProductForm({ ...productForm, shipping: e.target.value })}
-                    placeholder="e.g. Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos."
-                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal resize-none text-xs mb-1.5"
-                  />
-                  <div className="flex flex-wrap gap-1">
-                    {['Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.', '7-day hassle-free return and exchange policy.'].map(s => (
-                      <button
-                        type="button"
-                        key={s}
-                        onClick={() => setProductForm({ ...productForm, shipping: s })}
-                        className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xs cursor-pointer"
-                      >
-                        +{s}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
 
