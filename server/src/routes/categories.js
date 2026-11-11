@@ -165,6 +165,77 @@ router.post('/', async (req, res) => {
 });
 
 /**
+ * PUT /api/categories/:id
+ * Update an existing category (name, slug, displayOrder, subcategories)
+ */
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, slug, displayOrder, subcategories: rawSubs } = req.body;
+
+    const category = categories.find(c => c.id === id || c.slug === id);
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: `Category '${id}' not found.`,
+      });
+    }
+
+    if (name && typeof name === 'string') category.name = name.trim();
+    if (slug && typeof slug === 'string') category.slug = slug.trim();
+    if (typeof displayOrder === 'number') category.displayOrder = displayOrder;
+
+    if (Array.isArray(rawSubs)) {
+      category.subcategories = rawSubs.map(sub => {
+        if (typeof sub === 'string') {
+          return { name: sub.trim(), subtypes: [] };
+        } else if (typeof sub === 'object' && sub !== null) {
+          return {
+            name: (sub.name || '').trim(),
+            subtypes: Array.isArray(sub.subtypes) ? sub.subtypes.map(s => String(s).trim()).filter(Boolean) : []
+          };
+        }
+        return { name: String(sub).trim(), subtypes: [] };
+      }).filter(s => s.name);
+    }
+
+    writeJsonFile('categories.json', categories);
+
+    try {
+      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+        const pool = getPool();
+        await pool.query(
+          `UPDATE categories 
+           SET name = $1, slug = $2, display_order = $3, subcategories = $4 
+           WHERE id = $5 OR slug = $5`,
+          [
+            category.name,
+            category.slug || category.id,
+            category.displayOrder || 1,
+            JSON.stringify(category.subcategories),
+            category.id
+          ]
+        );
+      }
+    } catch (e) {
+      console.warn('[CATEGORIES] DB category update warning:', e.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Category '${category.name}' updated successfully.`,
+      data: category,
+    });
+  } catch (error) {
+    console.error('Error updating category:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update category.',
+    });
+  }
+});
+
+/**
  * POST /api/categories/:id/subcategories
  * Add a subcategory to an existing category
  */
@@ -172,6 +243,7 @@ router.post('/:id/subcategories', async (req, res) => {
   try {
     const { id } = req.params;
     const subcategoryName = (req.body.subcategory || req.body.name || '').trim();
+    const rawSubtypes = req.body.subtypes || [];
 
     if (!subcategoryName) {
       return res.status(400).json({
@@ -192,8 +264,10 @@ router.post('/:id/subcategories', async (req, res) => {
       category.subcategories = [];
     }
 
+    const getSubName = (s) => (typeof s === 'string' ? s : s?.name || '').trim();
+
     // Check for duplicate (case-insensitive)
-    const exists = category.subcategories.some(s => s.toLowerCase() === subcategoryName.toLowerCase());
+    const exists = category.subcategories.some(s => getSubName(s).toLowerCase() === subcategoryName.toLowerCase());
     if (exists) {
       return res.status(400).json({
         success: false,
@@ -201,7 +275,12 @@ router.post('/:id/subcategories', async (req, res) => {
       });
     }
 
-    category.subcategories.push(subcategoryName);
+    const newSubObj = {
+      name: subcategoryName,
+      subtypes: Array.isArray(rawSubtypes) ? rawSubtypes.map(s => String(s).trim()).filter(Boolean) : []
+    };
+
+    category.subcategories.push(newSubObj);
     writeJsonFile('categories.json', categories);
 
     try {
@@ -231,13 +310,15 @@ router.post('/:id/subcategories', async (req, res) => {
 });
 
 /**
- * DELETE /api/categories/:id/subcategories/:subName
- * Remove a subcategory from an existing category
+ * PUT /api/categories/:id/subcategories/:subName
+ * Update a subcategory name or its subtypes
  */
-router.delete('/:id/subcategories/:subName', async (req, res) => {
+router.put('/:id/subcategories/:subName', async (req, res) => {
   try {
     const { id, subName } = req.params;
+    const { newName, subtypes } = req.body;
     const targetSub = decodeURIComponent(subName).trim().toLowerCase();
+    const getSubName = (s) => (typeof s === 'string' ? s : s?.name || '').trim();
 
     const category = categories.find(c => c.id === id || c.slug === id);
     if (!category) {
@@ -251,16 +332,74 @@ router.delete('/:id/subcategories/:subName', async (req, res) => {
       category.subcategories = [];
     }
 
-    const initialLength = category.subcategories.length;
-    category.subcategories = category.subcategories.filter(s => s.toLowerCase() !== targetSub);
-
-    if (category.subcategories.length === initialLength) {
+    const subIndex = category.subcategories.findIndex(s => getSubName(s).toLowerCase() === targetSub);
+    if (subIndex === -1) {
       return res.status(404).json({
         success: false,
         message: `Subcategory '${subName}' not found in ${category.name}.`,
       });
     }
 
+    const currentSub = category.subcategories[subIndex];
+    const updatedSub = {
+      name: (newName && typeof newName === 'string') ? newName.trim() : getSubName(currentSub),
+      subtypes: Array.isArray(subtypes) 
+        ? subtypes.map(s => String(s).trim()).filter(Boolean)
+        : (typeof currentSub === 'object' && Array.isArray(currentSub.subtypes) ? currentSub.subtypes : [])
+    };
+
+    category.subcategories[subIndex] = updatedSub;
+    writeJsonFile('categories.json', categories);
+
+    try {
+      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+        const pool = getPool();
+        await pool.query(
+          'UPDATE categories SET subcategories = $1 WHERE id = $2 OR slug = $2',
+          [JSON.stringify(category.subcategories), category.id]
+        );
+      }
+    } catch (e) {
+      console.warn('[CATEGORIES] DB subcategory update warning:', e.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Subcategory updated in ${category.name}.`,
+      data: category,
+    });
+  } catch (error) {
+    console.error('Error updating subcategory:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update subcategory.',
+    });
+  }
+});
+
+/**
+ * DELETE /api/categories/:id/subcategories/:subName
+ * Remove a subcategory from an existing category
+ */
+router.delete('/:id/subcategories/:subName', async (req, res) => {
+  try {
+    const { id, subName } = req.params;
+    const targetSub = decodeURIComponent(subName).trim().toLowerCase();
+    const getSubName = (s) => (typeof s === 'string' ? s : s?.name || '').trim();
+
+    const category = categories.find(c => c.id === id || c.slug === id);
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: `Category '${id}' not found.`,
+      });
+    }
+
+    if (!Array.isArray(category.subcategories)) {
+      category.subcategories = [];
+    }
+
+    category.subcategories = category.subcategories.filter(s => getSubName(s).toLowerCase() !== targetSub);
     writeJsonFile('categories.json', categories);
 
     try {

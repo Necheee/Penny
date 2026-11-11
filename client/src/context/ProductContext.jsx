@@ -295,20 +295,120 @@ export function ProductProvider({ children }) {
     }
   };
 
-  const addSubcategory = async (categoryId, subcategoryName) => {
-    const cleanSub = subcategoryName.trim();
-    if (!cleanSub) return;
+  // Helper to extract name whether subcategory is string or object
+  const getSubName = (s) => (typeof s === 'string' ? s : s?.name || '').trim();
+
+  // Update an existing category (name, slug, displayOrder, subcategories)
+  const updateCategory = async (categoryId, updatedData) => {
+    setCategories((prev) => {
+      const updated = prev.map((cat) => {
+        if (cat.id === categoryId || cat.slug === categoryId) {
+          return {
+            ...cat,
+            ...updatedData,
+            subcategories: updatedData.subcategories !== undefined ? updatedData.subcategories : cat.subcategories,
+          };
+        }
+        return cat;
+      });
+      localStorage.setItem('penny_categories', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      await fetch(`/api/categories/${encodeURIComponent(categoryId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData),
+      });
+    } catch (err) {
+      console.warn("Backend category update sync note:", err);
+    }
+  };
+
+  // Update an individual subcategory (rename and/or update subtypes)
+  const updateSubcategory = async (categoryId, oldSubName, newSubData) => {
+    const cleanOld = (typeof oldSubName === 'string' ? oldSubName : oldSubName?.name || '').trim().toLowerCase();
+    if (!cleanOld) return;
+
+    let targetNewName = '';
+    let targetSubtypes = [];
+
+    if (typeof newSubData === 'string') {
+      targetNewName = newSubData.trim();
+    } else if (typeof newSubData === 'object' && newSubData !== null) {
+      targetNewName = (newSubData.name || '').trim();
+      targetSubtypes = Array.isArray(newSubData.subtypes) ? newSubData.subtypes : [];
+    }
 
     setCategories((prev) => {
       const updated = prev.map((cat) => {
         if (cat.id === categoryId || cat.slug === categoryId) {
           const currentSubs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
-          if (currentSubs.some(s => s.toLowerCase() === cleanSub.toLowerCase())) {
+          const newSubs = currentSubs.map((s) => {
+            if (getSubName(s).toLowerCase() === cleanOld) {
+              return {
+                name: targetNewName || getSubName(s),
+                subtypes: targetSubtypes.length > 0 
+                  ? targetSubtypes 
+                  : (typeof s === 'object' && Array.isArray(s.subtypes) ? s.subtypes : [])
+              };
+            }
+            return s;
+          });
+          return { ...cat, subcategories: newSubs };
+        }
+        return cat;
+      });
+      localStorage.setItem('penny_categories', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories/${encodeURIComponent(typeof oldSubName === 'string' ? oldSubName : oldSubName?.name || '')}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newName: targetNewName,
+          subtypes: targetSubtypes,
+        }),
+      });
+    } catch (err) {
+      console.warn("Backend subcategory update sync note:", err);
+    }
+  };
+
+  const addSubcategory = async (categoryId, subcategoryInput, subtypes = []) => {
+    let cleanSub = '';
+    let cleanSubtypes = [];
+
+    if (typeof subcategoryInput === 'string') {
+      cleanSub = subcategoryInput.trim();
+      cleanSubtypes = Array.isArray(subtypes) ? subtypes.map(s => String(s).trim()).filter(Boolean) : [];
+    } else if (typeof subcategoryInput === 'object' && subcategoryInput !== null) {
+      cleanSub = (subcategoryInput.name || '').trim();
+      cleanSubtypes = Array.isArray(subcategoryInput.subtypes) 
+        ? subcategoryInput.subtypes.map(s => String(s).trim()).filter(Boolean) 
+        : (Array.isArray(subtypes) ? subtypes.map(s => String(s).trim()).filter(Boolean) : []);
+    }
+
+    if (!cleanSub) return;
+
+    const newSubObj = {
+      name: cleanSub,
+      subtypes: cleanSubtypes
+    };
+
+    setCategories((prev) => {
+      const updated = prev.map((cat) => {
+        if (cat.id === categoryId || cat.slug === categoryId) {
+          const currentSubs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
+          if (currentSubs.some(s => getSubName(s).toLowerCase() === cleanSub.toLowerCase())) {
             return cat;
           }
           return {
             ...cat,
-            subcategories: [...currentSubs, cleanSub]
+            subcategories: [...currentSubs, newSubObj]
           };
         }
         return cat;
@@ -321,7 +421,7 @@ export function ProductProvider({ children }) {
       await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subcategory: cleanSub })
+        body: JSON.stringify({ subcategory: cleanSub, subtypes: cleanSubtypes })
       });
     } catch (err) {
       console.warn("Backend subcategory add sync note:", err);
@@ -329,7 +429,9 @@ export function ProductProvider({ children }) {
   };
 
   const deleteSubcategory = async (categoryId, subcategoryName) => {
-    const cleanSub = subcategoryName.trim().toLowerCase();
+    const rawSubName = typeof subcategoryName === 'string' ? subcategoryName : subcategoryName?.name || '';
+    const cleanSub = rawSubName.trim().toLowerCase();
+    if (!cleanSub) return;
 
     setCategories((prev) => {
       const updated = prev.map((cat) => {
@@ -337,7 +439,7 @@ export function ProductProvider({ children }) {
           const currentSubs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
           return {
             ...cat,
-            subcategories: currentSubs.filter(s => s.toLowerCase() !== cleanSub)
+            subcategories: currentSubs.filter(s => getSubName(s).toLowerCase() !== cleanSub)
           };
         }
         return cat;
@@ -347,7 +449,7 @@ export function ProductProvider({ children }) {
     });
 
     try {
-      await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories/${encodeURIComponent(subcategoryName)}`, {
+      await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories/${encodeURIComponent(rawSubName)}`, {
         method: 'DELETE'
       });
     } catch (err) {
@@ -395,8 +497,10 @@ export function ProductProvider({ children }) {
         toggleFeatured,
         toggleStock,
         addCategory,
+        updateCategory,
         deleteCategory,
         addSubcategory,
+        updateSubcategory,
         deleteSubcategory,
       }}
     >

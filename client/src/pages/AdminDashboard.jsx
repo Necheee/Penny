@@ -365,8 +365,10 @@ export default function AdminDashboard() {
     toggleFeatured, 
     toggleStock, 
     addCategory, 
+    updateCategory,
     deleteCategory,
     addSubcategory,
+    updateSubcategory,
     deleteSubcategory,
     announcements = [],
     updateAnnouncements,
@@ -382,6 +384,17 @@ export default function AdminDashboard() {
   const [isAddingCustomSub, setIsAddingCustomSub] = useState(false);
   const [customSubcategoryInput, setCustomSubcategoryInput] = useState('');
   const [categoryFeedback, setCategoryFeedback] = useState('');
+
+  // Category & Subcategory Editing Modal State
+  const [isEditCategoryModalOpen, setIsEditCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState({
+    id: '',
+    name: '',
+    slug: '',
+    subcategories: []
+  });
+  const [modalNewSubName, setModalNewSubName] = useState('');
+  const [modalNewSubSubtypes, setModalNewSubSubtypes] = useState('');
 
   // Orders state initialized from localStorage with fallback, and synced from /api/payments/orders
   const [orders, setOrders] = useState(() => {
@@ -1081,8 +1094,19 @@ export default function AdminDashboard() {
     if (!newCategoryName.trim()) return;
     const slug = newCategorySlug.trim() || newCategoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const initialSubs = newCategorySubcategories
-      ? newCategorySubcategories.split(',').map(s => s.trim()).filter(Boolean)
+      ? newCategorySubcategories.split(/,(?![^(]*\))/).map(s => {
+          const item = s.trim();
+          const match = item.match(/^(.*?)\((.*?)\)$/);
+          if (match) {
+            return {
+              name: match[1].trim(),
+              subtypes: match[2].split(',').map(st => st.trim()).filter(Boolean)
+            };
+          }
+          return { name: item, subtypes: [] };
+        }).filter(s => s.name)
       : [];
+
     addCategory({
       id: slug,
       name: newCategoryName.trim(),
@@ -1105,13 +1129,112 @@ export default function AdminDashboard() {
     }
   };
 
-  // Add subcategory to specific category
+  // Open Edit Category & Subcategories Modal
+  const handleOpenEditCategory = (cat) => {
+    const rawSubs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
+    const formattedSubs = rawSubs.map(s => {
+      if (typeof s === 'string') {
+        return { name: s, subtypes: [] };
+      }
+      return {
+        name: s?.name || '',
+        subtypes: Array.isArray(s?.subtypes) ? [...s.subtypes] : []
+      };
+    });
+    setEditingCategory({
+      id: cat.id,
+      name: cat.name || '',
+      slug: cat.slug || cat.id || '',
+      subcategories: formattedSubs
+    });
+    setModalNewSubName('');
+    setModalNewSubSubtypes('');
+    setIsEditCategoryModalOpen(true);
+  };
+
+  const handleUpdateEditingSubcategoryName = (index, newName) => {
+    setEditingCategory(prev => {
+      const subs = [...prev.subcategories];
+      subs[index] = { ...subs[index], name: newName };
+      return { ...prev, subcategories: subs };
+    });
+  };
+
+  const handleUpdateEditingSubcategorySubtypes = (index, subtypesString) => {
+    const list = subtypesString.split(',').map(s => s.trim()).filter(Boolean);
+    setEditingCategory(prev => {
+      const subs = [...prev.subcategories];
+      subs[index] = { ...subs[index], subtypes: list };
+      return { ...prev, subcategories: subs };
+    });
+  };
+
+  const handleRemoveSubcategoryInModal = (index) => {
+    setEditingCategory(prev => ({
+      ...prev,
+      subcategories: prev.subcategories.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleAddSubcategoryInModal = () => {
+    const cleanName = modalNewSubName.trim();
+    if (!cleanName) return;
+    const subtypesList = modalNewSubSubtypes
+      ? modalNewSubSubtypes.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    setEditingCategory(prev => ({
+      ...prev,
+      subcategories: [...prev.subcategories, { name: cleanName, subtypes: subtypesList }]
+    }));
+    setModalNewSubName('');
+    setModalNewSubSubtypes('');
+  };
+
+  const handleSaveCategoryEdit = async (e) => {
+    if (e) e.preventDefault();
+    if (!editingCategory.name.trim()) {
+      alert('Category name is required.');
+      return;
+    }
+    const cleanSlug = editingCategory.slug.trim() || editingCategory.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const cleanData = {
+      name: editingCategory.name.trim(),
+      slug: cleanSlug,
+      subcategories: editingCategory.subcategories
+        .filter(s => s.name && s.name.trim())
+        .map(s => ({
+          name: s.name.trim(),
+          subtypes: Array.isArray(s.subtypes) ? s.subtypes.map(st => String(st).trim()).filter(Boolean) : []
+        }))
+    };
+    await updateCategory(editingCategory.id, cleanData);
+    setIsEditCategoryModalOpen(false);
+    setCategoryFeedback(`Category "${cleanData.name}" and subcategories updated successfully.`);
+    setTimeout(() => setCategoryFeedback(''), 4000);
+  };
+
+  // Add subcategory to specific category from card input
   const handleAddSubcategoryToCat = (catId) => {
-    const text = (subInputs[catId] || '').trim();
-    if (!text) return;
-    addSubcategory(catId, text);
+    const rawText = (subInputs[catId] || '').trim();
+    if (!rawText) return;
+
+    let subName = rawText;
+    let subtypes = [];
+
+    // Check if user entered format like "Sweatpants (Cuffed, Open-Hem)" or "Shorts: Chino Shorts, Utility Shorts"
+    const parenMatch = rawText.match(/^(.*?)\((.*?)\)$/);
+    if (parenMatch) {
+      subName = parenMatch[1].trim();
+      subtypes = parenMatch[2].split(',').map(s => s.trim()).filter(Boolean);
+    } else if (rawText.includes(':')) {
+      const parts = rawText.split(':');
+      subName = parts[0].trim();
+      subtypes = parts.slice(1).join(':').split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    addSubcategory(catId, { name: subName, subtypes });
     setSubInputs(prev => ({ ...prev, [catId]: '' }));
-    setCategoryFeedback(`Added "${text}" subcategory.`);
+    setCategoryFeedback(`Added "${subName}" subcategory.`);
     setTimeout(() => setCategoryFeedback(''), 3000);
   };
 
@@ -1690,12 +1813,24 @@ export default function AdminDashboard() {
                         </div>
                         <p className="text-[11px] text-neutral-400 font-mono mt-0.5">/shop?category={cat.slug || cat.id}</p>
                       </div>
-                      <button
-                        onClick={() => handleDeleteCategory(cat.id)}
-                        className="text-red-500 hover:text-red-700 text-xs uppercase font-bold tracking-wider self-start sm:self-auto cursor-pointer"
-                      >
-                        Delete Category
-                      </button>
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditCategory(cat)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 hover:bg-brand-charcoal hover:text-white text-brand-charcoal text-xs uppercase font-bold tracking-wider rounded-xs transition-colors cursor-pointer border border-neutral-200"
+                          title="Edit Category and Subcategories"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                          Edit Category
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat.id)}
+                          className="px-3 py-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 text-xs uppercase font-bold tracking-wider rounded-xs transition-colors cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
 
                     {/* Subcategories Section */}
@@ -1704,6 +1839,7 @@ export default function AdminDashboard() {
                         <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
                           Subcategories ({subs.length})
                         </span>
+                        <span className="text-[10px] text-neutral-400">Click edit icon on any subcategory to configure style options</span>
                       </div>
 
                       {/* Subcategory Badges */}
@@ -1719,14 +1855,24 @@ export default function AdminDashboard() {
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="font-bold text-[11px] uppercase tracking-wide">{subName}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteSubcategoryFromCat(cat.id, subName)}
-                                    className="text-neutral-400 hover:text-red-600 transition-colors ml-0.5 cursor-pointer"
-                                    title={`Delete ${subName}`}
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditCategory(cat)}
+                                      className="text-neutral-400 hover:text-brand-charcoal transition-colors p-0.5 cursor-pointer"
+                                      title={`Edit ${subName} and its style options`}
+                                    >
+                                      <Edit className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteSubcategoryFromCat(cat.id, subName)}
+                                      className="text-neutral-400 hover:text-red-600 transition-colors p-0.5 cursor-pointer"
+                                      title={`Delete ${subName}`}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
                                 </div>
                                 {subSubtypes.length > 0 && (
                                   <div className="flex flex-wrap gap-1 pt-1">
@@ -3965,6 +4111,204 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT CATEGORY & SUBCATEGORIES MODAL */}
+      {isEditCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-neutral-200 shadow-2xl p-6 md:p-8 rounded-sm">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center border-b border-neutral-200 pb-4 mb-5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Edit className="w-4 h-4 text-brand-charcoal" />
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-brand-charcoal">
+                    Edit Category & Subcategories
+                  </h2>
+                </div>
+                <p className="text-[11px] text-neutral-500 mt-1">
+                  Rename this category, manage subcategory names, and configure Tier 3 style options (e.g. Crewneck, Quarter-Zip, Cuffed, Open-Hem).
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsEditCategoryModalOpen(false)}
+                className="text-xs uppercase font-bold text-neutral-400 hover:text-black cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCategoryEdit} className="space-y-6">
+              {/* Category Details Form */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50 p-4 border border-neutral-200 rounded-xs">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-600 mb-1">
+                    Category Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={editingCategory.name}
+                    onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                    placeholder="e.g. Tops, Sweatshirts & Hoodies"
+                    className="w-full border border-neutral-300 p-2.5 bg-white text-xs font-semibold focus:outline-none focus:border-brand-charcoal"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-600 mb-1">
+                    URL Slug
+                  </label>
+                  <input
+                    type="text"
+                    value={editingCategory.slug}
+                    onChange={(e) => setEditingCategory({ ...editingCategory, slug: e.target.value })}
+                    placeholder="e.g. tops"
+                    className="w-full border border-neutral-300 p-2.5 bg-white text-xs font-mono focus:outline-none focus:border-brand-charcoal"
+                  />
+                </div>
+              </div>
+
+              {/* Subcategories & Tier 3 Styles List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-charcoal">
+                    Subcategories & Style Options ({editingCategory.subcategories.length})
+                  </h4>
+                  <span className="text-[10px] text-neutral-400 font-mono">
+                    Tier 2 Subcategories & Tier 3 Styles
+                  </span>
+                </div>
+
+                {editingCategory.subcategories.length === 0 ? (
+                  <p className="text-xs text-neutral-400 italic bg-neutral-50 p-4 border border-neutral-200 rounded-xs text-center">
+                    No subcategories added yet. Use the form below to add one.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {editingCategory.subcategories.map((sub, idx) => (
+                      <div 
+                        key={idx}
+                        className="bg-neutral-50/70 border border-neutral-200 p-3.5 rounded-xs space-y-2.5"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono text-neutral-400 font-bold w-4">
+                            #{idx + 1}
+                          </span>
+                          <div className="flex-1">
+                            <label className="block text-[9px] font-bold uppercase tracking-widest text-neutral-500 mb-0.5">
+                              Subcategory Name
+                            </label>
+                            <input
+                              type="text"
+                              value={sub.name}
+                              onChange={(e) => handleUpdateEditingSubcategoryName(idx, e.target.value)}
+                              placeholder="e.g. Sweatshirts & Hoodies"
+                              className="w-full border border-neutral-300 p-2 bg-white text-xs font-medium focus:outline-none focus:border-brand-charcoal"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSubcategoryInModal(idx)}
+                            className="text-neutral-400 hover:text-red-600 transition-colors p-2 mt-4 cursor-pointer"
+                            title="Remove this subcategory"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Tier 3 Styles / Subtypes */}
+                        <div>
+                          <label className="block text-[9px] font-bold uppercase tracking-widest text-neutral-500 mb-0.5">
+                            Styles / Subtypes (Comma-separated)
+                          </label>
+                          <input
+                            type="text"
+                            value={Array.isArray(sub.subtypes) ? sub.subtypes.join(', ') : ''}
+                            onChange={(e) => handleUpdateEditingSubcategorySubtypes(idx, e.target.value)}
+                            placeholder="e.g. Crewneck sweatshirt, Quarter-Zip, Collared Quarter-Zip, Zip-through Hoodie, Standard Hoodie"
+                            className="w-full border border-neutral-300 p-2 bg-white text-xs focus:outline-none focus:border-brand-charcoal"
+                          />
+                          {Array.isArray(sub.subtypes) && sub.subtypes.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {sub.subtypes.map((st, sIdx) => (
+                                <span 
+                                  key={sIdx}
+                                  className="text-[10px] px-2 py-0.5 bg-white border border-neutral-300 rounded-xs text-neutral-700 font-medium"
+                                >
+                                  • {st}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Add New Subcategory in Modal */}
+              <div className="border border-dashed border-neutral-300 p-4 bg-neutral-50/50 rounded-xs space-y-3">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-brand-charcoal block">
+                  + Add New Subcategory to this Category
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-widest text-neutral-500 mb-0.5">
+                      Subcategory Name
+                    </label>
+                    <input
+                      type="text"
+                      value={modalNewSubName}
+                      onChange={(e) => setModalNewSubName(e.target.value)}
+                      placeholder="e.g. Sweatpants"
+                      className="w-full border border-neutral-300 p-2 bg-white text-xs focus:outline-none focus:border-brand-charcoal"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-widest text-neutral-500 mb-0.5">
+                      Styles / Subtypes (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={modalNewSubSubtypes}
+                      onChange={(e) => setModalNewSubSubtypes(e.target.value)}
+                      placeholder="e.g. Cuffed, Open-Hem"
+                      className="w-full border border-neutral-300 p-2 bg-white text-xs focus:outline-none focus:border-brand-charcoal"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddSubcategoryInModal}
+                  disabled={!modalNewSubName.trim()}
+                  className="px-4 py-2 bg-neutral-200 hover:bg-neutral-800 hover:text-white text-brand-charcoal text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  + Add to List
+                </button>
+              </div>
+
+              {/* Modal Actions Footer */}
+              <div className="flex justify-end items-center gap-3 pt-4 border-t border-neutral-200">
+                <button
+                  type="button"
+                  onClick={() => setIsEditCategoryModalOpen(false)}
+                  className="px-5 py-2.5 border border-neutral-300 text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-brand-charcoal hover:bg-black text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
