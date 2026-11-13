@@ -106,29 +106,11 @@ export function ProductProvider({ children }) {
     ];
   });
 
-  // Dynamic Size Guide Data: Exactly 4 categories as specified (Top, Shirt, Shorts, Trousers)
+  // Dynamic Size Guide Data: Exactly 3 categories as specified (Shirts, Shorts, Trousers)
   const [sizeGuideData, setSizeGuideData] = useState(() => {
     const defaultGuides = {
-      tops: {
-        title: "Top",
-        subtitle: "T-Shirts, Knitwear Polos, Henleys & Sweatshirts",
-        columns: [
-          { key: "size", label: "Size" },
-          { key: "chest", label: "Chest (CM)" },
-          { key: "length", label: "Length (CM)" },
-          { key: "shoulder", label: "Shoulder (CM)" }
-        ],
-        rows: [
-          { size: "XS", chest: "86 - 91", length: "68", shoulder: "42" },
-          { size: "S", chest: "91 - 96", length: "70", shoulder: "44" },
-          { size: "M", chest: "96 - 101", length: "72", shoulder: "46" },
-          { size: "L", chest: "101 - 106", length: "74", shoulder: "48" },
-          { size: "XL", chest: "106 - 111", length: "76", shoulder: "50" },
-          { size: "XXL", chest: "111 - 116", length: "78", shoulder: "52" }
-        ]
-      },
       shirts: {
-        title: "Shirt",
+        title: "Shirts",
         subtitle: "Oxford Shirts, Linen Tops & Shackets",
         columns: [
           { key: "size", label: "Size" },
@@ -189,6 +171,7 @@ export function ProductProvider({ children }) {
         const parsed = JSON.parse(saved);
         delete parsed.sets; // permanently purge sets
         delete parsed.bottoms; // migrated to shorts and trousers
+        delete parsed.tops; // user requested only shirts, shorts, trousers
         return {
           ...defaultGuides,
           ...parsed

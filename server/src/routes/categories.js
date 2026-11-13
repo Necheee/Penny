@@ -9,7 +9,8 @@ const router = express.Router();
 // Active persistent storage for categories and size guides
 let categories = (readJsonFile('categories.json', initialCategories) || initialCategories)
   .filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets');
-let sizeGuides = readJsonFile('sizeGuides.json', initialSizeGuides) || initialSizeGuides;
+let sizeGuides = (readJsonFile('sizeGuides.json', initialSizeGuides) || initialSizeGuides)
+  .filter(sg => sg.category !== 'sets' && sg.category !== 'tops' && sg.category !== 'bottoms');
 
 // Ensure initial categories always have their subcategories array
 categories = categories

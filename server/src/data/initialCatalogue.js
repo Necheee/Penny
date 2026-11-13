@@ -155,17 +155,6 @@ export const initialCategories = [
 
 export const initialSizeGuides = [
   {
-    category: 'tops',
-    measurements: JSON.stringify([
-      { size: 'XS', chest: '86 - 91', length: '68', shoulder: '42' },
-      { size: 'S', chest: '91 - 96', length: '70', shoulder: '44' },
-      { size: 'M', chest: '96 - 101', length: '72', shoulder: '46' },
-      { size: 'L', chest: '101 - 106', length: '74', shoulder: '48' },
-      { size: 'XL', chest: '106 - 111', length: '76', shoulder: '50' },
-      { size: 'XXL', chest: '111 - 116', length: '78', shoulder: '52' }
-    ])
-  },
-  {
     category: 'shirts',
     measurements: JSON.stringify([
       { size: 'XS', collar: '37', chest: '88 - 93', sleeve: '82' },

@@ -1,21 +1,37 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Ruler } from 'lucide-react';
 import { useProducts } from '../../context/ProductContext';
 
-export default function SizeGuideModal({ isOpen, onClose, initialCategory = 'tops' }) {
+export default function SizeGuideModal({ isOpen, onClose, initialCategory = 'shirts' }) {
   const { sizeGuideData = {} } = useProducts();
-  const availableCategories = ['tops', 'shirts', 'shorts', 'trousers'].filter(k => !!sizeGuideData[k]);
-  const resolvedCategory = initialCategory === 'bottoms' ? 'trousers' : initialCategory;
+  const availableCategories = ['shirts', 'shorts', 'trousers'].filter(k => !!sizeGuideData[k]);
+  
+  let resolvedCategory = 'shirts';
+  const lowerInitial = (initialCategory || '').toLowerCase();
+  if (lowerInitial.includes('short')) {
+    resolvedCategory = 'shorts';
+  } else if (lowerInitial.includes('trouser') || lowerInitial.includes('pant') || lowerInitial.includes('bottom') || lowerInitial.includes('denim')) {
+    resolvedCategory = 'trousers';
+  } else if (availableCategories.includes(lowerInitial)) {
+    resolvedCategory = lowerInitial;
+  }
+
   const defaultCategory = availableCategories.includes(resolvedCategory)
     ? resolvedCategory
-    : availableCategories[0] || 'tops';
+    : availableCategories[0] || 'shirts';
 
   const [activeTab, setActiveTab] = useState(defaultCategory);
 
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(defaultCategory);
+    }
+  }, [isOpen, defaultCategory]);
+
   if (!isOpen) return null;
 
-  const currentCategoryData = sizeGuideData[activeTab] || sizeGuideData.tops || {
+  const currentCategoryData = sizeGuideData[activeTab] || sizeGuideData.shirts || {
     title: "Size & Fit Guide",
     subtitle: "Standard measurements",
     columns: [{ key: 'size', label: 'Size' }],

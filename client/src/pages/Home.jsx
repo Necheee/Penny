@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
-import { useModal } from '../context/ModalContext';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProductCard from '../components/shop/ProductCard';
@@ -14,7 +13,6 @@ const heroImages = [
 
 export default function Home() {
   const { products, featuredProducts } = useProducts();
-  const { openModal } = useModal();
   const linenSet = products.find(p => p.id === 'p-001') || products[0];
   const displayedFeatured = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : products.slice(0, 4);
 
@@ -141,13 +139,12 @@ export default function Home() {
             <p className="text-gray-400 mb-8 max-w-md font-serif text-lg leading-relaxed">
               Our signature Linen Two-Piece Set perfectly embodies the PENNY philosophy. Wear them together for a cohesive, sophisticated look, or style the pieces separately to multiply your wardrobe options.
             </p>
-            <button 
-              type="button"
-              onClick={() => openModal(linenSet?.id || 'p-001')} 
-              className="bg-brand-offwhite text-brand-charcoal px-8 py-3.5 text-xs font-bold tracking-[0.15em] uppercase hover:bg-brand-beige transition-colors cursor-pointer"
+            <Link 
+              to="/shop?category=the-linen-shop" 
+              className="bg-brand-offwhite text-brand-charcoal px-8 py-3.5 text-xs font-bold tracking-[0.15em] uppercase hover:bg-brand-beige transition-colors inline-block text-center cursor-pointer"
             >
               Explore The Set
-            </button>
+            </Link>
           </div>
         </div>
       </section>

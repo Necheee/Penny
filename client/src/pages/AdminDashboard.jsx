@@ -618,15 +618,15 @@ export default function AdminDashboard() {
     setTimeout(() => setAnnouncementFeedback(''), 4000);
   };
 
-  // Dynamic Size Guide Admin State
-  const [activeSizeCategory, setActiveSizeCategory] = useState('tops');
+  // Dynamic Size Guide Admin State (Shirts, Shorts, Trousers)
+  const [activeSizeCategory, setActiveSizeCategory] = useState('shirts');
   const [sizeGuideFeedback, setSizeGuideFeedback] = useState('');
 
   // Local editable copy of current category's size data
   const [sizeForm, setSizeForm] = useState(() => {
-    return sizeGuideData[activeSizeCategory] || {
-      title: 'Tops & Shirts',
-      subtitle: 'Standard Fit',
+    return sizeGuideData[activeSizeCategory] || sizeGuideData.shirts || {
+      title: 'Shirts',
+      subtitle: 'Oxford Shirts, Linen Tops & Shackets',
       columns: [{ key: 'size', label: 'Size' }],
       rows: []
     };
@@ -2151,8 +2151,7 @@ export default function AdminDashboard() {
           {/* Category Switcher */}
           <div className="flex flex-wrap gap-2 border-b border-neutral-100 pb-4">
             {[
-              { id: 'tops', label: 'Top' },
-              { id: 'shirts', label: 'Shirt' },
+              { id: 'shirts', label: 'Shirts' },
               { id: 'shorts', label: 'Shorts' },
               { id: 'trousers', label: 'Trousers' },
             ].map(tab => (
