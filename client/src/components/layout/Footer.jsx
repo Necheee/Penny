@@ -1,6 +1,12 @@
 import { Link } from 'react-router-dom';
+import { useProducts } from '../../context/ProductContext';
 
 export default function Footer() {
+  const { categories = [] } = useProducts();
+  const footerCategories = categories
+    .filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets')
+    .slice(0, 3);
+
   return (
     <footer className="bg-brand-charcoal text-brand-offwhite pt-16 pb-8 px-6 md:px-12 mt-auto border-t border-brand-charcoal">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8">
@@ -15,13 +21,19 @@ export default function Footer() {
           </p>
         </div>
 
-        {/* Shop Links */}
+        {/* Dynamic Shop Links (Top 3 active store categories) */}
         <div className="flex flex-col space-y-3 text-sm">
           <h4 className="font-bold text-white mb-4 uppercase tracking-widest text-xs">Shop</h4>
           <Link to="/shop" className="text-brand-border hover:text-white transition-colors">All Products</Link>
-          <Link to="/shop?category=tops" className="text-brand-border hover:text-white transition-colors">Tops</Link>
-          <Link to="/shop?category=bottoms" className="text-brand-border hover:text-white transition-colors">Bottoms</Link>
-          <Link to="/shop?category=sets" className="text-brand-border hover:text-white transition-colors">Two-Piece Sets</Link>
+          {footerCategories.map(cat => (
+            <Link 
+              key={cat.id || cat.slug} 
+              to={`/shop?category=${cat.slug || cat.id}`} 
+              className="text-brand-border hover:text-white transition-colors"
+            >
+              {cat.name}
+            </Link>
+          ))}
         </div>
 
         {/* Info Links */}
@@ -29,7 +41,7 @@ export default function Footer() {
           <h4 className="font-bold text-white mb-4 uppercase tracking-widest text-xs">Information</h4>
           <Link to="/about" className="text-brand-border hover:text-white transition-colors">About Us</Link>
           <Link to="/contact" className="text-brand-border hover:text-white transition-colors">Contact</Link>
-          <Link to="/care" className="text-brand-border hover:text-white transition-colors">Care Guide</Link>
+          <Link to="/care-guide" className="text-brand-border hover:text-white transition-colors">Care Guide</Link>
           <Link to="/shipping" className="text-brand-border hover:text-white transition-colors">Shipping & Returns</Link>
         </div>
 
@@ -39,7 +51,7 @@ export default function Footer() {
           <Link to="/account/login" className="text-brand-border hover:text-white transition-colors">Sign In</Link>
           <Link to="/account/register" className="text-brand-border hover:text-white transition-colors">Create Account</Link>
           <Link to="/wishlist" className="text-brand-border hover:text-white transition-colors">Wishlist</Link>
-          <Link to="/account/orders" className="text-brand-border hover:text-white transition-colors">Orders</Link>
+          <Link to="/account" className="text-brand-border hover:text-white transition-colors">Orders</Link>
         </div>
 
       </div>

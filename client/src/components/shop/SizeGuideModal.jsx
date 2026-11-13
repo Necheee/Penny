@@ -5,9 +5,10 @@ import { useProducts } from '../../context/ProductContext';
 
 export default function SizeGuideModal({ isOpen, onClose, initialCategory = 'tops' }) {
   const { sizeGuideData = {} } = useProducts();
-  const availableCategories = Object.keys(sizeGuideData);
-  const defaultCategory = availableCategories.includes(initialCategory)
-    ? initialCategory
+  const availableCategories = ['tops', 'shirts', 'shorts', 'trousers'].filter(k => !!sizeGuideData[k]);
+  const resolvedCategory = initialCategory === 'bottoms' ? 'trousers' : initialCategory;
+  const defaultCategory = availableCategories.includes(resolvedCategory)
+    ? resolvedCategory
     : availableCategories[0] || 'tops';
 
   const [activeTab, setActiveTab] = useState(defaultCategory);

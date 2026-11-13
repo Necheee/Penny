@@ -72,10 +72,10 @@ export default function Header() {
                   className="absolute top-full left-0 w-48 bg-white shadow-lg border border-brand-border py-2 flex flex-col z-50 font-sans"
                 >
                   <Link to="/shop" className="px-6 py-2.5 hover:bg-brand-beige/40 transition-colors">All Products</Link>
-                  {categories.map((cat) => (
+                  {categories.filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets').map((cat) => (
                     <Link 
                       key={cat.id} 
-                      to={`/shop?category=${cat.id}`} 
+                      to={`/shop?category=${cat.slug || cat.id}`} 
                       className="px-6 py-2.5 hover:bg-brand-beige/40 transition-colors"
                     >
                       {cat.name}
@@ -230,10 +230,10 @@ export default function Header() {
                         className="flex flex-col space-y-4 mt-4 ml-4 text-lg font-normal text-brand-charcoal/80 overflow-hidden"
                       >
                         <Link to="/shop" onClick={closeMenu}>All Products</Link>
-                        {categories.map((cat) => (
+                        {categories.filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets').map((cat) => (
                           <Link 
                             key={cat.id} 
-                            to={`/shop?category=${cat.id}`} 
+                            to={`/shop?category=${cat.slug || cat.id}`} 
                             onClick={closeMenu}
                           >
                             {cat.name}

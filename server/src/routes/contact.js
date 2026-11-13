@@ -366,37 +366,40 @@ ${cleanMessage}
       </html>
     `;
 
-    let previewUrl = null;
-    try {
-      const mailer = await getTransporter();
-      if (mailer) {
-        const info = await mailer.sendMail({
-          from: `"PENNY Customer Care" <${senderFrom}>`,
-          to: adminEmail,
-          replyTo: `"${cleanName}" <${cleanEmail}>`,
-          subject: `Inquiry from ${cleanName} ${cleanOrder ? `[Order #${cleanOrder}]` : ''} - PENNY`,
-          html: htmlContent,
-        });
-        previewUrl = nodemailer.getTestMessageUrl(info) || null;
-      }
-    } catch (mailErr) {
-      console.warn('[CONTACT EMAIL] Notification note:', mailErr.message);
-    }
-
-    console.log(`\n============================================================`);
-    console.log(`[PENNY INQUIRY] Customer Contact Form Submitted (#${newInquiry.id})`);
-    console.log(`Sender: ${cleanName} <${cleanEmail}>`);
-    console.log(`Order Number: ${cleanOrder || 'None'}`);
-    console.log(`Sent To Admin: ${adminEmail}`);
-    if (previewUrl) console.log(`Ethereal Live Preview: ${previewUrl}`);
-    console.log(`============================================================\n`);
-
-    return res.status(200).json({
+    // Send 200 response immediately so the customer's browser gets instantaneous confirmation
+    res.status(200).json({
       success: true,
       message: 'Your inquiry has been received. Our client care team will respond to your email within 24 hours.',
       inquiry: newInquiry,
-      previewUrl,
     });
+
+    // Dispatch notification email in the background without blocking the customer's HTTP response
+    (async () => {
+      let previewUrl = null;
+      try {
+        const mailer = await getTransporter();
+        if (mailer) {
+          const info = await mailer.sendMail({
+            from: `"PENNY Customer Care" <${senderFrom}>`,
+            to: adminEmail,
+            replyTo: `"${cleanName}" <${cleanEmail}>`,
+            subject: `Inquiry from ${cleanName} ${cleanOrder ? `[Order #${cleanOrder}]` : ''} - PENNY`,
+            html: htmlContent,
+          });
+          previewUrl = nodemailer.getTestMessageUrl(info) || null;
+        }
+      } catch (mailErr) {
+        console.warn('[CONTACT EMAIL] Background notification note:', mailErr.message);
+      }
+
+      console.log(`\n============================================================`);
+      console.log(`[PENNY INQUIRY] Customer Contact Form Submitted (#${newInquiry.id})`);
+      console.log(`Sender: ${cleanName} <${cleanEmail}>`);
+      console.log(`Order Number: ${cleanOrder || 'None'}`);
+      console.log(`Sent To Admin: ${adminEmail}`);
+      if (previewUrl) console.log(`Ethereal Live Preview: ${previewUrl}`);
+      console.log(`============================================================\n`);
+    })();
   } catch (error) {
     console.error('Contact endpoint error:', error);
     return res.status(500).json({

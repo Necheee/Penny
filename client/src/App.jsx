@@ -54,9 +54,12 @@ function App() {
                   <Route path="/about" element={<About />} />
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/care-guide" element={<CareGuide />} />
+                  <Route path="/care" element={<CareGuide />} />
                   <Route path="/shipping" element={<Shipping />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
+                  <Route path="/orders" element={<Account />} />
+                  <Route path="/account/orders" element={<Account />} />
 
                   {/* Admin Management Dashboard & Security Gate */}
                   <Route path="/admin/login" element={<AdminLogin />} />

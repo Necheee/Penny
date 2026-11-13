@@ -237,7 +237,10 @@ export default function Shop() {
 
     // 2. Filter by Subcategory
     if (activeSubcategory && activeSubcategory !== 'all') {
-      result = result.filter(p => p.subcategory?.toLowerCase() === activeSubcategory.toLowerCase());
+      result = result.filter(p => {
+        const sub = typeof p.subcategory === 'string' ? p.subcategory : p.subcategory?.name || '';
+        return sub.toLowerCase() === activeSubcategory.toLowerCase();
+      });
     }
 
     // 3. Filter by Subtype (Tier 3)
@@ -255,7 +258,8 @@ export default function Shop() {
       const matDef = MATERIAL_OPTIONS.find(m => m.id === activeMaterial);
       if (matDef?.match) {
         result = result.filter(p => {
-          const combined = `${p.material || ''} ${p.name || ''} ${p.description || ''} ${p.subcategory || ''}`.toLowerCase();
+          const sub = typeof p.subcategory === 'string' ? p.subcategory : p.subcategory?.name || '';
+          const combined = `${p.material || ''} ${p.name || ''} ${p.description || ''} ${sub}`.toLowerCase();
           return matDef.match.some(term => combined.includes(term));
         });
       }
@@ -291,16 +295,20 @@ export default function Shop() {
     // 7. Filter by Search query
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      result = result.filter(p => 
-        p.name?.toLowerCase().includes(q) ||
-        p.category?.toLowerCase().includes(q) ||
-        p.subcategory?.toLowerCase().includes(q) ||
-        p.subtype?.toLowerCase().includes(q) ||
-        p.description?.toLowerCase().includes(q) ||
-        p.material?.toLowerCase().includes(q) ||
-        p.fit?.toLowerCase().includes(q) ||
-        p.colors?.some(c => c.toLowerCase().includes(q))
-      );
+      result = result.filter(p => {
+        const sub = typeof p.subcategory === 'string' ? p.subcategory : p.subcategory?.name || '';
+        const cat = typeof p.category === 'string' ? p.category : p.category?.name || '';
+        return (
+          p.name?.toLowerCase().includes(q) ||
+          cat.toLowerCase().includes(q) ||
+          sub.toLowerCase().includes(q) ||
+          p.subtype?.toLowerCase().includes(q) ||
+          p.description?.toLowerCase().includes(q) ||
+          p.material?.toLowerCase().includes(q) ||
+          p.fit?.toLowerCase().includes(q) ||
+          p.colors?.some(c => c.toLowerCase().includes(q))
+        );
+      });
     }
 
     // Sort
@@ -342,8 +350,9 @@ export default function Shop() {
         });
 
     inCategory.forEach(p => {
-      if (p.subcategory) {
-        const key = p.subcategory.toLowerCase();
+      const sub = typeof p.subcategory === 'string' ? p.subcategory : p.subcategory?.name || '';
+      if (sub) {
+        const key = sub.toLowerCase();
         map[key] = (map[key] || 0) + 1;
       }
     });
@@ -354,7 +363,10 @@ export default function Shop() {
   const subtypeCounts = useMemo(() => {
     const map = {};
     if (!products || !activeSubcategory || activeSubcategory === 'all') return map;
-    const inSubcategory = products.filter(p => p.subcategory?.toLowerCase() === activeSubcategory.toLowerCase());
+    const inSubcategory = products.filter(p => {
+      const sub = typeof p.subcategory === 'string' ? p.subcategory : p.subcategory?.name || '';
+      return sub.toLowerCase() === activeSubcategory.toLowerCase();
+    });
     inSubcategory.forEach(p => {
       if (p.subtype) {
         const key = p.subtype.toLowerCase();

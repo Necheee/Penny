@@ -652,15 +652,17 @@ export default function AdminDashboard() {
 
   // Filter Products
   const filteredProducts = productList.filter(p => {
+    const subName = typeof p.subcategory === 'string' ? p.subcategory : p.subcategory?.name || '';
+    const catName = typeof p.category === 'string' ? p.category : p.category?.name || '';
     const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.subcategory?.toLowerCase().includes(searchQuery.toLowerCase());
+                          catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          subName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategoryFilter === 'all' || 
                             p.category === selectedCategoryFilter || 
                             p.category === categoryList.find(c => c.id === selectedCategoryFilter)?.slug;
     const matchesSubcategory = selectedSubcategoryFilter === 'all' || 
                                !selectedSubcategoryFilter || 
-                               p.subcategory?.toLowerCase() === selectedSubcategoryFilter.toLowerCase();
+                               subName.toLowerCase() === selectedSubcategoryFilter.toLowerCase();
     return matchesSearch && matchesCategory && matchesSubcategory;
   });
 
@@ -803,7 +805,8 @@ export default function AdminDashboard() {
   };
 
   const handleSaveCurrentAsPreset = (targetKey) => {
-    const key = targetKey || productForm.subcategory || productForm.category;
+    const subName = typeof productForm.subcategory === 'string' ? productForm.subcategory : productForm.subcategory?.name || '';
+    const key = targetKey || subName || productForm.category;
     if (!key) {
       alert('Please select or enter a subcategory first.');
       return;
@@ -824,9 +827,10 @@ export default function AdminDashboard() {
 
   // Apply Garment Preset to Product Form (Auto-fill Accordion Tabs & Colors/Sizes)
   const handleApplyGarmentPreset = (specificKey) => {
-    const key = specificKey || productForm.subtype || productForm.subcategory || productForm.category;
+    const subName = typeof productForm.subcategory === 'string' ? productForm.subcategory : productForm.subcategory?.name || '';
+    const key = specificKey || productForm.subtype || subName || productForm.category;
     const preset = (key && garmentPresets[key]) || 
-                   (productForm.subcategory && garmentPresets[productForm.subcategory]) || 
+                   (subName && garmentPresets[subName]) || 
                    (productForm.category && garmentPresets[productForm.category]) || 
                    garmentPresets['Sweatshirts & Hoodies'] ||
                    DEFAULT_GARMENT_PRESETS['Sweatshirts & Hoodies'];
@@ -1690,10 +1694,10 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td className="py-3 px-4 uppercase text-[11px] font-medium text-neutral-600">
-                        <span className="font-bold text-brand-charcoal">{p.category}</span>
+                        <span className="font-bold text-brand-charcoal">{typeof p.category === 'string' ? p.category : p.category?.name}</span>
                         {p.subcategory && (
                           <span className="block text-[10px] text-brand-taupe font-normal lowercase tracking-wide capitalize">
-                            • {p.subcategory}
+                            • {typeof p.subcategory === 'string' ? p.subcategory : p.subcategory?.name}
                           </span>
                         )}
                       </td>
@@ -2147,9 +2151,10 @@ export default function AdminDashboard() {
           {/* Category Switcher */}
           <div className="flex flex-wrap gap-2 border-b border-neutral-100 pb-4">
             {[
-              { id: 'tops', label: 'Tops & Shirts' },
-              { id: 'bottoms', label: 'Trousers & Shorts' },
-              { id: 'sets', label: 'Two-Piece Sets' },
+              { id: 'tops', label: 'Top' },
+              { id: 'shirts', label: 'Shirt' },
+              { id: 'shorts', label: 'Shorts' },
+              { id: 'trousers', label: 'Trousers' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -2997,10 +3002,13 @@ export default function AdminDashboard() {
                     onChange={(e) => {
                       const newCatId = e.target.value;
                       const catObj = categoryList.find(c => c.id === newCatId || c.slug === newCatId);
+                      const firstSub = catObj?.subcategories?.[0];
+                      const firstSubName = typeof firstSub === 'string' ? firstSub : firstSub?.name || '';
                       setProductForm({ 
                         ...productForm, 
                         category: newCatId,
-                        subcategory: catObj?.subcategories?.[0] || ''
+                        subcategory: firstSubName,
+                        subtype: ''
                       });
                       setIsAddingCustomSub(false);
                       setCustomSubcategoryInput('');
@@ -3036,7 +3044,7 @@ export default function AdminDashboard() {
                   {!isAddingCustomSub ? (
                     <div className="flex gap-2">
                       <select
-                        value={productForm.subcategory}
+                        value={typeof productForm.subcategory === 'string' ? productForm.subcategory : productForm.subcategory?.name || ''}
                         onChange={(e) => {
                           if (e.target.value === '__NEW_SUB__') {
                             setIsAddingCustomSub(true);
@@ -3382,7 +3390,7 @@ export default function AdminDashboard() {
                     title="Saves whatever text is currently in these 5 tabs as the default preset for this garment"
                   >
                     <Save className="w-3.5 h-3.5 text-emerald-600" />
-                    💾 Save Current Text as Default Preset for "{productForm.subcategory || productForm.category || 'General'}"
+                    💾 Save Current Text as Default Preset for "{typeof productForm.subcategory === 'string' ? productForm.subcategory : productForm.subcategory?.name || productForm.category || 'General'}"
                   </button>
                   {presetSaveMessage && (
                     <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-xs animate-fade-in">

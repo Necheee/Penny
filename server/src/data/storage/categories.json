@@ -148,21 +148,5 @@
         "subtypes": []
       }
     ]
-  },
-  {
-    "id": "sets",
-    "name": "Two-Piece Sets",
-    "slug": "two-piece-sets",
-    "displayOrder": 6,
-    "subcategories": [
-      {
-        "name": "Linen Sets",
-        "subtypes": []
-      },
-      {
-        "name": "Cotton Lounge Sets",
-        "subtypes": []
-      }
-    ]
   }
 ]

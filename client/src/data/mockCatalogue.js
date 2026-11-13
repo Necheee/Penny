@@ -148,22 +148,6 @@ export const categories = [
         "subtypes": []
       }
     ]
-  },
-  {
-    "id": "sets",
-    "name": "Two-Piece Sets",
-    "slug": "two-piece-sets",
-    "displayOrder": 6,
-    "subcategories": [
-      {
-        "name": "Linen Sets",
-        "subtypes": []
-      },
-      {
-        "name": "Cotton Lounge Sets",
-        "subtypes": []
-      }
-    ]
   }
 ];
 
@@ -1325,8 +1309,8 @@ export const products = [
     "id": "p-002",
     "slug": "heavyweight-cotton-lounge-set",
     "name": "Heavyweight Cotton Lounge Set",
-    "category": "sets",
-    "subcategory": "Cotton Lounge Sets",
+    "category": "outerwear",
+    "subcategory": "Track Suit",
     "subtype": "",
     "price": 52000,
     "description": "A structured yet comfortable lounge set crafted from heavyweight organic cotton. Perfect for travel or elevated weekend wear.",

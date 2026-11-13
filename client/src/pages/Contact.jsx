@@ -26,8 +26,17 @@ export default function Contact() {
         body: JSON.stringify(formData),
       });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (e) {
+        if (res.ok) {
+          setStatus('submitted');
+          return;
+        }
+      }
+
+      if (res.ok && (data.success || data.inquiry)) {
         setStatus('submitted');
       } else {
         throw new Error(data.message || 'Unable to submit your inquiry.');

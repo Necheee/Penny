@@ -150,22 +150,6 @@ export const initialCategories = [
         "subtypes": []
       }
     ]
-  },
-  {
-    "id": "sets",
-    "name": "Two-Piece Sets",
-    "slug": "two-piece-sets",
-    "displayOrder": 6,
-    "subcategories": [
-      {
-        "name": "Linen Sets",
-        "subtypes": []
-      },
-      {
-        "name": "Cotton Lounge Sets",
-        "subtypes": []
-      }
-    ]
   }
 ];
 
@@ -173,16 +157,38 @@ export const initialSizeGuides = [
   {
     category: 'tops',
     measurements: JSON.stringify([
-      { size: 'XS', chest: '86 - 91', waist: '71 - 76', shoulder: '42' },
-      { size: 'S', chest: '91 - 96', waist: '76 - 81', shoulder: '44' },
-      { size: 'M', chest: '96 - 101', waist: '81 - 86', shoulder: '46' },
-      { size: 'L', chest: '101 - 106', waist: '86 - 91', shoulder: '48' },
-      { size: 'XL', chest: '106 - 111', waist: '91 - 96', shoulder: '50' },
-      { size: 'XXL', chest: '111 - 116', waist: '96 - 101', shoulder: '52' }
+      { size: 'XS', chest: '86 - 91', length: '68', shoulder: '42' },
+      { size: 'S', chest: '91 - 96', length: '70', shoulder: '44' },
+      { size: 'M', chest: '96 - 101', length: '72', shoulder: '46' },
+      { size: 'L', chest: '101 - 106', length: '74', shoulder: '48' },
+      { size: 'XL', chest: '106 - 111', length: '76', shoulder: '50' },
+      { size: 'XXL', chest: '111 - 116', length: '78', shoulder: '52' }
     ])
   },
   {
-    category: 'bottoms',
+    category: 'shirts',
+    measurements: JSON.stringify([
+      { size: 'XS', collar: '37', chest: '88 - 93', sleeve: '82' },
+      { size: 'S', collar: '38 - 39', chest: '93 - 98', sleeve: '84' },
+      { size: 'M', collar: '40 - 41', chest: '98 - 103', sleeve: '86' },
+      { size: 'L', collar: '42 - 43', chest: '103 - 108', sleeve: '88' },
+      { size: 'XL', collar: '44 - 45', chest: '108 - 113', sleeve: '90' },
+      { size: 'XXL', collar: '46 - 47', chest: '113 - 118', sleeve: '92' }
+    ])
+  },
+  {
+    category: 'shorts',
+    measurements: JSON.stringify([
+      { size: 'XS', waist: '71 - 76', hips: '88 - 93', inseam: '16' },
+      { size: 'S', waist: '76 - 81', hips: '93 - 98', inseam: '17' },
+      { size: 'M', waist: '81 - 86', hips: '98 - 103', inseam: '18' },
+      { size: 'L', waist: '86 - 91', hips: '103 - 108', inseam: '19' },
+      { size: 'XL', waist: '91 - 96', hips: '108 - 113', inseam: '20' },
+      { size: 'XXL', waist: '96 - 101', hips: '113 - 118', inseam: '21' }
+    ])
+  },
+  {
+    category: 'trousers',
     measurements: JSON.stringify([
       { size: 'XS', waist: '71 - 76', hips: '88 - 93', inseam: '78' },
       { size: 'S', waist: '76 - 81', hips: '93 - 98', inseam: '80' },
@@ -1350,8 +1356,8 @@ export const initialProducts = [
     "id": "p-002",
     "slug": "heavyweight-cotton-lounge-set",
     "name": "Heavyweight Cotton Lounge Set",
-    "category": "sets",
-    "subcategory": "Cotton Lounge Sets",
+    "category": "outerwear",
+    "subcategory": "Track Suit",
     "subtype": "",
     "price": 52000,
     "description": "A structured yet comfortable lounge set crafted from heavyweight organic cotton. Perfect for travel or elevated weekend wear.",

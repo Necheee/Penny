@@ -4,6 +4,24 @@ import { getProducts, getCategories } from '../services/api';
 
 const ProductContext = createContext();
 
+// Helper to guarantee product data integrity across the entire application
+const normalizeProduct = (p) => {
+  if (!p) return p;
+  let sub = p.subcategory;
+  if (typeof sub === 'object' && sub !== null) {
+    sub = sub.name || '';
+  }
+  let cat = p.category;
+  if (cat === 'sets' || cat === 'two-piece-sets') {
+    cat = 'the-linen-shop';
+  }
+  return {
+    ...p,
+    category: cat,
+    subcategory: typeof sub === 'string' ? sub : String(sub || '')
+  };
+};
+
 export function ProductProvider({ children }) {
   // Load products from localStorage or fallback to mockCatalogue
   const [products, setProducts] = useState(() => {
@@ -15,7 +33,7 @@ export function ProductProvider({ children }) {
           const existingIds = new Set(parsed.map(p => p.id));
           const updated = parsed.map(p => {
             const initP = initialProducts.find(ip => ip.id === p.id);
-            return {
+            return normalizeProduct({
               ...initP,
               ...p,
               subtype: p.subtype || initP?.subtype || '',
@@ -23,11 +41,11 @@ export function ProductProvider({ children }) {
               fit: p.fit || initP?.fit || 'Relaxed fit',
               care: p.care || initP?.care || 'Machine wash cold.',
               shipping: p.shipping || initP?.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
-            };
+            });
           });
           initialProducts.forEach(ip => {
             if (!existingIds.has(ip.id)) {
-              updated.push(ip);
+              updated.push(normalizeProduct(ip));
             }
           });
           return updated;
@@ -36,15 +54,21 @@ export function ProductProvider({ children }) {
         console.error("Failed to parse saved products", e);
       }
     }
-    return initialProducts;
+    return initialProducts.map(normalizeProduct);
   });
 
-  // Load categories from localStorage or fallback (respects permanent deletions)
+  // Load categories from localStorage or fallback (respects permanent deletions and excludes obsolete sets)
   const [categories, setCategories] = useState(() => {
-    let deletedIds = new Set();
+    let deletedIds = new Set(['sets', 'two-piece-sets']);
     try {
       const deletedSaved = localStorage.getItem('penny_deleted_categories');
-      if (deletedSaved) deletedIds = new Set(JSON.parse(deletedSaved));
+      if (deletedSaved) {
+        const parsedDeleted = JSON.parse(deletedSaved);
+        parsedDeleted.forEach(id => deletedIds.add(id));
+      }
+      deletedIds.add('sets');
+      deletedIds.add('two-piece-sets');
+      localStorage.setItem('penny_deleted_categories', JSON.stringify(Array.from(deletedIds)));
     } catch {}
 
     const saved = localStorage.getItem('penny_categories');
@@ -82,38 +106,66 @@ export function ProductProvider({ children }) {
     ];
   });
 
-  // Dynamic Size Guide Data (Headings, Subtitles, Columns, and Rows)
+  // Dynamic Size Guide Data: Exactly 4 categories as specified (Top, Shirt, Shorts, Trousers)
   const [sizeGuideData, setSizeGuideData] = useState(() => {
-    const saved = localStorage.getItem('penny_size_guide');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse saved size guide", e);
-      }
-    }
-    return {
+    const defaultGuides = {
       tops: {
-        title: "Tops & Shirts",
-        subtitle: "T-Shirts, Overshirts, Henleys & Sweaters",
+        title: "Top",
+        subtitle: "T-Shirts, Knitwear Polos, Henleys & Sweatshirts",
         columns: [
           { key: "size", label: "Size" },
           { key: "chest", label: "Chest (CM)" },
-          { key: "waist", label: "Waist (CM)" },
+          { key: "length", label: "Length (CM)" },
           { key: "shoulder", label: "Shoulder (CM)" }
         ],
         rows: [
-          { size: "XS", chest: "86 - 91", waist: "71 - 76", shoulder: "42" },
-          { size: "S", chest: "91 - 96", waist: "76 - 81", shoulder: "44" },
-          { size: "M", chest: "96 - 101", waist: "81 - 86", shoulder: "46" },
-          { size: "L", chest: "101 - 106", waist: "86 - 91", shoulder: "48" },
-          { size: "XL", chest: "106 - 111", waist: "91 - 96", shoulder: "50" },
-          { size: "XXL", chest: "111 - 116", waist: "96 - 101", shoulder: "52" }
+          { size: "XS", chest: "86 - 91", length: "68", shoulder: "42" },
+          { size: "S", chest: "91 - 96", length: "70", shoulder: "44" },
+          { size: "M", chest: "96 - 101", length: "72", shoulder: "46" },
+          { size: "L", chest: "101 - 106", length: "74", shoulder: "48" },
+          { size: "XL", chest: "106 - 111", length: "76", shoulder: "50" },
+          { size: "XXL", chest: "111 - 116", length: "78", shoulder: "52" }
         ]
       },
-      bottoms: {
-        title: "Trousers & Shorts",
-        subtitle: "Chinos, Trousers, Cargo & Shorts",
+      shirts: {
+        title: "Shirt",
+        subtitle: "Oxford Shirts, Linen Tops & Shackets",
+        columns: [
+          { key: "size", label: "Size" },
+          { key: "collar", label: "Collar (CM)" },
+          { key: "chest", label: "Chest (CM)" },
+          { key: "sleeve", label: "Sleeve (CM)" }
+        ],
+        rows: [
+          { size: "XS", collar: "37", chest: "88 - 93", sleeve: "82" },
+          { size: "S", collar: "38 - 39", chest: "93 - 98", sleeve: "84" },
+          { size: "M", collar: "40 - 41", chest: "98 - 103", sleeve: "86" },
+          { size: "L", collar: "42 - 43", chest: "103 - 108", sleeve: "88" },
+          { size: "XL", collar: "44 - 45", chest: "108 - 113", sleeve: "90" },
+          { size: "XXL", collar: "46 - 47", chest: "113 - 118", sleeve: "92" }
+        ]
+      },
+      shorts: {
+        title: "Shorts",
+        subtitle: "Chino Shorts, Sweatshorts, Utility & Linen Shorts",
+        columns: [
+          { key: "size", label: "Size" },
+          { key: "waist", label: "Waist (CM)" },
+          { key: "hips", label: "Hips (CM)" },
+          { key: "inseam", label: "Inseam (CM)" }
+        ],
+        rows: [
+          { size: "XS", waist: "71 - 76", hips: "88 - 93", inseam: "16" },
+          { size: "S", waist: "76 - 81", hips: "93 - 98", inseam: "17" },
+          { size: "M", waist: "81 - 86", hips: "98 - 103", inseam: "18" },
+          { size: "L", waist: "86 - 91", hips: "103 - 108", inseam: "19" },
+          { size: "XL", waist: "91 - 96", hips: "108 - 113", inseam: "20" },
+          { size: "XXL", waist: "96 - 101", hips: "113 - 118", inseam: "21" }
+        ]
+      },
+      trousers: {
+        title: "Trousers",
+        subtitle: "Classic Tailored Pants, Chinos, Utility Pants & Sweatpants",
         columns: [
           { key: "size", label: "Size" },
           { key: "waist", label: "Waist (CM)" },
@@ -128,26 +180,24 @@ export function ProductProvider({ children }) {
           { size: "XL", waist: "91 - 96", hips: "108 - 113", inseam: "83" },
           { size: "XXL", waist: "96 - 101", hips: "113 - 118", inseam: "84" }
         ]
-      },
-      sets: {
-        title: "Two-Piece Sets",
-        subtitle: "Linen & Cotton Co-ord Sets",
-        columns: [
-          { key: "size", label: "Size" },
-          { key: "chest", label: "Chest (CM)" },
-          { key: "waist", label: "Waist (CM)" },
-          { key: "hips", label: "Hips (CM)" }
-        ],
-        rows: [
-          { size: "XS", chest: "86 - 91", waist: "71 - 76", hips: "88 - 93" },
-          { size: "S", chest: "91 - 96", waist: "76 - 81", hips: "93 - 98" },
-          { size: "M", chest: "96 - 101", waist: "81 - 86", hips: "98 - 103" },
-          { size: "L", chest: "101 - 106", waist: "86 - 91", hips: "103 - 108" },
-          { size: "XL", chest: "106 - 111", waist: "91 - 96", hips: "108 - 113" },
-          { size: "XXL", chest: "111 - 116", waist: "96 - 101", hips: "113 - 118" }
-        ]
       }
     };
+
+    const saved = localStorage.getItem('penny_size_guide');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        delete parsed.sets; // permanently purge sets
+        delete parsed.bottoms; // migrated to shorts and trousers
+        return {
+          ...defaultGuides,
+          ...parsed
+        };
+      } catch (e) {
+        console.error("Failed to parse saved size guide", e);
+      }
+    }
+    return defaultGuides;
   });
 
   // Sync announcements & size guide to storage
@@ -170,13 +220,16 @@ export function ProductProvider({ children }) {
         ]);
         if (isMounted) {
           if (Array.isArray(liveProducts) && liveProducts.length > 0) {
-            setProducts(liveProducts);
+            setProducts(liveProducts.map(normalizeProduct));
           }
           if (Array.isArray(liveCategories) && liveCategories.length > 0) {
-            let deletedIds = new Set();
+            let deletedIds = new Set(['sets', 'two-piece-sets']);
             try {
               const deletedSaved = localStorage.getItem('penny_deleted_categories');
-              if (deletedSaved) deletedIds = new Set(JSON.parse(deletedSaved));
+              if (deletedSaved) {
+                const parsed = JSON.parse(deletedSaved);
+                parsed.forEach(id => deletedIds.add(id));
+              }
             } catch {}
 
             const activeLive = liveCategories.filter(c => !deletedIds.has(c.id) && !deletedIds.has(c.slug));
@@ -205,13 +258,15 @@ export function ProductProvider({ children }) {
   // Admin Actions:
   // 1. Add Product
   const addProduct = (newProduct) => {
-    setProducts((prev) => [newProduct, ...prev]);
+    const normalized = normalizeProduct(newProduct);
+    setProducts((prev) => [normalized, ...prev]);
   };
 
   // 2. Update Product
   const updateProduct = (updatedProduct) => {
+    const normalized = normalizeProduct(updatedProduct);
     setProducts((prev) =>
-      prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
+      prev.map((p) => (p.id === normalized.id ? normalized : p))
     );
   };
 

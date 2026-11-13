@@ -7,19 +7,22 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js';
 const router = express.Router();
 
 // Active persistent storage for categories and size guides
-let categories = readJsonFile('categories.json', initialCategories) || initialCategories;
+let categories = (readJsonFile('categories.json', initialCategories) || initialCategories)
+  .filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets');
 let sizeGuides = readJsonFile('sizeGuides.json', initialSizeGuides) || initialSizeGuides;
 
 // Ensure initial categories always have their subcategories array
-categories = categories.map(cat => {
-  const initial = initialCategories.find(ic => ic.id === cat.id || ic.slug === cat.slug);
-  return {
-    ...cat,
-    subcategories: Array.isArray(cat.subcategories) && cat.subcategories.length > 0
-      ? cat.subcategories
-      : (initial?.subcategories || [])
-  };
-});
+categories = categories
+  .filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets')
+  .map(cat => {
+    const initial = initialCategories.find(ic => ic.id === cat.id || ic.slug === cat.slug);
+    return {
+      ...cat,
+      subcategories: Array.isArray(cat.subcategories) && cat.subcategories.length > 0
+        ? cat.subcategories
+        : (initial?.subcategories || [])
+    };
+  });
 
 /**
  * GET /api/categories
@@ -40,7 +43,10 @@ router.get('/', async (req, res) => {
         ALTER TABLE categories ADD COLUMN IF NOT EXISTS subcategories JSONB DEFAULT '[]'::jsonb;
         ALTER TABLE categories ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 1;
       `);
-      const dbRes = await pool.query('SELECT * FROM categories ORDER BY display_order ASC');
+      // Delete obsolete categories (e.g. sets / two-piece-sets) permanently from database
+      await pool.query("DELETE FROM categories WHERE id = 'sets' OR slug = 'two-piece-sets'").catch(() => {});
+
+      const dbRes = await pool.query("SELECT * FROM categories WHERE id != 'sets' AND slug != 'two-piece-sets' ORDER BY display_order ASC");
       if (dbRes.rows && dbRes.rows.length > 0) {
         categories = dbRes.rows.map(r => {
           let subs = [];
@@ -56,18 +62,18 @@ router.get('/', async (req, res) => {
             displayOrder: r.display_order || 1,
             subcategories: Array.isArray(subs) ? subs : [],
           };
-        }).sort((a, b) => (a.displayOrder || 1) - (b.displayOrder || 1));
+        }).filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets').sort((a, b) => (a.displayOrder || 1) - (b.displayOrder || 1));
         writeJsonFile('categories.json', categories);
       } else {
         // Table is empty! First-time seed initial categories into database
-        for (const ic of initialCategories) {
+        for (const ic of initialCategories.filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets')) {
           await pool.query(`
             INSERT INTO categories (id, name, slug, display_order, subcategories)
             VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (id) DO NOTHING
           `, [ic.id, ic.name, ic.slug, ic.displayOrder || 1, JSON.stringify(ic.subcategories || [])]).catch(() => {});
         }
-        categories = [...initialCategories];
+        categories = initialCategories.filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets');
         writeJsonFile('categories.json', categories);
       }
     }
