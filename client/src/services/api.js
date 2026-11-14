@@ -71,11 +71,15 @@ export const createProductApi = async (productData) => {
     if (res.ok) {
       const data = await res.json();
       return data.data;
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      console.warn("Server rejected product creation:", res.status, errData);
+      throw new Error(errData.message || `Server error (${res.status}) saving product.`);
     }
   } catch (err) {
     console.warn("Error creating product via API:", err.message);
+    throw err;
   }
-  return null;
 };
 
 export const updateProductApi = async (id, productData) => {
@@ -88,11 +92,15 @@ export const updateProductApi = async (id, productData) => {
     if (res.ok) {
       const data = await res.json();
       return data.data;
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      console.warn("Server rejected product update:", res.status, errData);
+      throw new Error(errData.message || `Server error (${res.status}) updating product.`);
     }
   } catch (err) {
     console.warn(`Error updating product ${id} via API:`, err.message);
+    throw err;
   }
-  return null;
 };
 
 export const deleteProductApi = async (id) => {

@@ -1074,7 +1074,7 @@ export default function AdminDashboard() {
   };
 
   // Save Product (Add or Edit) with Context Sync
-  const handleSaveProduct = (e) => {
+  const handleSaveProduct = async (e) => {
     e.preventDefault();
     if (!productForm.name || !productForm.price) {
       showAlertDialog({
@@ -1113,57 +1113,67 @@ export default function AdminDashboard() {
       }
     }
 
-    if (editingProduct) {
-      updateProduct({
-        ...editingProduct,
-        name: productForm.name,
-        category: productForm.category,
-        subcategory: finalSubcategory,
-        subtype: finalSubtype,
-        price: Number(productForm.price),
-        description: productForm.description,
-        material: productForm.material,
-        fit: productForm.fit,
-        care: productForm.care || 'Machine wash cold inside out. Hang dry.',
-        shipping: productForm.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
-        featured: productForm.featured,
-        inStock: productForm.inStock,
-        isArchived: !!productForm.isArchived,
-        colors: productForm.colors,
-        availableSizes: productForm.availableSizes,
-        images: {
-          ...editingProduct.images,
-          primary: productForm.imageUrl || editingProduct.images?.primary || '/images/products/linen-set-1.jpg'
-        }
-      });
-    } else {
-      const newId = `p-${Date.now().toString().slice(-4)}`;
-      const newProduct = {
-        id: newId,
-        name: productForm.name,
-        category: productForm.category,
-        subcategory: finalSubcategory || 'New Arrival',
-        subtype: finalSubtype,
-        price: Number(productForm.price),
-        description: productForm.description || 'Premium menswear essential.',
-        material: productForm.material || '100% Cotton',
-        fit: productForm.fit || 'Relaxed fit.',
-        care: productForm.care || 'Machine wash cold inside out. Hang dry.',
-        shipping: productForm.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
-        featured: productForm.featured,
-        inStock: productForm.inStock,
-        isArchived: !!productForm.isArchived,
-        colors: productForm.colors,
-        availableSizes: productForm.availableSizes,
-        images: {
-          primary: productForm.imageUrl || '/images/products/linen-set-1.jpg',
-          gallery: ['/images/products/linen-set-2.jpg']
-        }
-      };
-      addProduct(newProduct);
-    }
+    try {
+      if (editingProduct) {
+        await updateProduct({
+          ...editingProduct,
+          name: productForm.name,
+          category: productForm.category,
+          subcategory: finalSubcategory,
+          subtype: finalSubtype,
+          price: Number(productForm.price),
+          description: productForm.description,
+          material: productForm.material,
+          fit: productForm.fit,
+          care: productForm.care || 'Machine wash cold inside out. Hang dry.',
+          shipping: productForm.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+          featured: productForm.featured,
+          inStock: productForm.inStock,
+          isArchived: !!productForm.isArchived,
+          colors: productForm.colors,
+          availableSizes: productForm.availableSizes,
+          images: {
+            ...editingProduct.images,
+            primary: productForm.imageUrl || editingProduct.images?.primary || '/images/products/linen-set-1.jpg'
+          }
+        });
+      } else {
+        const newId = `p-${Date.now().toString().slice(-4)}`;
+        const newProduct = {
+          id: newId,
+          name: productForm.name,
+          category: productForm.category,
+          subcategory: finalSubcategory || 'New Arrival',
+          subtype: finalSubtype,
+          price: Number(productForm.price),
+          description: productForm.description || 'Premium menswear essential.',
+          material: productForm.material || '100% Cotton',
+          fit: productForm.fit || 'Relaxed fit.',
+          care: productForm.care || 'Machine wash cold inside out. Hang dry.',
+          shipping: productForm.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+          featured: productForm.featured,
+          inStock: productForm.inStock,
+          isArchived: !!productForm.isArchived,
+          colors: productForm.colors,
+          availableSizes: productForm.availableSizes,
+          images: {
+            primary: productForm.imageUrl || '/images/products/linen-set-1.jpg',
+            gallery: ['/images/products/linen-set-2.jpg']
+          }
+        };
+        await addProduct(newProduct);
+      }
 
-    setIsProductModalOpen(false);
+      setIsProductModalOpen(false);
+      setProductFeedback('Product piece saved successfully to catalogue.');
+      setTimeout(() => setProductFeedback(''), 4000);
+    } catch (err) {
+      showAlertDialog({
+        title: 'Save Failed',
+        message: err.message || 'Could not save product to cloud database. Please verify your admin connection and sign in again if needed.',
+        type: 'error',
+      });
+    }
   };
 
   // Toggle Featured status directly in table (syncs to homepage immediately)

@@ -248,13 +248,17 @@ export function ProductProvider({ children }) {
 
             setAllProducts((prev) => {
               const combined = [...activeLive];
-              // Only preserve genuinely custom client-added products not yet in backend
+              // Preserve client-added products not yet in backend
               prev.forEach(localP => {
-                if (!liveMap.has(localP.id) && !deletedProductIds.has(localP.id) && localP.id.startsWith('p-custom')) {
+                if (!liveMap.has(localP.id) && !deletedProductIds.has(localP.id) && (localP.id.startsWith('p-custom') || !initialProducts.some(ip => ip.id === localP.id))) {
                   combined.unshift(normalizeProduct(localP));
                 }
               });
-              localStorage.setItem('penny_products', JSON.stringify(combined));
+              try {
+                localStorage.setItem('penny_products', JSON.stringify(combined));
+              } catch (storageErr) {
+                console.warn('localStorage quota warning on catalogue sync:', storageErr);
+              }
               return combined;
             });
           }
@@ -299,39 +303,47 @@ export function ProductProvider({ children }) {
   // 1. Add Product with immediate Cloud Database & Storage persistence
   const addProduct = async (newProduct) => {
     const normalized = normalizeProduct(newProduct);
+    let persisted = null;
+    try {
+      persisted = await createProductApi(normalized);
+    } catch (e) {
+      console.error("Failed to persist product to cloud DB:", e);
+      throw e;
+    }
+
+    const finalProduct = persisted ? normalizeProduct(persisted) : normalized;
     setAllProducts((prev) => {
-      const updated = [normalized, ...prev];
-      localStorage.setItem('penny_products', JSON.stringify(updated));
+      const updated = [finalProduct, ...prev.filter(p => p.id !== finalProduct.id)];
+      try {
+        localStorage.setItem('penny_products', JSON.stringify(updated));
+      } catch (storageErr) {
+        console.warn('localStorage quota warning on addProduct:', storageErr);
+      }
       return updated;
     });
-    try {
-      const persisted = await createProductApi(normalized);
-      if (persisted) {
-        const normPersisted = normalizeProduct(persisted);
-        setAllProducts((prev) => {
-          const updated = prev.map((p) => (p.id === normalized.id ? normPersisted : p));
-          localStorage.setItem('penny_products', JSON.stringify(updated));
-          return updated;
-        });
-      }
-    } catch (e) {
-      console.warn("Failed to persist product to cloud DB:", e);
-    }
+    return finalProduct;
   };
 
   // 2. Update Product with immediate Cloud Database & Storage persistence
   const updateProduct = async (updatedProduct) => {
     const normalized = normalizeProduct(updatedProduct);
-    setAllProducts((prev) => {
-      const updated = prev.map((p) => (p.id === normalized.id ? normalized : p));
-      localStorage.setItem('penny_products', JSON.stringify(updated));
-      return updated;
-    });
     try {
       await updateProductApi(normalized.id, normalized);
     } catch (e) {
-      console.warn("Failed to persist product update to cloud DB:", e);
+      console.error("Failed to persist product update to cloud DB:", e);
+      throw e;
     }
+
+    setAllProducts((prev) => {
+      const updated = prev.map((p) => (p.id === normalized.id ? normalized : p));
+      try {
+        localStorage.setItem('penny_products', JSON.stringify(updated));
+      } catch (storageErr) {
+        console.warn('localStorage quota warning on updateProduct:', storageErr);
+      }
+      return updated;
+    });
+    return normalized;
   };
 
   // 3. Delete Product permanently from Cloud Database & Storage
