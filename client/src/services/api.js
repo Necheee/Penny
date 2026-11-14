@@ -30,6 +30,13 @@ const getStoredCategories = () => {
 
 const API_BASE = '/api';
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('penny_token') : null;
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+};
+
 // Fetch catalogue from backend API with fallback to localStorage / mock
 export const getProducts = async (options = {}) => {
   const { includeArchived = true } = options;
@@ -51,15 +58,61 @@ export const getProducts = async (options = {}) => {
   return getStoredProducts();
 };
 
+export const createProductApi = async (productData) => {
+  try {
+    const res = await fetch(`${API_BASE}/products`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(productData),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.data;
+    }
+  } catch (err) {
+    console.warn("Error creating product via API:", err.message);
+  }
+  return null;
+};
+
+export const updateProductApi = async (id, productData) => {
+  try {
+    const res = await fetch(`${API_BASE}/products/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(productData),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.data;
+    }
+  } catch (err) {
+    console.warn(`Error updating product ${id} via API:`, err.message);
+  }
+  return null;
+};
+
+export const deleteProductApi = async (id) => {
+  try {
+    const res = await fetch(`${API_BASE}/products/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.data;
+    }
+  } catch (err) {
+    console.warn(`Error deleting product ${id} via API:`, err.message);
+  }
+  return null;
+};
+
 export const toggleArchiveProduct = async (id, isArchived) => {
   try {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('penny_token') : null;
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
     const res = await fetch(`${API_BASE}/products/${id}/archive`, {
       method: 'PATCH',
-      headers,
+      headers: getAuthHeaders(),
       body: JSON.stringify({ isArchived })
     });
     if (res.ok) {
@@ -68,6 +121,38 @@ export const toggleArchiveProduct = async (id, isArchived) => {
     }
   } catch (err) {
     console.warn(`Failed to sync archive status to backend for product ${id}:`, err);
+  }
+  return null;
+};
+
+export const getAnnouncementsApi = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/categories/announcements`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not fetch announcements from API:", err.message);
+  }
+  return null;
+};
+
+export const saveAnnouncementsApi = async (messages) => {
+  try {
+    const res = await fetch(`${API_BASE}/categories/announcements`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ messages }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.data;
+    }
+  } catch (err) {
+    console.warn("Could not save announcements to API:", err.message);
   }
   return null;
 };

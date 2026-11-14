@@ -94,6 +94,44 @@ export async function initCloudDatabase() {
       );
       ALTER TABLE categories ADD COLUMN IF NOT EXISTS subcategories JSONB DEFAULT '[]'::jsonb;
       ALTER TABLE categories ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 1;
+
+      CREATE TABLE IF NOT EXISTS products (
+        id VARCHAR(100) PRIMARY KEY,
+        slug VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        subcategory VARCHAR(100) DEFAULT '',
+        subtype VARCHAR(100) DEFAULT '',
+        price NUMERIC NOT NULL,
+        description TEXT DEFAULT '',
+        material TEXT DEFAULT '',
+        fit TEXT DEFAULT '',
+        care TEXT DEFAULT '',
+        shipping TEXT DEFAULT '',
+        images JSONB DEFAULT '{"primary": "", "gallery": []}'::jsonb,
+        colors JSONB DEFAULT '[]'::jsonb,
+        available_sizes JSONB DEFAULT '[]'::jsonb,
+        featured BOOLEAN DEFAULT false,
+        in_stock BOOLEAN DEFAULT true,
+        is_archived BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS announcements (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        messages JSONB DEFAULT '[]'::jsonb,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS size_guides (
+        category VARCHAR(100) PRIMARY KEY,
+        title VARCHAR(255),
+        subtitle VARCHAR(255),
+        columns JSONB DEFAULT '[]'::jsonb,
+        rows JSONB DEFAULT '[]'::jsonb,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Seed existing orders and bank config from local files if empty
@@ -161,6 +199,50 @@ export async function initCloudDatabase() {
         }
         console.log(`[DATABASE] Seeded ${catData.length} categories to Neon Cloud!`);
       }
+    }
+
+    // Seed initial products ONLY if table is currently empty
+    const prodCountRes = await client.query('SELECT COUNT(*) as count FROM products');
+    const prodCount = parseInt(prodCountRes.rows[0]?.count || 0, 10);
+    if (prodCount === 0) {
+      const prodFile = path.resolve(__dirname, '../data/storage/products.json');
+      let prodData = [];
+      if (fs.existsSync(prodFile)) {
+        prodData = JSON.parse(fs.readFileSync(prodFile, 'utf-8'));
+      }
+      for (const p of prodData) {
+        await client.query(`
+          INSERT INTO products (
+            id, slug, name, category, subcategory, subtype, price,
+            description, material, fit, care, shipping, images,
+            colors, available_sizes, featured, in_stock, is_archived, created_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7,
+            $8, $9, $10, $11, $12, $13,
+            $14, $15, $16, $17, $18, CURRENT_TIMESTAMP
+          ) ON CONFLICT (id) DO NOTHING
+        `, [
+          p.id,
+          p.slug || p.id,
+          p.name,
+          p.category || 'tops',
+          typeof p.subcategory === 'string' ? p.subcategory : p.subcategory?.name || '',
+          p.subtype || '',
+          Number(p.price) || 0,
+          p.description || '',
+          p.material || '',
+          p.fit || '',
+          p.care || '',
+          p.shipping || '',
+          JSON.stringify(p.images || { primary: '', gallery: [] }),
+          JSON.stringify(p.colors || []),
+          JSON.stringify(p.availableSizes || []),
+          !!p.featured,
+          p.inStock !== false,
+          !!p.isArchived
+        ]);
+      }
+      console.log(`[DATABASE] Seeded ${prodData.length} products to Neon Cloud!`);
     }
 
     client.release();

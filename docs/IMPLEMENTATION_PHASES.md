@@ -138,6 +138,12 @@ The objective of Phase 12 is to establish the secure production server runtime, 
 - **Task 12.2.1:** Initialize Prisma with PostgreSQL datasource (`npx prisma init`).
 - **Task 12.2.2:** Define relational models in `schema.prisma`:
   - `User`: Unique email, hashed password, role (`admin` | `customer`), timestamps.
+  - `Product`: ID, slug, name, category, subcategory, subtype, price, description, material, fit, care, shipping, images (JSONB), colors (JSONB), availableSizes (JSONB), featured (bool), inStock (bool), isArchived (bool), timestamps.
+  - `Category`: ID, name, slug, displayOrder, subcategories (JSONB).
+  - `Order`: ID, reference, customer, email, phone, state, city, address, shippingMethod, paymentMethod, transferAccountName, paymentConfirmed, itemsCount, subtotal, deliveryFee, total, status, items (JSONB), timestamps.
+  - `BankConfig`: Bank name, account name, account number, transfer instructions.
+  - `Announcement`: Storewide marquee announcement banner messages.
+  - `SizeGuide`: Dynamic centimetre measurements tables for shirts, shorts, and trousers.
   - `Category`: Unique slug, display name, display order.
   - `Product`: Title, slug, price, description, material, fit, care, featured toggle, in-stock status, category relation.
   - `ProductImage`: Media URL, public ID, primary flag, relation to product.

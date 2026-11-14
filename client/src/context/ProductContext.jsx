@@ -1,6 +1,15 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { products as initialProducts, categories as initialCategories, sizes as initialSizes } from '../data/mockCatalogue';
-import { getProducts, getCategories, toggleArchiveProduct } from '../services/api';
+import {
+  getProducts,
+  getCategories,
+  toggleArchiveProduct,
+  createProductApi,
+  updateProductApi,
+  deleteProductApi,
+  getAnnouncementsApi,
+  saveAnnouncementsApi
+} from '../services/api';
 
 const ProductContext = createContext();
 
@@ -205,13 +214,25 @@ export function ProductProvider({ children }) {
     let isMounted = true;
     async function syncBackendCatalogue() {
       try {
-        const [liveProducts, liveCategories] = await Promise.all([
+        const [liveProducts, liveCategories, liveAnnouncements] = await Promise.all([
           getProducts({ includeArchived: true }),
-          getCategories()
+          getCategories(),
+          getAnnouncementsApi().catch(() => null),
         ]);
         if (isMounted) {
           if (Array.isArray(liveProducts) && liveProducts.length > 0) {
-            setAllProducts(liveProducts.map(normalizeProduct));
+            const liveNormalized = liveProducts.map(normalizeProduct);
+            const liveMap = new Map(liveNormalized.map(p => [p.id, p]));
+            setAllProducts((prev) => {
+              const combined = [...liveNormalized];
+              // Preserve any newly-added local products not yet caught in backend query
+              prev.forEach(localP => {
+                if (!liveMap.has(localP.id)) {
+                  combined.unshift(normalizeProduct(localP));
+                }
+              });
+              return combined;
+            });
           }
           if (Array.isArray(liveCategories) && liveCategories.length > 0) {
             let deletedIds = new Set(['sets', 'two-piece-sets']);
@@ -226,6 +247,10 @@ export function ProductProvider({ children }) {
             const activeLive = liveCategories.filter(c => !deletedIds.has(c.id) && !deletedIds.has(c.slug));
             setCategories(activeLive);
             localStorage.setItem('penny_categories', JSON.stringify(activeLive));
+          }
+          if (Array.isArray(liveAnnouncements) && liveAnnouncements.length > 0) {
+            setAnnouncements(liveAnnouncements);
+            localStorage.setItem('penny_announcements', JSON.stringify(liveAnnouncements));
           }
         }
       } catch (err) {
@@ -247,23 +272,44 @@ export function ProductProvider({ children }) {
   }, [categories]);
 
   // Admin Actions:
-  // 1. Add Product
-  const addProduct = (newProduct) => {
+  // 1. Add Product with immediate Cloud Database & Storage persistence
+  const addProduct = async (newProduct) => {
     const normalized = normalizeProduct(newProduct);
     setAllProducts((prev) => [normalized, ...prev]);
+    try {
+      const persisted = await createProductApi(normalized);
+      if (persisted) {
+        const normPersisted = normalizeProduct(persisted);
+        setAllProducts((prev) =>
+          prev.map((p) => (p.id === normalized.id ? normPersisted : p))
+        );
+      }
+    } catch (e) {
+      console.warn("Failed to persist product to cloud DB:", e);
+    }
   };
 
-  // 2. Update Product
-  const updateProduct = (updatedProduct) => {
+  // 2. Update Product with immediate Cloud Database & Storage persistence
+  const updateProduct = async (updatedProduct) => {
     const normalized = normalizeProduct(updatedProduct);
     setAllProducts((prev) =>
       prev.map((p) => (p.id === normalized.id ? normalized : p))
     );
+    try {
+      await updateProductApi(normalized.id, normalized);
+    } catch (e) {
+      console.warn("Failed to persist product update to cloud DB:", e);
+    }
   };
 
-  // 3. Delete Product permanently
-  const deleteProduct = (productId) => {
+  // 3. Delete Product permanently from Cloud Database & Storage
+  const deleteProduct = async (productId) => {
     setAllProducts((prev) => prev.filter((p) => p.id !== productId));
+    try {
+      await deleteProductApi(productId);
+    } catch (e) {
+      console.warn("Failed to persist product deletion to cloud DB:", e);
+    }
   };
 
   // 4. Archive Product (Soft-hide from storefront while keeping data saved)
@@ -310,17 +356,41 @@ export function ProductProvider({ children }) {
   };
 
   // 7. Toggle Featured on Homepage
-  const toggleFeatured = (productId) => {
+  const toggleFeatured = async (productId) => {
+    let nextVal = false;
     setAllProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, featured: !p.featured } : p))
+      prev.map((p) => {
+        if (p.id === productId) {
+          nextVal = !p.featured;
+          return { ...p, featured: nextVal };
+        }
+        return p;
+      })
     );
+    try {
+      await updateProductApi(productId, { featured: nextVal });
+    } catch (e) {
+      console.warn("Failed to persist featured state:", e);
+    }
   };
 
   // 8. Toggle Stock Availability
-  const toggleStock = (productId) => {
+  const toggleStock = async (productId) => {
+    let nextVal = false;
     setAllProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, inStock: !p.inStock } : p))
+      prev.map((p) => {
+        if (p.id === productId) {
+          nextVal = !p.inStock;
+          return { ...p, inStock: nextVal };
+        }
+        return p;
+      })
     );
+    try {
+      await updateProductApi(productId, { inStock: nextVal });
+    } catch (e) {
+      console.warn("Failed to persist stock state:", e);
+    }
   };
 
   // 6. Category & Subcategory Management
@@ -547,9 +617,15 @@ export function ProductProvider({ children }) {
   };
 
   // 7. Announcement Bar Management
-  const updateAnnouncements = (newAnnouncements) => {
+  const updateAnnouncements = async (newAnnouncements) => {
     if (Array.isArray(newAnnouncements)) {
       setAnnouncements(newAnnouncements);
+      localStorage.setItem('penny_announcements', JSON.stringify(newAnnouncements));
+      try {
+        await saveAnnouncementsApi(newAnnouncements);
+      } catch (e) {
+        console.warn("Backend announcement sync note:", e);
+      }
     }
   };
 

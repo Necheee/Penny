@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getProductById, getSizes } from '../../services/api';
-import { Plus, Minus, X, ShoppingBag, Heart } from 'lucide-react';
+import { Plus, Minus, X, ShoppingBag, Heart, Check, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const getColorHex = (colorName) => {
@@ -65,6 +65,8 @@ export default function ProductModal({ productId, closeModal }) {
   const [selectedSize, setSelectedSize] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
+  const [bespokeNotified, setBespokeNotified] = useState(false);
+  const [sizeError, setSizeError] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -112,10 +114,10 @@ export default function ProductModal({ productId, closeModal }) {
 
   const handleAddToBag = () => {
     if (!selectedSize) {
-      alert("Please select a size first.");
+      setSizeError(true);
       return;
     }
-    
+    setSizeError(false);
     setIsAdding(true);
     setTimeout(() => {
       addToCart(product, selectedSize, selectedColor, quantity);
@@ -244,9 +246,59 @@ export default function ProductModal({ productId, closeModal }) {
                 />
               ))}
             </div>
-            <button onClick={(e) => { e.preventDefault(); alert("Our bespoke team has been notified. Custom colors take 2-3 weeks to produce."); }} className="mt-3 text-[10px] font-bold tracking-widest uppercase text-brand-taupe hover:text-brand-charcoal transition-colors underline underline-offset-4 decoration-brand-taupe/30 hover:decoration-brand-charcoal">
-              Request a custom color
-            </button>
+            <div className="mt-3">
+              <AnimatePresence mode="wait">
+                {!bespokeNotified ? (
+                  <motion.button
+                    key="btn"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setBespokeNotified(true);
+                    }}
+                    className="text-[10px] font-bold tracking-widest uppercase text-brand-taupe hover:text-brand-charcoal transition-colors underline underline-offset-4 decoration-brand-taupe/30 hover:decoration-brand-charcoal inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-700/70" />
+                    Request a custom color
+                  </motion.button>
+                ) : (
+                  <motion.div
+                    key="card"
+                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                    className="p-3.5 bg-[#fbf9f5] border border-brand-charcoal/15 rounded-sm relative shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-4 h-4 rounded-full bg-brand-charcoal text-white flex items-center justify-center shrink-0 mt-0.5">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-brand-charcoal">
+                            Bespoke Atelier Notified
+                          </p>
+                          <p className="text-xs text-brand-charcoal/80 font-serif mt-0.5 leading-relaxed">
+                            Our bespoke team has been notified. Custom colors take 2–3 weeks to handcraft.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setBespokeNotified(false)}
+                        className="text-brand-charcoal/40 hover:text-brand-charcoal text-xs p-1 cursor-pointer transition-colors"
+                        aria-label="Dismiss notice"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           {/* Size Selection */}
@@ -268,11 +320,14 @@ export default function ProductModal({ productId, closeModal }) {
                   <button
                     key={size}
                     disabled={!isAvailable}
-                    onClick={() => setSelectedSize(size)}
+                    onClick={() => {
+                      setSelectedSize(size);
+                      setSizeError(false);
+                    }}
                     aria-label={`Select size ${size}`}
                     aria-pressed={selectedSize === size}
-                    className={`py-2 text-xs font-bold tracking-wider transition-all border
-                      ${!isAvailable ? 'border-brand-charcoal/10 text-brand-charcoal/20 cursor-not-allowed line-through' : ''}
+                    className={`py-2 text-xs font-bold tracking-wider transition-all border cursor-pointer
+                      ${!isAvailable ? 'border-brand-charcoal/10 text-brand-charcoal/20 !cursor-not-allowed line-through' : ''}
                       ${isAvailable && selectedSize !== size ? 'border-brand-charcoal/20 text-brand-charcoal hover:border-brand-charcoal' : ''}
                       ${isAvailable && selectedSize === size ? 'border-brand-charcoal bg-brand-charcoal text-white' : ''}
                     `}
@@ -282,7 +337,15 @@ export default function ProductModal({ productId, closeModal }) {
                 );
               })}
             </div>
-            {!selectedSize && <p className="text-xs text-red-500/80 mt-2 italic font-serif">Please select a size.</p>}
+            {sizeError && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-[11px] text-amber-900 tracking-wide font-sans mt-2 font-medium"
+              >
+                Please select a size to proceed.
+              </motion.p>
+            )}
           </div>
 
           {/* Add to Bag */}

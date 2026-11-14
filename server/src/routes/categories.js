@@ -499,6 +499,63 @@ router.post('/presets/all', (req, res) => {
 });
 
 /**
+ * GET /api/categories/announcements
+ * Retrieve announcement bar messages from Neon Cloud DB or local cache
+ */
+router.get('/announcements', async (req, res) => {
+  try {
+    let list = [
+      "Enjoy free shipping on orders above ₦200,000",
+      "Lagos delivery in 1 to 3 days",
+      "Pieces designed to work perfectly together"
+    ];
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      const pool = getPool();
+      const resDb = await pool.query('SELECT messages FROM announcements WHERE id = 1');
+      if (resDb.rows.length > 0 && Array.isArray(resDb.rows[0].messages)) {
+        list = resDb.rows[0].messages;
+      }
+    } else {
+      list = readJsonFile('announcements.json', list);
+    }
+    return res.status(200).json({ success: true, data: list });
+  } catch (err) {
+    return res.status(200).json({
+      success: true,
+      data: [
+        "Enjoy free shipping on orders above ₦200,000",
+        "Lagos delivery in 1 to 3 days",
+        "Pieces designed to work perfectly together"
+      ]
+    });
+  }
+});
+
+/**
+ * POST /api/categories/announcements
+ * Save announcement bar messages to Neon Cloud DB (Admin only)
+ */
+router.post('/announcements', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { messages } = req.body;
+    if (Array.isArray(messages)) {
+      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+        const pool = getPool();
+        await pool.query(`
+          INSERT INTO announcements (id, messages, updated_at)
+          VALUES (1, $1, CURRENT_TIMESTAMP)
+          ON CONFLICT (id) DO UPDATE SET messages = EXCLUDED.messages, updated_at = CURRENT_TIMESTAMP
+        `, [JSON.stringify(messages)]);
+      }
+      writeJsonFile('announcements.json', messages);
+    }
+    return res.status(200).json({ success: true, message: 'Announcements saved.', data: messages });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to save announcements.' });
+  }
+});
+
+/**
  * GET /api/categories/size-guides
  * Retrieve all size guides
  */
