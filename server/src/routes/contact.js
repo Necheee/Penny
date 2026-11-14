@@ -167,9 +167,38 @@ router.post('/messages/:id/reply', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Reply text cannot be empty.' });
     }
 
-    const item = inquiriesStore.find(i => i.id === id);
+    let item = inquiriesStore.find(i => i.id === id);
+
+    // If not in memory cache, search PostgreSQL
+    if (!item && process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        const dbRes = await pool.query('SELECT * FROM contact_inquiries WHERE id = $1', [id]);
+        if (dbRes.rows && dbRes.rows.length > 0) {
+          const r = dbRes.rows[0];
+          item = {
+            id: r.id,
+            userId: r.user_id,
+            name: r.name,
+            email: r.email,
+            orderNumber: r.order_number,
+            subject: r.subject || 'Customer Inquiry',
+            message: r.message,
+            type: r.type || 'inquiry',
+            status: r.status,
+            reply: r.reply,
+            repliedAt: r.replied_at,
+            createdAt: r.created_at,
+          };
+          inquiriesStore.unshift(item);
+        }
+      } catch (dbErr) {
+        console.warn('DB lookup warning on reply:', dbErr.message);
+      }
+    }
+
     if (!item) {
-      return res.status(404).json({ success: false, message: 'Inquiry not found.' });
+      return res.status(404).json({ success: false, message: 'Inquiry record not found.' });
     }
 
     const repliedAt = new Date().toISOString();
@@ -178,52 +207,62 @@ router.post('/messages/:id/reply', async (req, res) => {
     item.status = 'replied';
     writeJsonFile('inquiries.json', inquiriesStore);
 
+    // Persist to Neon Cloud PostgreSQL immediately
     try {
       if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
         const pool = getPool();
         await pool.query("UPDATE contact_inquiries SET reply = $1, replied_at = $2, status = 'replied' WHERE id = $3", [item.reply, repliedAt, id]);
       }
-    } catch (e) {}
-
-    // Dispatch email to customer
-    try {
-      const mailer = await getTransporter();
-      if (mailer) {
-        const info = await mailer.sendMail({
-          from: `"PENNY" <${process.env.SMTP_FROM || 'support@penny.com'}>`,
-          to: item.email,
-          subject: `Response to your PENNY inquiry ${item.orderNumber ? `[Order #${item.orderNumber}]` : ''}`,
-          html: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 28px; color: #232220; background: #ffffff; border: 1px solid #e8e7e4;">
-              <div style="text-align: center; border-bottom: 2px solid #232220; padding-bottom: 20px; margin-bottom: 24px;">
-                <img src="${process.env.CLIENT_URL || 'http://localhost:5173'}/logo.png" alt="PENNY" style="height: 38px; width: auto; object-fit: contain; margin-bottom: 8px;" />
-                <h1 style="letter-spacing: 0.3em; font-size: 22px; font-weight: 300; margin: 0; text-transform: uppercase;">PENNY</h1>
-                <p style="font-size: 11px; letter-spacing: 0.15em; color: #767471; margin-top: 4px; text-transform: uppercase;">Customer Support Response • Lagos, Nigeria</p>
-              </div>
-              <p style="font-size: 14px; margin-bottom: 16px;">Dear <strong>${item.name}</strong>,</p>
-              <p style="font-size: 13px; color: #555; line-height: 1.6;">Thank you for contacting PENNY. In response to your inquiry${item.orderNumber ? ` regarding Order <strong>#${item.orderNumber}</strong>` : ''}:</p>
-              <div style="background: #f7f6f4; border-left: 3px solid #232220; padding: 16px; margin: 18px 0; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: #232220;">
-${replyText.trim()}
-              </div>
-              <div style="background-color: #faf9f7; border: 1px solid #e8e7e4; padding: 12px 14px; border-radius: 2px; font-size: 11px; color: #767471;">
-                <strong style="text-transform: uppercase; letter-spacing: 0.1em; color: #232220; display: block; margin-bottom: 4px;">Original Inquiry:</strong>
-                <span style="font-style: italic;">"${item.message}"</span>
-              </div>
-            </div>
-          `
-        });
-        const previewUrl = nodemailer.getTestMessageUrl(info);
-        if (previewUrl) {
-          item.previewUrl = previewUrl;
-          writeJsonFile('inquiries.json', inquiriesStore);
-          console.log(`[REPLY EMAIL SENT] Ethereal live preview URL: ${previewUrl}`);
-        }
-      }
-    } catch (emailErr) {
-      console.warn('[REPLY EMAIL] Notification note:', emailErr.message);
+    } catch (e) {
+      console.warn('Cloud DB update on reply warning:', e.message);
     }
 
-    return res.status(200).json({ success: true, message: 'Reply recorded and email dispatched to customer.', data: item });
+    // Immediately respond to Admin Dashboard with success so the UI never times out
+    res.status(200).json({
+      success: true,
+      message: 'Reply recorded successfully and customer notification initiated.',
+      data: item
+    });
+
+    // Dispatch email to customer in background
+    (async () => {
+      try {
+        const mailer = await getTransporter();
+        if (mailer) {
+          const info = await mailer.sendMail({
+            from: `"PENNY" <${process.env.SMTP_FROM || 'support@penny.com'}>`,
+            to: item.email,
+            subject: `Response to your PENNY inquiry ${item.orderNumber ? `[Order #${item.orderNumber}]` : ''}`,
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 28px; color: #232220; background: #ffffff; border: 1px solid #e8e7e4;">
+                <div style="text-align: center; border-bottom: 2px solid #232220; padding-bottom: 20px; margin-bottom: 24px;">
+                  <img src="${process.env.CLIENT_URL || 'https://penny-kbrh.onrender.com'}/logo.png" alt="PENNY" style="height: 38px; width: auto; object-fit: contain; margin-bottom: 8px;" />
+                  <h1 style="letter-spacing: 0.3em; font-size: 22px; font-weight: 300; margin: 0; text-transform: uppercase;">PENNY</h1>
+                  <p style="font-size: 11px; letter-spacing: 0.15em; color: #767471; margin-top: 4px; text-transform: uppercase;">Customer Support Response • Lagos, Nigeria</p>
+                </div>
+                <p style="font-size: 14px; margin-bottom: 16px;">Dear <strong>${item.name}</strong>,</p>
+                <p style="font-size: 13px; color: #555; line-height: 1.6;">Thank you for contacting PENNY. In response to your inquiry${item.orderNumber ? ` regarding Order <strong>#${item.orderNumber}</strong>` : ''}:</p>
+                <div style="background: #f7f6f4; border-left: 3px solid #232220; padding: 16px; margin: 18px 0; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: #232220;">
+${replyText.trim()}
+                </div>
+                <div style="background-color: #faf9f7; border: 1px solid #e8e7e4; padding: 12px 14px; border-radius: 2px; font-size: 11px; color: #767471;">
+                  <strong style="text-transform: uppercase; letter-spacing: 0.1em; color: #232220; display: block; margin-bottom: 4px;">Original Inquiry:</strong>
+                  <span style="font-style: italic;">"${item.message}"</span>
+                </div>
+              </div>
+            `
+          });
+          const previewUrl = nodemailer.getTestMessageUrl(info);
+          if (previewUrl) {
+            item.previewUrl = previewUrl;
+            writeJsonFile('inquiries.json', inquiriesStore);
+            console.log(`[REPLY EMAIL SENT] Live preview URL: ${previewUrl}`);
+          }
+        }
+      } catch (emailErr) {
+        console.warn('[REPLY EMAIL] Background email notice:', emailErr.message);
+      }
+    })();
   } catch (err) {
     console.error('Error replying to inquiry:', err);
     return res.status(500).json({ success: false, message: 'Failed to process inquiry reply.' });

@@ -97,6 +97,7 @@ export default function Account() {
   const [profileForm, setProfileForm] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
+    email: user?.email || '',
     phone: user?.phone || '',
   });
 
@@ -105,10 +106,11 @@ export default function Account() {
       setProfileForm({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
+        email: user.email || '',
         phone: user.phone || '',
       });
     }
-  }, [user?.firstName, user?.lastName, user?.phone]);
+  }, [user?.firstName, user?.lastName, user?.email, user?.phone]);
 
   // If not logged in, redirect
   if (!user) {
@@ -120,16 +122,29 @@ export default function Account() {
     navigate('/');
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    updateProfile({
+    if (!profileForm.email || !/\S+@\S+\.\S+/.test(profileForm.email)) {
+      setProfileFeedback('Please enter a valid email address.');
+      return;
+    }
+
+    await updateProfile({
       firstName: profileForm.firstName.trim(),
       lastName: profileForm.lastName.trim(),
+      email: profileForm.email.trim().toLowerCase(),
       phone: profileForm.phone.trim(),
     });
     setIsEditingProfile(false);
-    setProfileFeedback('Profile details successfully updated.');
+    setProfileFeedback('Profile details and email address successfully updated.');
     setTimeout(() => setProfileFeedback(''), 4000);
+
+    // Refresh orders and inquiries under the updated email
+    setTimeout(() => {
+      fetchUserOrders();
+      fetchUserInquiries();
+      refreshNotifications?.();
+    }, 300);
   };
 
   const handleAddAddress = (e) => {
@@ -250,7 +265,8 @@ export default function Account() {
         const orderCustomer = (ord.customer || '').toLowerCase().trim();
 
         if (userEmail && orderEmail && orderEmail === userEmail) return true;
-        if (userFullName && orderCustomer && orderCustomer === userFullName) return true;
+        if (userFullName && orderCustomer && (orderCustomer === userFullName || orderCustomer.includes(userFullName) || userFullName.includes(orderCustomer))) return true;
+        if (ord.userId && ord.userId === user?.id) return true;
         return false;
       });
 
@@ -337,18 +353,15 @@ export default function Account() {
     if (!user?.email) return;
     try {
       setIsLoadingInquiries(true);
-      const res = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}`);
+      const res = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user.id || '')}`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) {
           const cloudList = data.data;
-          const cloudIds = new Set(cloudList.map(c => c.id));
-          let localSaved = [];
+          setUserInquiries(cloudList);
           try {
-            localSaved = JSON.parse(localStorage.getItem('penny_my_inquiries') || '[]');
+            localStorage.setItem('penny_my_inquiries', JSON.stringify(cloudList));
           } catch {}
-          const userLocal = localSaved.filter(l => (l.email || '').toLowerCase() === user.email.toLowerCase() && !cloudIds.has(l.id));
-          setUserInquiries([...userLocal, ...cloudList]);
         }
       }
     } catch (err) {
@@ -362,8 +375,25 @@ export default function Account() {
     if (user) {
       fetchUserOrders();
       fetchUserInquiries();
+
+      // Poll every 10 seconds for real-time admin replies
+      const interval = setInterval(() => {
+        fetchUserOrders();
+        fetchUserInquiries();
+      }, 10000);
+
+      const onFocus = () => {
+        fetchUserOrders();
+        fetchUserInquiries();
+      };
+      window.addEventListener('focus', onFocus);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('focus', onFocus);
+      };
     }
-  }, [user?.email]);
+  }, [user?.email, user?.id]);
 
   useEffect(() => {
     const handleInquirySync = () => {
@@ -375,7 +405,7 @@ export default function Account() {
       window.removeEventListener('penny_inquiry_sent', handleInquirySync);
       window.removeEventListener('penny_inquiry_updated', handleInquirySync);
     };
-  }, [user?.email]);
+  }, [user?.email, user?.id]);
 
   const repliedInquiriesCount = userInquiries.filter(i => i.status === 'replied').length;
 
@@ -521,6 +551,7 @@ export default function Account() {
                         setProfileForm({
                           firstName: user.firstName || '',
                           lastName: user.lastName || '',
+                          email: user.email || '',
                           phone: user.phone || '',
                         });
                         setIsEditingProfile(true);
@@ -603,6 +634,23 @@ export default function Account() {
                           className="w-full border border-brand-charcoal/20 p-2.5 text-xs focus:outline-none focus:border-brand-charcoal rounded-xs"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                        Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={profileForm.email}
+                        onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                        placeholder="client@example.com"
+                        className="w-full border border-brand-charcoal/20 p-2.5 text-xs focus:outline-none focus:border-brand-charcoal rounded-xs"
+                      />
+                      <p className="text-[10px] text-neutral-400 font-serif mt-1">
+                        Changing your email address synchronizes your order history and support correspondence automatically.
+                      </p>
                     </div>
 
                     <div>

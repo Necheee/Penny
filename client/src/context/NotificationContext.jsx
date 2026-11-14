@@ -55,7 +55,8 @@ export function NotificationProvider({ children }) {
         const orderEmail = (ord.email || '').toLowerCase().trim();
         const orderCustomer = (ord.customer || '').toLowerCase().trim();
         if (userEmail && orderEmail && orderEmail === userEmail) return true;
-        if (userFullName && orderCustomer && orderCustomer === userFullName) return true;
+        if (userFullName && orderCustomer && (orderCustomer === userFullName || orderCustomer.includes(userFullName) || userFullName.includes(orderCustomer))) return true;
+        if (ord.userId && ord.userId === user.id) return true;
         return false;
       });
 
@@ -72,14 +73,14 @@ export function NotificationProvider({ children }) {
       // 3. Fetch customer care inquiries
       let userInquiries = [];
       try {
-        const inqRes = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}`);
+        const inqRes = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user.id || '')}`);
         if (inqRes.ok) {
           const inqData = await inqRes.json();
           userInquiries = Array.isArray(inqData.data) ? inqData.data : [];
         }
       } catch (e) {}
 
-      const repliedInquiries = userInquiries.filter(i => i.reply && !dismissedIds.has(i.id));
+      const repliedInquiries = userInquiries.filter(i => (i.reply || i.status === 'replied') && !dismissedIds.has(i.id));
 
       // Build active notifications list
       const items = [];

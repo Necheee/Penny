@@ -148,8 +148,14 @@ export function AuthProvider({ children }) {
 
   const updateProfile = async (updatedFields) => {
     if (!user) return;
-    const cleanEmail = (user.email || '').trim().toLowerCase();
-    const updatedUser = { ...user, ...updatedFields, email: cleanEmail };
+    const oldEmail = (user.email || '').trim().toLowerCase();
+    const newEmail = updatedFields.email ? updatedFields.email.trim().toLowerCase() : oldEmail;
+
+    const updatedUser = { 
+      ...user, 
+      ...updatedFields, 
+      email: newEmail 
+    };
 
     setUser(updatedUser);
     localStorage.setItem('penny_user', JSON.stringify(updatedUser));
@@ -158,7 +164,7 @@ export function AuthProvider({ children }) {
     const savedAccounts = JSON.parse(localStorage.getItem('penny_registered_users') || '[]');
     const idx = savedAccounts.findIndex(a => 
       (a.id && a.id === user.id) || 
-      (a.email && a.email.trim().toLowerCase() === cleanEmail)
+      (a.email && a.email.trim().toLowerCase() === oldEmail)
     );
 
     if (idx !== -1) {
@@ -168,16 +174,21 @@ export function AuthProvider({ children }) {
     }
     localStorage.setItem('penny_registered_users', JSON.stringify(savedAccounts));
 
-    // Sync to backend Neon Cloud
+    // Sync to backend Neon Cloud with previousEmail to link past orders and inquiries
     try {
       await fetch('/api/auth/customer-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedUser),
+        body: JSON.stringify({
+          ...updatedUser,
+          previousEmail: oldEmail !== newEmail ? oldEmail : null,
+        }),
       });
     } catch (err) {
       console.warn('Could not sync profile to backend:', err.message);
     }
+
+    return updatedUser;
   };
 
   const updateAddresses = (newAddresses) => {
