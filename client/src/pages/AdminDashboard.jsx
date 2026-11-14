@@ -494,6 +494,9 @@ export default function AdminDashboard() {
         const configData = await configRes.json();
         if (configData.bankDetails) {
           setBankForm(configData.bankDetails);
+          try {
+            localStorage.setItem('penny_bank_config', JSON.stringify(configData.bankDetails));
+          } catch {}
         }
       }
     } catch (err) {
@@ -520,11 +523,17 @@ export default function AdminDashboard() {
   }, []);
 
   // Bank Account Information Management (Admin Config)
-  const [bankForm, setBankForm] = useState({
-    bankName: 'Zenith Bank Plc',
-    accountName: 'PENNY CLOTHING CO',
-    accountNumber: '1018924560',
-    instructions: 'Please transfer the exact total amount and use your Order Number as payment reference/narration. Once verified by store admin, your receipt and confirmation will be emailed.',
+  const [bankForm, setBankForm] = useState(() => {
+    try {
+      const saved = localStorage.getItem('penny_bank_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      bankName: 'Zenith Bank Plc',
+      accountName: 'PENNY CLOTHING CO',
+      accountNumber: '1018924560',
+      instructions: 'Please transfer the exact total amount and use your Order Number as payment reference/narration. Once verified by store admin, your receipt and confirmation will be emailed.',
+    };
   });
   const [isSavingBank, setIsSavingBank] = useState(false);
   const [bankFeedbackMsg, setBankFeedbackMsg] = useState({ type: '', text: '' });
@@ -544,7 +553,10 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (res.ok && data.success) {
         setBankForm(data.bankDetails);
-        setBankFeedbackMsg({ type: 'success', text: 'Bank transfer details successfully updated and live on storefront checkout.' });
+        try {
+          localStorage.setItem('penny_bank_config', JSON.stringify(data.bankDetails));
+        } catch {}
+        setBankFeedbackMsg({ type: 'success', text: 'Bank transfer details successfully saved to cloud database and active on checkout.' });
       } else {
         setBankFeedbackMsg({ type: 'error', text: data.message || 'Could not update bank details.' });
       }

@@ -29,11 +29,17 @@ const Checkout = () => {
   const [checkoutMode, setCheckoutMode] = useState(user ? 'member' : 'guest');
 
   // Live Bank Transfer Account Details from Backend
-  const [bankDetails, setBankDetails] = useState({
-    bankName: 'Zenith Bank Plc',
-    accountName: 'PENNY CLOTHING CO',
-    accountNumber: '1018924560',
-    instructions: 'Please transfer the exact total amount and use your Order Number as payment reference/narration.',
+  const [bankDetails, setBankDetails] = useState(() => {
+    try {
+      const saved = localStorage.getItem('penny_bank_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      bankName: 'Zenith Bank Plc',
+      accountName: 'PENNY CLOTHING CO',
+      accountNumber: '1018924560',
+      instructions: 'Please transfer the exact total amount and use your Order Number as payment reference/narration.',
+    };
   });
   const [copiedNumber, setCopiedNumber] = useState(false);
 
@@ -45,6 +51,9 @@ const Checkout = () => {
           const data = await res.json();
           if (data.bankDetails) {
             setBankDetails(data.bankDetails);
+            try {
+              localStorage.setItem('penny_bank_config', JSON.stringify(data.bankDetails));
+            } catch {}
           }
         }
       } catch (err) {
@@ -112,7 +121,11 @@ const Checkout = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    let finalValue = value;
+    if (name === 'phone') {
+      finalValue = value.replace(/[^\d+()-\s]/g, '');
+    }
+    setFormData(prev => ({ ...prev, [name]: finalValue }));
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -120,11 +133,17 @@ const Checkout = () => {
 
   const validateStep1 = () => {
     const newErrors = {};
-    if (!formData.email.trim() || !/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Valid email is required.';
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!formData.email.trim() || !emailRegex.test(formData.email.trim())) {
+      newErrors.email = 'Valid standard email format is required (e.g. name@example.com).';
     }
+    const cleanDigits = formData.phone.replace(/\D/g, '');
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required for delivery.';
+    } else if (/[a-zA-Z]/.test(formData.phone)) {
+      newErrors.phone = 'Phone number cannot contain letters.';
+    } else if (cleanDigits.length < 7) {
+      newErrors.phone = 'Please enter a valid phone number (digits only, at least 7 numbers).';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

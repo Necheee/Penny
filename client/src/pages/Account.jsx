@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -14,18 +14,18 @@ import {
   Check, 
   ChevronRight, 
   Package, 
-  ArrowRight,
-  Edit2,
-  Clock,
-  RefreshCw,
-  ChevronDown,
-  ChevronUp,
-  Bell,
-  Printer,
-  Truck,
-  Mail,
-  Palette,
-  MessageSquare
+  ArrowRight, 
+  Edit2, 
+  Clock, 
+  RefreshCw, 
+  ChevronDown, 
+  ChevronUp, 
+  Bell, 
+  Printer, 
+  Truck, 
+  Mail, 
+  Palette, 
+  MessageSquare 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { printOrderReceipt } from '../utils/printReceipt';
@@ -33,7 +33,7 @@ import FormattedMessage from '../components/common/FormattedMessage';
 import { useDialog } from '../context/DialogContext';
 
 export default function Account() {
-  const { user, logout, updateProfile, updateAddresses, deleteAccount } = useAuth();
+  const { user, logout, updateProfile, updateAddresses, deleteAccount, refreshProfile } = useAuth();
   const { markAllAsSeen, refreshNotifications, hasUnreadNotifications } = useNotifications();
   const { confirm, alert: showAlertDialog } = useDialog();
   const navigate = useNavigate();
@@ -126,8 +126,20 @@ export default function Account() {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (!profileForm.email || !/\S+@\S+\.\S+/.test(profileForm.email)) {
-      setProfileFeedback('Please enter a valid email address.');
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!profileForm.email || !emailRegex.test(profileForm.email.trim())) {
+      setProfileFeedback('Please enter a valid standard email address (e.g. name@example.com).');
+      return;
+    }
+
+    if (profileForm.phone && /[a-zA-Z]/.test(profileForm.phone)) {
+      setProfileFeedback('Phone number cannot contain letters.');
+      return;
+    }
+
+    const cleanDigits = profileForm.phone ? profileForm.phone.replace(/\D/g, '') : '';
+    if (profileForm.phone && cleanDigits.length < 7) {
+      setProfileFeedback('Please enter a valid phone number (digits only, at least 7 numbers).');
       return;
     }
 
@@ -331,25 +343,39 @@ export default function Account() {
   });
 
   // Sync cloud notifications state across devices
-  useEffect(() => {
+  const loadCloudNotificationsState = useCallback(async () => {
     if (!user) return;
-    async function loadCloudNotificationsState() {
-      try {
-        const res = await fetch(`/api/auth/notifications-state?email=${encodeURIComponent(user.email || '')}&userId=${encodeURIComponent(user.id || '')}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data.dismissedNotifications)) {
-            setDismissedNotifications(prev => {
-              const merged = Array.from(new Set([...prev, ...data.dismissedNotifications]));
-              localStorage.setItem('penny_dismissed_notifications', JSON.stringify(merged));
-              return merged;
-            });
-          }
+    try {
+      const res = await fetch(`/api/auth/notifications-state?email=${encodeURIComponent(user.email || '')}&userId=${encodeURIComponent(user.id || '')}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.dismissedNotifications)) {
+          setDismissedNotifications(prev => {
+            const merged = Array.from(new Set([...prev, ...data.dismissedNotifications]));
+            localStorage.setItem('penny_dismissed_notifications', JSON.stringify(merged));
+            return merged;
+          });
         }
-      } catch (e) {}
-    }
-    loadCloudNotificationsState();
+      }
+    } catch (e) {}
   }, [user?.email, user?.id]);
+
+  const handleSyncStatus = async () => {
+    setIsLoadingOrders(true);
+    try {
+      if (refreshProfile) {
+        await refreshProfile();
+      }
+      await loadCloudNotificationsState();
+      await fetchUserOrders(true);
+      await fetchUserInquiries(true);
+      refreshNotifications?.();
+    } catch (e) {
+      console.warn('Sync status error:', e);
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  };
 
   const handleDeleteOrder = async (orderId) => {
     const shouldDelete = await confirm({
@@ -461,16 +487,19 @@ export default function Account() {
 
   useEffect(() => {
     if (user) {
+      loadCloudNotificationsState();
       fetchUserOrders(false);
       fetchUserInquiries(false);
 
-      // Silent background poll every 15s to keep statuses live without page flickers
+      // Silent background poll every 12s to keep statuses and dismissed notifications live across devices
       const interval = setInterval(() => {
+        loadCloudNotificationsState();
         fetchUserOrders(true);
         fetchUserInquiries(true);
-      }, 15000);
+      }, 12000);
 
       const onFocus = () => {
+        loadCloudNotificationsState();
         fetchUserOrders(true);
         fetchUserInquiries(true);
       };
@@ -481,7 +510,7 @@ export default function Account() {
         window.removeEventListener('focus', onFocus);
       };
     }
-  }, [user?.email, user?.id]);
+  }, [user?.email, user?.id, loadCloudNotificationsState]);
 
   useEffect(() => {
     const handleInquirySync = () => {
@@ -748,7 +777,7 @@ export default function Account() {
                       <input
                         type="tel"
                         value={profileForm.phone}
-                        onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                        onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value.replace(/[^\d+()-\s]/g, '') })}
                         placeholder="+234 800 000 0000"
                         className="w-full border border-brand-charcoal/20 p-2.5 text-xs focus:outline-none focus:border-brand-charcoal rounded-xs"
                       />
@@ -963,7 +992,7 @@ export default function Account() {
                     </p>
                   </div>
                   <button
-                    onClick={fetchUserOrders}
+                    onClick={handleSyncStatus}
                     disabled={isLoadingOrders}
                     className="self-start sm:self-auto inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-charcoal/70 hover:text-black py-1.5 px-3 border border-brand-charcoal/20 hover:border-black rounded-xs transition-colors"
                   >
@@ -1350,7 +1379,7 @@ export default function Account() {
                     </p>
                   </div>
                   <button
-                    onClick={fetchUserOrders}
+                    onClick={handleSyncStatus}
                     disabled={isLoadingOrders}
                     className="self-start sm:self-auto inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-charcoal/70 hover:text-black py-1.5 px-3 border border-brand-charcoal/20 hover:border-black rounded-xs transition-colors"
                   >

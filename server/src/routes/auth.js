@@ -117,13 +117,14 @@ router.post('/logout', requireAuth, (req, res) => {
 
 /**
  * GET /api/auth/customer-profile
- * Fetches customer profile by email from Neon Cloud or local users.json
+ * Fetches customer profile by email or userId from Neon Cloud or local users.json
  */
 router.get('/customer-profile', async (req, res) => {
   try {
     const email = (req.query.email || '').trim().toLowerCase();
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email query is required.' });
+    const userId = (req.query.userId || '').trim();
+    if (!email && !userId) {
+      return res.status(400).json({ success: false, message: 'Email or userId query is required.' });
     }
 
     // 1. Check Neon Cloud Database
@@ -131,7 +132,10 @@ router.get('/customer-profile', async (req, res) => {
       try {
         const pool = getPool();
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cart TEXT DEFAULT '[]';`);
-        const { rows } = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [email]);
+        const { rows } = await pool.query(
+          'SELECT * FROM users WHERE (LOWER(email) = $1 AND $1 != \'\') OR (id = $2 AND $2 != \'\') LIMIT 1',
+          [email, userId]
+        );
         if (rows.length > 0) {
           const u = rows[0];
           let userAddresses = [];
@@ -167,7 +171,7 @@ router.get('/customer-profile', async (req, res) => {
 
     // 2. Fallback to local storage users.json
     const localUsers = readJsonFile('users.json', []) || [];
-    const found = localUsers.find((u) => u.email?.trim().toLowerCase() === email);
+    const found = localUsers.find((u) => (email && u.email?.trim().toLowerCase() === email) || (userId && u.id === userId));
     if (found) {
       return res.status(200).json({ success: true, user: found });
     }
@@ -275,6 +279,8 @@ router.get('/notifications-state', async (req, res) => {
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       try {
         const pool = getPool();
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS seen_notifications TEXT DEFAULT '[]';`);
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS dismissed_notifications TEXT DEFAULT '[]';`);
         const { rows } = await pool.query(
           'SELECT seen_notifications, dismissed_notifications FROM users WHERE (LOWER(email) = $1 AND $1 != \'\') OR (id = $2 AND $2 != \'\')',
           [email, userId]
@@ -296,7 +302,13 @@ router.get('/notifications-state', async (req, res) => {
       }
     }
 
-    return res.status(200).json({ success: true, seenNotifications: [], dismissedNotifications: [] });
+    const localUsers = readJsonFile('users.json', []) || [];
+    const found = localUsers.find(u => (u.email?.trim().toLowerCase() === email && email !== '') || (u.id === userId && userId !== ''));
+    return res.status(200).json({
+      success: true,
+      seenNotifications: Array.isArray(found?.seen_notifications) ? found.seen_notifications : [],
+      dismissedNotifications: Array.isArray(found?.dismissed_notifications) ? found.dismissed_notifications : []
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -316,21 +328,52 @@ router.post('/notifications-state', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email or userId required.' });
     }
 
-    const seenJson = JSON.stringify(Array.isArray(seenNotifications) ? seenNotifications : []);
-    const dismissedJson = JSON.stringify(Array.isArray(dismissedNotifications) ? dismissedNotifications : []);
+    const hasSeen = Array.isArray(seenNotifications);
+    const hasDismissed = Array.isArray(dismissedNotifications);
 
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       try {
         const pool = getPool();
-        await pool.query(
-          `UPDATE users 
-           SET seen_notifications = $1, dismissed_notifications = $2 
-           WHERE (LOWER(email) = $3 AND $3 != '') OR (id = $4 AND $4 != '')`,
-          [seenJson, dismissedJson, cleanEmail, cleanUserId]
-        );
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS seen_notifications TEXT DEFAULT '[]';`);
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS dismissed_notifications TEXT DEFAULT '[]';`);
+
+        if (hasSeen && hasDismissed) {
+          const seenJson = JSON.stringify(seenNotifications);
+          const dismissedJson = JSON.stringify(dismissedNotifications);
+          await pool.query(
+            `UPDATE users 
+             SET seen_notifications = $1, dismissed_notifications = $2 
+             WHERE (LOWER(email) = $3 AND $3 != '') OR (id = $4 AND $4 != '')`,
+            [seenJson, dismissedJson, cleanEmail, cleanUserId]
+          );
+        } else if (hasSeen) {
+          const seenJson = JSON.stringify(seenNotifications);
+          await pool.query(
+            `UPDATE users 
+             SET seen_notifications = $1 
+             WHERE (LOWER(email) = $2 AND $2 != '') OR (id = $3 AND $3 != '')`,
+            [seenJson, cleanEmail, cleanUserId]
+          );
+        } else if (hasDismissed) {
+          const dismissedJson = JSON.stringify(dismissedNotifications);
+          await pool.query(
+            `UPDATE users 
+             SET dismissed_notifications = $1 
+             WHERE (LOWER(email) = $2 AND $2 != '') OR (id = $3 AND $3 != '')`,
+            [dismissedJson, cleanEmail, cleanUserId]
+          );
+        }
       } catch (dbErr) {
         console.warn('Could not update notifications-state in db:', dbErr.message);
       }
+    }
+
+    const localUsers = readJsonFile('users.json', []) || [];
+    const idx = localUsers.findIndex(u => (u.email?.trim().toLowerCase() === cleanEmail && cleanEmail !== '') || (u.id === cleanUserId && cleanUserId !== ''));
+    if (idx !== -1) {
+      if (hasSeen) localUsers[idx].seen_notifications = seenNotifications;
+      if (hasDismissed) localUsers[idx].dismissed_notifications = dismissedNotifications;
+      writeJsonFile('users.json', localUsers);
     }
 
     return res.status(200).json({ success: true });

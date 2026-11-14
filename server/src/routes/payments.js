@@ -98,23 +98,45 @@ export let bankDetailsStore = readJsonFile('bankDetails.json', defaultBankDetail
 
 /**
  * GET /api/payments/config
- * Returns public configuration and official bank transfer details
+ * Returns public configuration and official bank transfer details from Neon DB
  */
-router.get('/config', (req, res) => {
+router.get('/config', async (req, res) => {
+  let currentBankDetails = { ...bankDetailsStore };
+
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+    try {
+      const pool = getPool();
+      const dbRes = await pool.query('SELECT * FROM bank_config WHERE id = 1');
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        const row = dbRes.rows[0];
+        currentBankDetails = {
+          bankName: row.bank_name || currentBankDetails.bankName,
+          accountName: row.account_name || currentBankDetails.accountName,
+          accountNumber: row.account_number || currentBankDetails.accountNumber,
+          instructions: row.instructions || currentBankDetails.instructions,
+        };
+        bankDetailsStore = currentBankDetails;
+        writeJsonFile('bankDetails.json', currentBankDetails);
+      }
+    } catch (dbErr) {
+      console.warn('[PAYMENTS] Error querying bank_config from Neon DB:', dbErr.message);
+    }
+  }
+
   return res.status(200).json({
     success: true,
     publicKey: PAYSTACK_PUBLIC_KEY,
     currency: 'NGN',
-    bankDetails: bankDetailsStore,
-    paystackEnabled: false, // inactive for now as requested
+    bankDetails: currentBankDetails,
+    paystackEnabled: false,
   });
 });
 
 /**
  * PUT /api/payments/config/bank
- * Updates official bank transfer details (Owner Admin only)
+ * Updates official bank transfer details in Neon PostgreSQL & memory
  */
-router.put('/config/bank', (req, res) => {
+router.put('/config/bank', async (req, res) => {
   try {
     const { bankName, accountName, accountNumber, instructions } = req.body;
 
@@ -125,19 +147,39 @@ router.put('/config/bank', (req, res) => {
       });
     }
 
-    bankDetailsStore = {
+    const updated = {
       bankName: bankName.trim(),
       accountName: accountName.trim(),
       accountNumber: accountNumber.trim(),
-      instructions: instructions ? instructions.trim() : bankDetailsStore.instructions,
+      instructions: instructions ? instructions.trim() : (bankDetailsStore.instructions || ''),
     };
 
-    writeJsonFile('bankDetails.json', bankDetailsStore);
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        await pool.query(`
+          INSERT INTO bank_config (id, bank_name, account_name, account_number, instructions, updated_at)
+          VALUES (1, $1, $2, $3, $4, CURRENT_TIMESTAMP)
+          ON CONFLICT (id) DO UPDATE SET
+            bank_name = EXCLUDED.bank_name,
+            account_name = EXCLUDED.account_name,
+            account_number = EXCLUDED.account_number,
+            instructions = EXCLUDED.instructions,
+            updated_at = CURRENT_TIMESTAMP
+        `, [updated.bankName, updated.accountName, updated.accountNumber, updated.instructions]);
+        console.log('[PAYMENTS] Successfully persisted official bank transfer details to Neon PostgreSQL!');
+      } catch (dbErr) {
+        console.warn('[PAYMENTS] Could not persist bank_config to Neon DB:', dbErr.message);
+      }
+    }
+
+    bankDetailsStore = updated;
+    writeJsonFile('bankDetails.json', updated);
 
     return res.status(200).json({
       success: true,
       message: 'Bank transfer information updated successfully.',
-      bankDetails: bankDetailsStore,
+      bankDetails: updated,
     });
   } catch (error) {
     return res.status(500).json({

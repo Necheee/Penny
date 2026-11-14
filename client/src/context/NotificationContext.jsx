@@ -31,6 +31,13 @@ export function NotificationProvider({ children }) {
           const stateData = await stateRes.json();
           cloudDismissed = Array.isArray(stateData.dismissedNotifications) ? stateData.dismissedNotifications : [];
           cloudSeen = Array.isArray(stateData.seenNotifications) ? stateData.seenNotifications : [];
+          if (cloudDismissed.length > 0) {
+            try {
+              const currentLocal = JSON.parse(localStorage.getItem('penny_dismissed_notifications') || '[]');
+              const merged = Array.from(new Set([...currentLocal, ...cloudDismissed]));
+              localStorage.setItem('penny_dismissed_notifications', JSON.stringify(merged));
+            } catch {}
+          }
         }
       } catch (e) {}
 

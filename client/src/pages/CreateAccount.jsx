@@ -24,6 +24,13 @@ export default function CreateAccount() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      setErrorMsg('Please enter a valid standard email address (e.g. name@example.com).');
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMsg('');
     try {

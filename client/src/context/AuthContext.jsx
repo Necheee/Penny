@@ -212,46 +212,72 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('penny_user');
   };
 
-  // Background refresh user profile from cloud if session exists
+  // Background refresh user profile from cloud with cross-device sync
+  const refreshProfile = async () => {
+    const activeUser = user || (() => {
+      try {
+        const saved = localStorage.getItem('penny_user');
+        return saved ? JSON.parse(saved) : null;
+      } catch { return null; }
+    })();
+
+    if (!activeUser) return;
+    const cleanEmail = (activeUser.email || '').trim().toLowerCase();
+    const cleanUserId = (activeUser.id || '').trim();
+    if (!cleanEmail && !cleanUserId) return;
+
+    try {
+      const res = await fetch(`/api/auth/customer-profile?email=${encodeURIComponent(cleanEmail)}&userId=${encodeURIComponent(cleanUserId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.user) {
+          const fresh = data.user;
+          setUser(prev => {
+            if (!prev) return fresh;
+            return {
+              ...prev,
+              ...fresh,
+              firstName: fresh.firstName || prev.firstName || '',
+              lastName: fresh.lastName || prev.lastName || '',
+              phone: fresh.phone || prev.phone || '',
+              email: fresh.email || prev.email || '',
+              addresses: (fresh.addresses && fresh.addresses.length > 0) ? fresh.addresses : (prev.addresses || []),
+            };
+          });
+
+          const currentSaved = localStorage.getItem('penny_user');
+          const parsed = currentSaved ? JSON.parse(currentSaved) : {};
+          const merged = {
+            ...parsed,
+            ...fresh,
+            firstName: fresh.firstName || parsed.firstName || '',
+            lastName: fresh.lastName || parsed.lastName || '',
+            phone: fresh.phone || parsed.phone || '',
+            email: fresh.email || parsed.email || '',
+            addresses: (fresh.addresses && fresh.addresses.length > 0) ? fresh.addresses : (parsed.addresses || []),
+          };
+          localStorage.setItem('penny_user', JSON.stringify(merged));
+        }
+      }
+    } catch (e) {}
+  };
+
   useEffect(() => {
-    if (user && user.email) {
-      const cleanEmail = user.email.trim().toLowerCase();
-      fetch(`/api/auth/customer-profile?email=${encodeURIComponent(cleanEmail)}`)
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data && data.user) {
-            setUser(prev => {
-              if (!prev) return data.user;
-              return {
-                ...prev,
-                ...data.user,
-                firstName: data.user.firstName || prev.firstName || '',
-                lastName: data.user.lastName || prev.lastName || '',
-                phone: data.user.phone || prev.phone || '',
-                addresses: (data.user.addresses && data.user.addresses.length > 0) ? data.user.addresses : (prev.addresses || []),
-              };
-            });
-            const currentSaved = localStorage.getItem('penny_user');
-            if (currentSaved) {
-              const parsed = JSON.parse(currentSaved);
-              const merged = {
-                ...parsed,
-                ...data.user,
-                firstName: data.user.firstName || parsed.firstName || '',
-                lastName: data.user.lastName || parsed.lastName || '',
-                phone: data.user.phone || parsed.phone || '',
-                addresses: (data.user.addresses && data.user.addresses.length > 0) ? data.user.addresses : (parsed.addresses || []),
-              };
-              localStorage.setItem('penny_user', JSON.stringify(merged));
-            }
-          }
-        })
-        .catch(() => {});
-    }
-  }, []);
+    refreshProfile();
+
+    // Check cloud for profile changes made on other devices every 10s and on window focus
+    const interval = setInterval(refreshProfile, 10000);
+    const onFocus = () => refreshProfile();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [user?.email, user?.id]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthLoading, login, logout, createAccount, updateProfile, updateAddresses, deleteAccount }}>
+    <AuthContext.Provider value={{ user, isAuthLoading, login, logout, createAccount, updateProfile, updateAddresses, deleteAccount, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
