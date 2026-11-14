@@ -18,19 +18,56 @@ export function NotificationProvider({ children }) {
     }
 
     try {
-      // 1. Fetch server orders
+      const userEmail = (user.email || '').toLowerCase().trim();
+      const userFullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+      const userId = user.id || '';
+
+      // 1. Fetch cloud notifications state (seen & dismissed)
+      let cloudDismissed = [];
+      let cloudSeen = [];
+      try {
+        const stateRes = await fetch(`/api/auth/notifications-state?email=${encodeURIComponent(userEmail)}&userId=${encodeURIComponent(userId)}`);
+        if (stateRes.ok) {
+          const stateData = await stateRes.json();
+          cloudDismissed = Array.isArray(stateData.dismissedNotifications) ? stateData.dismissedNotifications : [];
+          cloudSeen = Array.isArray(stateData.seenNotifications) ? stateData.seenNotifications : [];
+        }
+      } catch (e) {}
+
+      // 2. Fetch server orders (my-orders query with fallback)
       let backendOrders = [];
       try {
-        const res = await fetch('/api/payments/orders');
+        const queryParams = new URLSearchParams();
+        if (userEmail) queryParams.append('email', userEmail);
+        if (userId) queryParams.append('userId', userId);
+        if (userFullName) queryParams.append('customer', userFullName);
+
+        const res = await fetch(`/api/payments/my-orders?${queryParams.toString()}`);
         if (res.ok) {
           const data = await res.json();
           backendOrders = Array.isArray(data.data) ? data.data : [];
         }
-      } catch (e) {
-        // Fallback silently to localStorage
+      } catch (e) {}
+
+      if (backendOrders.length === 0) {
+        try {
+          const resAll = await fetch('/api/payments/orders');
+          if (resAll.ok) {
+            const dataAll = await resAll.json();
+            const all = Array.isArray(dataAll.data) ? dataAll.data : [];
+            backendOrders = all.filter(ord => {
+              const orderEmail = (ord.email || '').toLowerCase().trim();
+              const orderCustomer = (ord.customer || '').toLowerCase().trim();
+              if (userId && ord.userId && ord.userId === userId) return true;
+              if (userEmail && orderEmail && orderEmail === userEmail) return true;
+              if (userFullName && orderCustomer && (orderCustomer.includes(userFullName.toLowerCase()) || userFullName.toLowerCase().includes(orderCustomer))) return true;
+              return false;
+            });
+          }
+        } catch (e) {}
       }
 
-      // 2. Fetch local orders
+      // 3. Fetch local orders
       let localOrders = [];
       try {
         localOrders = JSON.parse(localStorage.getItem('penny_orders') || '[]');
@@ -47,30 +84,27 @@ export function NotificationProvider({ children }) {
         }
       }
 
-      // Filter by current user
-      const userEmail = (user.email || '').toLowerCase().trim();
-      const userFullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().trim();
-
       const userOrders = uniqueOrders.filter(ord => {
         const orderEmail = (ord.email || '').toLowerCase().trim();
         const orderCustomer = (ord.customer || '').toLowerCase().trim();
+        if (userId && ord.userId && ord.userId === userId) return true;
         if (userEmail && orderEmail && orderEmail === userEmail) return true;
-        if (userFullName && orderCustomer && (orderCustomer === userFullName || orderCustomer.includes(userFullName) || userFullName.includes(orderCustomer))) return true;
-        if (ord.userId && ord.userId === user.id) return true;
+        if (userFullName && orderCustomer && (orderCustomer === userFullName.toLowerCase() || orderCustomer.includes(userFullName.toLowerCase()) || userFullName.toLowerCase().includes(orderCustomer))) return true;
         return false;
       });
 
-      // Filter out deleted orders & dismissed notifications
+      // Filter out deleted orders & dismissed notifications (merging local + cloud)
       let deletedIds = new Set();
-      let dismissedIds = new Set();
+      let dismissedIds = new Set(cloudDismissed);
       try {
         deletedIds = new Set(JSON.parse(localStorage.getItem('penny_deleted_order_ids') || '[]'));
-        dismissedIds = new Set(JSON.parse(localStorage.getItem('penny_dismissed_notifications') || '[]'));
+        const localDismissed = JSON.parse(localStorage.getItem('penny_dismissed_notifications') || '[]');
+        localDismissed.forEach(id => dismissedIds.add(id));
       } catch (e) {}
 
       const activeOrders = userOrders.filter(ord => !deletedIds.has(ord.id) && !dismissedIds.has(ord.id));
 
-      // 3. Fetch customer care inquiries
+      // 4. Fetch customer care inquiries
       let userInquiries = [];
       try {
         const inqRes = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user.id || '')}`);
@@ -119,10 +153,11 @@ export function NotificationProvider({ children }) {
       items.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
       setNotifications(items);
 
-      // Check against seen notification keys
-      let seenKeys = new Set();
+      // Check against seen notification keys (merging local + cloud)
+      let seenKeys = new Set(cloudSeen);
       try {
-        seenKeys = new Set(JSON.parse(localStorage.getItem('penny_seen_notifications') || '[]'));
+        const localSeen = JSON.parse(localStorage.getItem('penny_seen_notifications') || '[]');
+        localSeen.forEach(k => seenKeys.add(k));
       } catch (e) {}
 
       const unreadItems = items.filter(item => !seenKeys.has(item.versionKey));
@@ -133,7 +168,7 @@ export function NotificationProvider({ children }) {
     }
   }, [user]);
 
-  // Mark all active notifications as seen
+  // Mark all active notifications as seen with cross-device cloud sync
   const markAllAsSeen = useCallback(() => {
     if (notifications.length === 0) {
       setHasUnreadNotifications(false);
@@ -146,8 +181,20 @@ export function NotificationProvider({ children }) {
       localStorage.setItem('penny_seen_notifications', JSON.stringify(updated));
       setHasUnreadNotifications(false);
       setUnreadCount(0);
+
+      if (user) {
+        fetch('/api/auth/notifications-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            userId: user.id,
+            seenNotifications: updated,
+          }),
+        }).catch(() => {});
+      }
     } catch (e) {}
-  }, [notifications]);
+  }, [notifications, user]);
 
   // Sync on mount, user change, or update event
   useEffect(() => {

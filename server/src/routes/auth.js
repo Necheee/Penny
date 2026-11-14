@@ -260,6 +260,86 @@ router.post('/cart', async (req, res) => {
 });
 
 /**
+ * GET /api/auth/notifications-state
+ * Retrieves seen and dismissed notification IDs from user profile
+ */
+router.get('/notifications-state', async (req, res) => {
+  try {
+    const email = (req.query.email || '').trim().toLowerCase();
+    const userId = (req.query.userId || '').trim();
+
+    if (!email && !userId) {
+      return res.status(200).json({ success: true, seenNotifications: [], dismissedNotifications: [] });
+    }
+
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        const { rows } = await pool.query(
+          'SELECT seen_notifications, dismissed_notifications FROM users WHERE (LOWER(email) = $1 AND $1 != \'\') OR (id = $2 AND $2 != \'\')',
+          [email, userId]
+        );
+        if (rows.length > 0) {
+          const row = rows[0];
+          let seen = [];
+          let dismissed = [];
+          try { seen = typeof row.seen_notifications === 'string' ? JSON.parse(row.seen_notifications) : (row.seen_notifications || []); } catch {}
+          try { dismissed = typeof row.dismissed_notifications === 'string' ? JSON.parse(row.dismissed_notifications) : (row.dismissed_notifications || []); } catch {}
+          return res.status(200).json({
+            success: true,
+            seenNotifications: Array.isArray(seen) ? seen : [],
+            dismissedNotifications: Array.isArray(dismissed) ? dismissed : []
+          });
+        }
+      } catch (dbErr) {
+        console.warn('Could not query notifications-state from db:', dbErr.message);
+      }
+    }
+
+    return res.status(200).json({ success: true, seenNotifications: [], dismissedNotifications: [] });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/notifications-state
+ * Saves seen and dismissed notification IDs for cross-device sync
+ */
+router.post('/notifications-state', async (req, res) => {
+  try {
+    const { email, userId, seenNotifications, dismissedNotifications } = req.body;
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanUserId = (userId || '').trim();
+
+    if (!cleanEmail && !cleanUserId) {
+      return res.status(400).json({ success: false, message: 'Email or userId required.' });
+    }
+
+    const seenJson = JSON.stringify(Array.isArray(seenNotifications) ? seenNotifications : []);
+    const dismissedJson = JSON.stringify(Array.isArray(dismissedNotifications) ? dismissedNotifications : []);
+
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          `UPDATE users 
+           SET seen_notifications = $1, dismissed_notifications = $2 
+           WHERE (LOWER(email) = $3 AND $3 != '') OR (id = $4 AND $4 != '')`,
+          [seenJson, dismissedJson, cleanEmail, cleanUserId]
+        );
+      } catch (dbErr) {
+        console.warn('Could not update notifications-state in db:', dbErr.message);
+      }
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * POST /api/auth/customer-sync
  * Upserts customer profile to Neon Cloud and local storage users.json
  */

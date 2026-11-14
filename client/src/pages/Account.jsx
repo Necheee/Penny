@@ -30,10 +30,12 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { printOrderReceipt } from '../utils/printReceipt';
 import FormattedMessage from '../components/common/FormattedMessage';
+import { useDialog } from '../context/DialogContext';
 
 export default function Account() {
   const { user, logout, updateProfile, updateAddresses, deleteAccount } = useAuth();
   const { markAllAsSeen, refreshNotifications, hasUnreadNotifications } = useNotifications();
+  const { confirm, alert: showAlertDialog } = useDialog();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -226,18 +228,49 @@ export default function Account() {
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
 
-  const fetchUserOrders = async () => {
-    setIsLoadingOrders(true);
+  const fetchUserOrders = async (isSilent = false) => {
+    if (!isSilent && orders.length === 0) {
+      setIsLoadingOrders(true);
+    }
     try {
       let backendOrders = [];
+      const userEmail = (user?.email || '').toLowerCase().trim();
+      const userFullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
+      const userId = user?.id || '';
+
+      // 1. Direct query to my-orders (matches by user_id in DB, email, or customer name)
       try {
-        const res = await fetch('/api/payments/orders');
+        const queryParams = new URLSearchParams();
+        if (userEmail) queryParams.append('email', userEmail);
+        if (userId) queryParams.append('userId', userId);
+        if (userFullName) queryParams.append('customer', userFullName);
+
+        const res = await fetch(`/api/payments/my-orders?${queryParams.toString()}`);
         if (res.ok) {
           const data = await res.json();
           backendOrders = Array.isArray(data.data) ? data.data : [];
         }
       } catch (apiErr) {
-        console.warn('Could not fetch server orders, falling back to local store:', apiErr);
+        console.warn('Could not fetch server orders via my-orders, falling back:', apiErr);
+      }
+
+      // 2. Fallback to general orders query if needed
+      if (backendOrders.length === 0) {
+        try {
+          const res = await fetch('/api/payments/orders');
+          if (res.ok) {
+            const data = await res.json();
+            const allOrders = Array.isArray(data.data) ? data.data : [];
+            backendOrders = allOrders.filter(ord => {
+              const orderEmail = (ord.email || '').toLowerCase().trim();
+              const orderCustomer = (ord.customer || '').toLowerCase().trim();
+              if (userId && ord.userId && ord.userId === userId) return true;
+              if (userEmail && orderEmail && orderEmail === userEmail) return true;
+              if (userFullName && orderCustomer && (orderCustomer.includes(userFullName.toLowerCase()) || userFullName.toLowerCase().includes(orderCustomer))) return true;
+              return false;
+            });
+          }
+        } catch (apiErr) {}
       }
 
       let localOrders = [];
@@ -256,17 +289,14 @@ export default function Account() {
         }
       }
 
-      // Filter by logged-in user email or matching customer full name
-      const userEmail = (user?.email || '').toLowerCase().trim();
-      const userFullName = `${user?.firstName || ''} ${user?.lastName || ''}`.toLowerCase().trim();
-
+      // Filter by logged-in user email, userId or matching customer full name
       const userOrders = uniqueOrders.filter(ord => {
         const orderEmail = (ord.email || '').toLowerCase().trim();
         const orderCustomer = (ord.customer || '').toLowerCase().trim();
 
+        if (userId && ord.userId && ord.userId === userId) return true;
         if (userEmail && orderEmail && orderEmail === userEmail) return true;
-        if (userFullName && orderCustomer && (orderCustomer === userFullName || orderCustomer.includes(userFullName) || userFullName.includes(orderCustomer))) return true;
-        if (ord.userId && ord.userId === user?.id) return true;
+        if (userFullName && orderCustomer && (orderCustomer === userFullName.toLowerCase() || orderCustomer.includes(userFullName.toLowerCase()) || userFullName.toLowerCase().includes(orderCustomer))) return true;
         return false;
       });
 
@@ -300,10 +330,37 @@ export default function Account() {
     return [];
   });
 
-  const handleDeleteOrder = async (orderId) => {
-    if (!window.confirm(`Are you sure you want to delete order #${orderId} from your order history?`)) {
-      return;
+  // Sync cloud notifications state across devices
+  useEffect(() => {
+    if (!user) return;
+    async function loadCloudNotificationsState() {
+      try {
+        const res = await fetch(`/api/auth/notifications-state?email=${encodeURIComponent(user.email || '')}&userId=${encodeURIComponent(user.id || '')}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.dismissedNotifications)) {
+            setDismissedNotifications(prev => {
+              const merged = Array.from(new Set([...prev, ...data.dismissedNotifications]));
+              localStorage.setItem('penny_dismissed_notifications', JSON.stringify(merged));
+              return merged;
+            });
+          }
+        }
+      } catch (e) {}
     }
+    loadCloudNotificationsState();
+  }, [user?.email, user?.id]);
+
+  const handleDeleteOrder = async (orderId) => {
+    const shouldDelete = await confirm({
+      title: `Delete Order #${orderId}`,
+      message: `Are you sure you want to remove this order from your personal order history? This will delete the local summary for this device.`,
+      confirmText: 'Delete Order',
+      cancelText: 'Keep',
+      isDestructive: true,
+    });
+    if (!shouldDelete) return;
+
     setOrders(prev => prev.filter(o => o.id !== orderId));
 
     // Update localStorage penny_orders
@@ -328,17 +385,46 @@ export default function Account() {
     }
   };
 
-  const handleDismissNotification = (orderId) => {
-    if (!window.confirm(`Clear notification for order #${orderId}?`)) return;
-    const updated = [...dismissedNotifications, orderId];
+  const handleDismissNotification = async (orderId) => {
+    const shouldDismiss = await confirm({
+      title: 'Clear Delivery Notification',
+      message: `Clear the active delivery notification for order #${orderId}? Your order record remains safe in your Order History.`,
+      confirmText: 'Clear',
+      cancelText: 'Cancel',
+      isDestructive: false,
+    });
+    if (!shouldDismiss) return;
+
+    const updated = Array.from(new Set([...dismissedNotifications, orderId]));
     setDismissedNotifications(updated);
     localStorage.setItem('penny_dismissed_notifications', JSON.stringify(updated));
     refreshNotifications?.();
     window.dispatchEvent(new Event('penny_notifications_updated'));
+
+    // Sync cloud state for cross-device consistency
+    try {
+      await fetch('/api/auth/notifications-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user?.email,
+          userId: user?.id,
+          dismissedNotifications: updated,
+        }),
+      });
+    } catch (e) {}
   };
 
   const handleDeleteInquiry = async (inquiryId) => {
-    if (!window.confirm(`Delete inquiry #${inquiryId}?`)) return;
+    const shouldDelete = await confirm({
+      title: 'Delete Message',
+      message: `Are you sure you want to remove inquiry #${inquiryId} from your messages?`,
+      confirmText: 'Delete',
+      cancelText: 'Keep',
+      isDestructive: true,
+    });
+    if (!shouldDelete) return;
+
     setUserInquiries(prev => prev.filter(i => i.id !== inquiryId));
     refreshNotifications?.();
     window.dispatchEvent(new Event('penny_notifications_updated'));
@@ -349,10 +435,12 @@ export default function Account() {
     }
   };
 
-  const fetchUserInquiries = async () => {
+  const fetchUserInquiries = async (isSilent = false) => {
     if (!user?.email) return;
     try {
-      setIsLoadingInquiries(true);
+      if (!isSilent && userInquiries.length === 0) {
+        setIsLoadingInquiries(true);
+      }
       const res = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user.id || '')}`);
       if (res.ok) {
         const data = await res.json();
@@ -373,18 +461,18 @@ export default function Account() {
 
   useEffect(() => {
     if (user) {
-      fetchUserOrders();
-      fetchUserInquiries();
+      fetchUserOrders(false);
+      fetchUserInquiries(false);
 
-      // Poll every 10 seconds for real-time admin replies
+      // Silent background poll every 15s to keep statuses live without page flickers
       const interval = setInterval(() => {
-        fetchUserOrders();
-        fetchUserInquiries();
-      }, 10000);
+        fetchUserOrders(true);
+        fetchUserInquiries(true);
+      }, 15000);
 
       const onFocus = () => {
-        fetchUserOrders();
-        fetchUserInquiries();
+        fetchUserOrders(true);
+        fetchUserInquiries(true);
       };
       window.addEventListener('focus', onFocus);
 
@@ -397,7 +485,7 @@ export default function Account() {
 
   useEffect(() => {
     const handleInquirySync = () => {
-      fetchUserInquiries();
+      fetchUserInquiries(true);
     };
     window.addEventListener('penny_inquiry_sent', handleInquirySync);
     window.addEventListener('penny_inquiry_updated', handleInquirySync);
@@ -1652,13 +1740,20 @@ export default function Account() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (window.confirm('Are you sure you want to permanently delete your account? All saved addresses and details will be erased.')) {
+                    onClick={async () => {
+                      const shouldDelete = await confirm({
+                        title: 'Permanently Delete Account',
+                        message: 'Are you sure you want to permanently delete your account? All saved addresses, delivery records, and profile details will be erased.',
+                        confirmText: 'Delete Account',
+                        cancelText: 'Cancel',
+                        isDestructive: true,
+                      });
+                      if (shouldDelete) {
                         deleteAccount();
                         navigate('/');
                       }
                     }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold uppercase tracking-wider border border-red-200 rounded-xs transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold uppercase tracking-wider border border-red-200 rounded-xs transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Delete Account
                   </button>

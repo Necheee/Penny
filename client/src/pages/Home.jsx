@@ -14,7 +14,7 @@ const heroImages = [
 export default function Home() {
   const { products, featuredProducts } = useProducts();
   const linenSet = products.find(p => p.id === 'p-001') || products[0];
-  const displayedFeatured = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : products.slice(0, 4);
+  const displayedFeatured = featuredProducts.slice(0, 4);
 
   // Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -113,20 +113,22 @@ export default function Home() {
       </section>
 
       {/* 3. Featured Collection */}
-      <section className="py-12 px-6 md:px-12 max-w-7xl mx-auto">
-        <div className="flex justify-between items-end mb-12">
-          <h2 className="text-3xl font-serif text-brand-charcoal">Featured Essentials</h2>
-          <Link to="/shop" className="hidden md:inline-flex items-center text-xs font-bold tracking-[0.15em] uppercase hover:text-brand-taupe transition-colors">
-            View All <ArrowRight className="ml-2 w-4 h-4" />
-          </Link>
-        </div>
-        
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-12 md:gap-x-8">
-          {displayedFeatured.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      </section>
+      {displayedFeatured.length > 0 && (
+        <section className="py-12 px-6 md:px-12 max-w-7xl mx-auto">
+          <div className="flex justify-between items-end mb-12">
+            <h2 className="text-3xl font-serif text-brand-charcoal">Featured Essentials</h2>
+            <Link to="/shop" className="hidden md:inline-flex items-center text-xs font-bold tracking-[0.15em] uppercase hover:text-brand-taupe transition-colors">
+              View All <ArrowRight className="ml-2 w-4 h-4" />
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-12 md:gap-x-8">
+            {displayedFeatured.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 4. Two-Piece Set Feature */}
       <section className="bg-brand-charcoal text-brand-offwhite py-24">

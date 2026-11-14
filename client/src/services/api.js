@@ -31,7 +31,10 @@ const getStoredCategories = () => {
 const API_BASE = '/api';
 
 const getAuthHeaders = () => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('penny_token') : null;
+  let token = null;
+  if (typeof window !== 'undefined') {
+    token = localStorage.getItem('penny_admin_token') || localStorage.getItem('penny_token');
+  }
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   return headers;

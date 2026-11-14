@@ -35,6 +35,7 @@ const Checkout = () => {
     accountNumber: '1018924560',
     instructions: 'Please transfer the exact total amount and use your Order Number as payment reference/narration.',
   });
+  const [copiedNumber, setCopiedNumber] = useState(false);
 
   useEffect(() => {
     async function loadBankConfig() {
@@ -174,6 +175,7 @@ const Checkout = () => {
 
     const orderPayload = {
       ...formData,
+      userId: user?.id || null,
       cartItems,
       cartSubtotal,
       shippingCost,
@@ -1020,11 +1022,24 @@ const Checkout = () => {
                             type="button"
                             onClick={() => {
                               navigator.clipboard?.writeText(bankDetails.accountNumber);
-                              alert(`Account number ${bankDetails.accountNumber} copied to clipboard!`);
+                              setCopiedNumber(true);
+                              setTimeout(() => setCopiedNumber(false), 2500);
                             }}
-                            className="px-2.5 py-1.5 border border-brand-charcoal/20 hover:border-brand-charcoal text-[10px] font-bold uppercase tracking-wider text-brand-charcoal inline-flex items-center gap-1 rounded-xs bg-brand-offwhite cursor-pointer"
+                            className={`px-2.5 py-1.5 border text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 rounded-xs transition-colors cursor-pointer ${
+                              copiedNumber 
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                                : 'border-brand-charcoal/20 hover:border-brand-charcoal text-brand-charcoal bg-brand-offwhite'
+                            }`}
                           >
-                            <Copy className="w-3 h-3" /> Copy
+                            {copiedNumber ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-600" /> Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" /> Copy
+                              </>
+                            )}
                           </button>
                         </div>
                       </div>

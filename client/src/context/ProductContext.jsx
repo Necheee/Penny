@@ -35,27 +35,38 @@ const normalizeProduct = (p) => {
 export function ProductProvider({ children }) {
   // Load products from localStorage or fallback to mockCatalogue (preserves archive status)
   const [allProducts, setAllProducts] = useState(() => {
+    let deletedProductIds = new Set();
+    try {
+      const delSaved = localStorage.getItem('penny_deleted_products');
+      if (delSaved) {
+        JSON.parse(delSaved).forEach(id => deletedProductIds.add(id));
+      }
+    } catch {}
+
     const saved = localStorage.getItem('penny_products');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const existingIds = new Set(parsed.map(p => p.id));
-          const updated = parsed.map(p => {
-            const initP = initialProducts.find(ip => ip.id === p.id);
-            return normalizeProduct({
-              ...initP,
-              ...p,
-              subtype: p.subtype || initP?.subtype || '',
-              material: p.material || initP?.material || '100% Cotton',
-              fit: p.fit || initP?.fit || 'Relaxed fit',
-              care: p.care || initP?.care || 'Machine wash cold.',
-              shipping: p.shipping || initP?.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
-              isArchived: p.isArchived !== undefined ? !!p.isArchived : false,
+          const updated = parsed
+            .filter(p => !deletedProductIds.has(p.id))
+            .map(p => {
+              const initP = initialProducts.find(ip => ip.id === p.id);
+              return normalizeProduct({
+                ...initP,
+                ...p,
+                subtype: p.subtype || initP?.subtype || '',
+                material: p.material || initP?.material || '100% Cotton',
+                fit: p.fit || initP?.fit || 'Relaxed fit',
+                care: p.care || initP?.care || 'Machine wash cold.',
+                shipping: p.shipping || initP?.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+                isArchived: p.isArchived !== undefined ? !!p.isArchived : false,
+                featured: p.featured !== undefined ? !!p.featured : false,
+              });
             });
-          });
           initialProducts.forEach(ip => {
-            if (!existingIds.has(ip.id)) {
+            if (!existingIds.has(ip.id) && !deletedProductIds.has(ip.id)) {
               updated.push(normalizeProduct(ip));
             }
           });
@@ -65,7 +76,7 @@ export function ProductProvider({ children }) {
         console.error("Failed to parse saved products", e);
       }
     }
-    return initialProducts.map(normalizeProduct);
+    return initialProducts.filter(ip => !deletedProductIds.has(ip.id)).map(normalizeProduct);
   });
 
   // Active products for live customer storefront browsing
@@ -214,23 +225,36 @@ export function ProductProvider({ children }) {
     let isMounted = true;
     async function syncBackendCatalogue() {
       try {
+        let deletedProductIds = new Set();
+        try {
+          const delSaved = localStorage.getItem('penny_deleted_products');
+          if (delSaved) {
+            JSON.parse(delSaved).forEach(id => deletedProductIds.add(id));
+          }
+        } catch {}
+
         const [liveProducts, liveCategories, liveAnnouncements] = await Promise.all([
           getProducts({ includeArchived: true }),
           getCategories(),
           getAnnouncementsApi().catch(() => null),
         ]);
+
         if (isMounted) {
           if (Array.isArray(liveProducts) && liveProducts.length > 0) {
-            const liveNormalized = liveProducts.map(normalizeProduct);
-            const liveMap = new Map(liveNormalized.map(p => [p.id, p]));
+            const activeLive = liveProducts
+              .filter(p => !deletedProductIds.has(p.id))
+              .map(normalizeProduct);
+            const liveMap = new Map(activeLive.map(p => [p.id, p]));
+
             setAllProducts((prev) => {
-              const combined = [...liveNormalized];
-              // Preserve any newly-added local products not yet caught in backend query
+              const combined = [...activeLive];
+              // Only preserve genuinely custom client-added products not yet in backend
               prev.forEach(localP => {
-                if (!liveMap.has(localP.id)) {
+                if (!liveMap.has(localP.id) && !deletedProductIds.has(localP.id) && localP.id.startsWith('p-custom')) {
                   combined.unshift(normalizeProduct(localP));
                 }
               });
+              localStorage.setItem('penny_products', JSON.stringify(combined));
               return combined;
             });
           }
@@ -244,9 +268,9 @@ export function ProductProvider({ children }) {
               }
             } catch {}
 
-            const activeLive = liveCategories.filter(c => !deletedIds.has(c.id) && !deletedIds.has(c.slug));
-            setCategories(activeLive);
-            localStorage.setItem('penny_categories', JSON.stringify(activeLive));
+            const activeLiveCats = liveCategories.filter(c => !deletedIds.has(c.id) && !deletedIds.has(c.slug));
+            setCategories(activeLiveCats);
+            localStorage.setItem('penny_categories', JSON.stringify(activeLiveCats));
           }
           if (Array.isArray(liveAnnouncements) && liveAnnouncements.length > 0) {
             setAnnouncements(liveAnnouncements);
@@ -275,14 +299,20 @@ export function ProductProvider({ children }) {
   // 1. Add Product with immediate Cloud Database & Storage persistence
   const addProduct = async (newProduct) => {
     const normalized = normalizeProduct(newProduct);
-    setAllProducts((prev) => [normalized, ...prev]);
+    setAllProducts((prev) => {
+      const updated = [normalized, ...prev];
+      localStorage.setItem('penny_products', JSON.stringify(updated));
+      return updated;
+    });
     try {
       const persisted = await createProductApi(normalized);
       if (persisted) {
         const normPersisted = normalizeProduct(persisted);
-        setAllProducts((prev) =>
-          prev.map((p) => (p.id === normalized.id ? normPersisted : p))
-        );
+        setAllProducts((prev) => {
+          const updated = prev.map((p) => (p.id === normalized.id ? normPersisted : p));
+          localStorage.setItem('penny_products', JSON.stringify(updated));
+          return updated;
+        });
       }
     } catch (e) {
       console.warn("Failed to persist product to cloud DB:", e);
@@ -292,9 +322,11 @@ export function ProductProvider({ children }) {
   // 2. Update Product with immediate Cloud Database & Storage persistence
   const updateProduct = async (updatedProduct) => {
     const normalized = normalizeProduct(updatedProduct);
-    setAllProducts((prev) =>
-      prev.map((p) => (p.id === normalized.id ? normalized : p))
-    );
+    setAllProducts((prev) => {
+      const updated = prev.map((p) => (p.id === normalized.id ? normalized : p));
+      localStorage.setItem('penny_products', JSON.stringify(updated));
+      return updated;
+    });
     try {
       await updateProductApi(normalized.id, normalized);
     } catch (e) {
@@ -304,7 +336,18 @@ export function ProductProvider({ children }) {
 
   // 3. Delete Product permanently from Cloud Database & Storage
   const deleteProduct = async (productId) => {
-    setAllProducts((prev) => prev.filter((p) => p.id !== productId));
+    try {
+      const delSaved = localStorage.getItem('penny_deleted_products');
+      const delIds = new Set(delSaved ? JSON.parse(delSaved) : []);
+      delIds.add(productId);
+      localStorage.setItem('penny_deleted_products', JSON.stringify(Array.from(delIds)));
+    } catch {}
+
+    setAllProducts((prev) => {
+      const filtered = prev.filter((p) => p.id !== productId);
+      localStorage.setItem('penny_products', JSON.stringify(filtered));
+      return filtered;
+    });
     try {
       await deleteProductApi(productId);
     } catch (e) {
@@ -313,34 +356,42 @@ export function ProductProvider({ children }) {
   };
 
   // 4. Archive Product (Soft-hide from storefront while keeping data saved)
-  const archiveProduct = (productId) => {
-    setAllProducts((prev) =>
-      prev.map((p) =>
+  const archiveProduct = async (productId) => {
+    setAllProducts((prev) => {
+      const updated = prev.map((p) =>
         p.id === productId
           ? { ...p, isArchived: true, archivedAt: new Date().toISOString() }
           : p
-      )
-    );
-    toggleArchiveProduct(productId, true).catch(() => {});
+      );
+      localStorage.setItem('penny_products', JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      await toggleArchiveProduct(productId, true);
+    } catch (e) {}
   };
 
   // 5. Unarchive / Restore Product to active storefront
-  const unarchiveProduct = (productId) => {
-    setAllProducts((prev) =>
-      prev.map((p) =>
+  const unarchiveProduct = async (productId) => {
+    setAllProducts((prev) => {
+      const updated = prev.map((p) =>
         p.id === productId
           ? { ...p, isArchived: false, archivedAt: null }
           : p
-      )
-    );
-    toggleArchiveProduct(productId, false).catch(() => {});
+      );
+      localStorage.setItem('penny_products', JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      await toggleArchiveProduct(productId, false);
+    } catch (e) {}
   };
 
   // 6. Toggle Archive state
-  const toggleArchive = (productId) => {
+  const toggleArchive = async (productId) => {
     let nextStatus = false;
-    setAllProducts((prev) =>
-      prev.map((p) => {
+    setAllProducts((prev) => {
+      const updated = prev.map((p) => {
         if (p.id === productId) {
           nextStatus = !p.isArchived;
           return {
@@ -350,23 +401,29 @@ export function ProductProvider({ children }) {
           };
         }
         return p;
-      })
-    );
-    toggleArchiveProduct(productId, nextStatus).catch(() => {});
+      });
+      localStorage.setItem('penny_products', JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      await toggleArchiveProduct(productId, nextStatus);
+    } catch (e) {}
   };
 
   // 7. Toggle Featured on Homepage
   const toggleFeatured = async (productId) => {
     let nextVal = false;
-    setAllProducts((prev) =>
-      prev.map((p) => {
+    setAllProducts((prev) => {
+      const updated = prev.map((p) => {
         if (p.id === productId) {
           nextVal = !p.featured;
           return { ...p, featured: nextVal };
         }
         return p;
-      })
-    );
+      });
+      localStorage.setItem('penny_products', JSON.stringify(updated));
+      return updated;
+    });
     try {
       await updateProductApi(productId, { featured: nextVal });
     } catch (e) {

@@ -16,6 +16,7 @@ function mapDbOrder(row) {
 
   return {
     id: row.id,
+    userId: row.user_id || row.userId || null,
     reference: row.reference,
     customer: row.customer,
     email: row.email,
@@ -295,8 +296,11 @@ router.post('/verify', async (req, res) => {
       ? orderData.orderRef
       : `PNY-${Math.floor(100000 + Math.random() * 900000)}`;
     
+    const userId = orderData?.userId || null;
+    
     const newOrder = {
       id: orderId,
+      userId,
       reference,
       customer: `${orderData?.firstName || 'Valued'} ${orderData?.lastName || 'Client'}`.trim(),
       email: orderData?.email || '',
@@ -331,18 +335,19 @@ router.post('/verify', async (req, res) => {
       if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
         const pool = getPool();
         await pool.query(`
-          INSERT INTO orders (id, reference, customer, email, phone, state, city, address, shipping_method, payment_method, transfer_account_name, payment_confirmed, items_count, subtotal, delivery_fee, total, status, items, paid_at, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+          INSERT INTO orders (id, reference, customer, email, phone, state, city, address, shipping_method, payment_method, transfer_account_name, payment_confirmed, items_count, subtotal, delivery_fee, total, status, items, paid_at, created_at, user_id)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
           ON CONFLICT (id) DO UPDATE SET
             status = EXCLUDED.status,
             payment_confirmed = EXCLUDED.payment_confirmed,
-            paid_at = EXCLUDED.paid_at
+            paid_at = EXCLUDED.paid_at,
+            user_id = COALESCE(EXCLUDED.user_id, orders.user_id)
         `, [
           newOrder.id, newOrder.reference, newOrder.customer, newOrder.email, newOrder.phone,
           newOrder.state, newOrder.city, newOrder.address, newOrder.shippingMethod, newOrder.paymentMethod,
           newOrder.transferAccountName || '', newOrder.paymentConfirmed, newOrder.itemsCount,
           newOrder.subtotal, newOrder.deliveryFee, newOrder.total, newOrder.status,
-          JSON.stringify(newOrder.items), newOrder.paidAt, newOrder.createdAt
+          JSON.stringify(newOrder.items), newOrder.paidAt, newOrder.createdAt, newOrder.userId
         ]);
         console.log(`[ORDERS] Order #${newOrder.id} successfully saved to Neon PostgreSQL Cloud DB!`);
       }
@@ -443,20 +448,76 @@ router.post('/orders/:id/confirm-payment', async (req, res) => {
       order = { id, paymentConfirmed: true, status: 'Processing', paidAt };
     }
 
-    // Trigger transactional digital receipt and confirmation email
-    const emailResult = await sendOrderConfirmationEmail(order);
+    // Trigger transactional digital receipt and confirmation email asynchronously in background
+    sendOrderConfirmationEmail(order).catch(err => {
+      console.warn('[ORDERS] Background email sending failed:', err.message);
+    });
 
     return res.status(200).json({
       success: true,
       message: 'Bank transfer confirmed successfully and receipt email sent to customer.',
       order,
-      emailDispatch: emailResult,
     });
   } catch (error) {
     console.error('Failed to confirm payment and dispatch email:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while confirming payment.',
+    });
+  }
+});
+
+/**
+ * GET /api/payments/my-orders
+ * Retrieve orders belonging to the customer by email, user_id, or name.
+ * Direct cloud database synchronization for cross-device visibility.
+ */
+router.get('/my-orders', async (req, res) => {
+  try {
+    const email = (req.query.email || '').trim().toLowerCase();
+    const userId = (req.query.userId || '').trim();
+    const customer = (req.query.customer || '').trim();
+
+    let matchedOrders = [];
+
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        const dbRes = await pool.query(`
+          SELECT * FROM orders 
+          WHERE (user_id IS NOT NULL AND user_id = $1)
+             OR (email IS NOT NULL AND LOWER(email) = LOWER($2))
+             OR ($3 != '' AND LOWER(customer) ILIKE $4)
+          ORDER BY created_at DESC
+        `, [userId || 'none', email || 'none', customer, `%${customer}%`]);
+
+        if (dbRes.rows && dbRes.rows.length > 0) {
+          matchedOrders = dbRes.rows.map(mapDbOrder);
+        }
+      } catch (dbErr) {
+        console.warn('[ORDERS] my-orders query error from DB:', dbErr.message);
+      }
+    }
+
+    if (matchedOrders.length === 0) {
+      matchedOrders = ordersStore.filter(o => {
+        if (userId && o.userId === userId) return true;
+        if (email && (o.email || '').toLowerCase() === email) return true;
+        if (customer && (o.customer || '').toLowerCase().includes(customer.toLowerCase())) return true;
+        return false;
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: matchedOrders.length,
+      data: matchedOrders,
+    });
+  } catch (err) {
+    console.error('[ORDERS] my-orders endpoint error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve user orders.',
     });
   }
 });

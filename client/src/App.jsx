@@ -18,6 +18,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
 import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
 import { ModalProvider } from './context/ModalContext';
+import { DialogProvider } from './context/DialogContext';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
@@ -33,6 +34,7 @@ function App() {
           <WishlistProvider>
             <CartProvider>
               <ModalProvider>
+                <DialogProvider>
               <Router>
               <CartDrawer />
               <Layout>
@@ -77,6 +79,7 @@ function App() {
                 </Routes>
               </Layout>
             </Router>
+                </DialogProvider>
           </ModalProvider>
         </CartProvider>
       </WishlistProvider>

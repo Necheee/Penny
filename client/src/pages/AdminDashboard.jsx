@@ -40,6 +40,7 @@ import { useProducts } from '../context/ProductContext';
 import { printOrderReceipt } from '../utils/printReceipt';
 import { generateOrderReceiptEmailHtml, generateInquiryReplyEmailHtml } from '../utils/emailPreviewGenerator';
 import FormattedMessage from '../components/common/FormattedMessage';
+import { useDialog } from '../context/DialogContext';
 
 // Curated 1-Click Accordion & Garment Presets to eliminate repetitive product entry
 const DEFAULT_GARMENT_PRESETS = {
@@ -384,6 +385,8 @@ export default function AdminDashboard() {
     updateSizeGuide,
   } = useProducts();
 
+  const { confirm: showConfirmDialog, alert: showAlertDialog } = useDialog();
+
   const productList = allProducts.length ? allProducts : activeProductList;
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('all'); // 'all' | 'active' | 'archived'
   const [productFeedback, setProductFeedback] = useState('');
@@ -612,9 +615,13 @@ export default function AdminDashboard() {
     setTimeout(() => setAnnouncementFeedback(''), 4000);
   };
 
-  const handleDeleteAnnouncementItem = (index) => {
+  const handleDeleteAnnouncementItem = async (index) => {
     if (announcementList.length <= 1) {
-      alert('You must keep at least one active announcement message.');
+      await showAlertDialog({
+        title: 'Minimum Announcement Notice',
+        message: 'You must keep at least one active announcement message displayed on the storefront.',
+        type: 'warning',
+      });
       return;
     }
     const updated = announcementList.filter((_, idx) => idx !== index);
@@ -834,7 +841,11 @@ export default function AdminDashboard() {
     const subName = typeof productForm.subcategory === 'string' ? productForm.subcategory : productForm.subcategory?.name || '';
     const key = targetKey || subName || productForm.category;
     if (!key) {
-      alert('Please select or enter a subcategory first.');
+      showAlertDialog({
+        title: 'Select Subcategory',
+        message: 'Please select or enter a subcategory first before saving a preset.',
+        type: 'warning',
+      });
       return;
     }
     const newPresetData = {
@@ -969,7 +980,11 @@ export default function AdminDashboard() {
   const processImageFile = async (file) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file (PNG, JPG, or WEBP).');
+      showAlertDialog({
+        title: 'Unsupported File Format',
+        message: 'Please upload an image file (PNG, JPG, or WEBP).',
+        type: 'warning',
+      });
       return;
     }
 
@@ -1050,7 +1065,11 @@ export default function AdminDashboard() {
   const handleSaveProduct = (e) => {
     e.preventDefault();
     if (!productForm.name || !productForm.price) {
-      alert('Please fill out the product title and price.');
+      showAlertDialog({
+        title: 'Missing Details',
+        message: 'Please provide both the piece name and retail price before saving.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -1146,12 +1165,16 @@ export default function AdminDashboard() {
   };
 
   // Archive or Unarchive Product (Soft-hide from storefront while keeping data safe)
-  const handleToggleArchive = (product) => {
+  const handleToggleArchive = async (product) => {
     const willArchive = !product.isArchived;
     if (willArchive) {
-      const confirmArchive = window.confirm(
-        `Archive "${product.name}"?\n\nThis piece will be hidden from the live website immediately, but all details, images, and presets will remain safely stored here for easy retrieval anytime.`
-      );
+      const confirmArchive = await showConfirmDialog({
+        title: `Archive "${product.name}"?`,
+        message: 'This piece will be hidden from the live website immediately, but all details, images, and presets will remain safely stored here for easy retrieval anytime.',
+        confirmText: 'Archive Piece',
+        cancelText: 'Cancel',
+        isDestructive: false,
+      });
       if (!confirmArchive) return;
     }
     toggleArchive(product.id);
@@ -1164,8 +1187,15 @@ export default function AdminDashboard() {
   };
 
   // Delete product permanently with Context Sync
-  const handleDeleteProduct = (productId) => {
-    if (confirm('Are you sure you want to remove this piece from the catalogue?')) {
+  const handleDeleteProduct = async (productId) => {
+    const shouldDelete = await showConfirmDialog({
+      title: 'Remove Piece from Catalogue',
+      message: 'Are you sure you want to permanently delete this piece? It will be removed from both the storefront and the administration database.',
+      confirmText: 'Delete Piece',
+      cancelText: 'Keep',
+      isDestructive: true,
+    });
+    if (shouldDelete) {
       deleteProduct(productId);
     }
   };
@@ -1203,8 +1233,15 @@ export default function AdminDashboard() {
   };
 
   // Delete Category with Context Sync
-  const handleDeleteCategory = (categoryId) => {
-    if (confirm('Delete this category?')) {
+  const handleDeleteCategory = async (categoryId) => {
+    const shouldDelete = await showConfirmDialog({
+      title: 'Delete Category',
+      message: 'Are you sure you want to delete this category? Associated pieces will remain saved in the catalogue.',
+      confirmText: 'Delete Category',
+      cancelText: 'Cancel',
+      isDestructive: true,
+    });
+    if (shouldDelete) {
       deleteCategory(categoryId);
       setCategoryFeedback('Category deleted.');
       setTimeout(() => setCategoryFeedback(''), 3000);
@@ -1310,7 +1347,11 @@ export default function AdminDashboard() {
   const handleSaveCategoryEdit = async (e) => {
     if (e) e.preventDefault();
     if (!editingCategory.name.trim()) {
-      alert('Category name is required.');
+      showAlertDialog({
+        title: 'Category Name Required',
+        message: 'Please provide a valid name for this category.',
+        type: 'warning',
+      });
       return;
     }
     const cleanSlug = editingCategory.slug.trim() || editingCategory.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
@@ -1356,8 +1397,15 @@ export default function AdminDashboard() {
   };
 
   // Delete subcategory from specific category
-  const handleDeleteSubcategoryFromCat = (catId, subName) => {
-    if (confirm(`Remove subcategory "${subName}" from this category?`)) {
+  const handleDeleteSubcategoryFromCat = async (catId, subName) => {
+    const shouldRemove = await showConfirmDialog({
+      title: 'Remove Subcategory',
+      message: `Are you sure you want to remove the "${subName}" subcategory from this category?`,
+      confirmText: 'Remove',
+      cancelText: 'Keep',
+      isDestructive: true,
+    });
+    if (shouldRemove) {
       deleteSubcategory(catId, subName);
       setCategoryFeedback(`Removed "${subName}" subcategory.`);
       setTimeout(() => setCategoryFeedback(''), 3000);
@@ -3915,7 +3963,14 @@ export default function AdminDashboard() {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (confirm(`Reset "${editingPresetKey}" preset back to factory default?`)) {
+                        const shouldReset = await showConfirmDialog({
+                          title: 'Reset Preset',
+                          message: `Reset "${editingPresetKey}" preset back to factory default?`,
+                          confirmText: 'Reset',
+                          cancelText: 'Cancel',
+                          isDestructive: false,
+                        });
+                        if (shouldReset) {
                           const def = await handleResetGarmentPreset(editingPresetKey);
                           setPresetForm({
                             description: def.description || '',
@@ -4086,7 +4141,11 @@ export default function AdminDashboard() {
                   onClick={async () => {
                     const finalKey = isCustomPresetKey ? customPresetNameInput.trim() : editingPresetKey;
                     if (!finalKey) {
-                      alert('Please provide a name for this preset.');
+                      showAlertDialog({
+                        title: 'Preset Name Required',
+                        message: 'Please provide a name for this custom preset.',
+                        type: 'warning',
+                      });
                       return;
                     }
                     await handleSaveGarmentPreset(finalKey, presetForm);
