@@ -30,10 +30,17 @@ The Admin Dashboard provides store managers with full administrative control thr
 - **Private Credential Provisioning:** The owner's initial administrator account is seeded securely through server environment variables (`ADMIN_EMAIL`, `ADMIN_PASSWORD`) with `bcrypt` salt hashing.
 - **Session Termination:** An authenticated administrator can terminate their session via the sidebar "Log Out" action, invalidating the session cookie/token and returning to the storefront.
 
-### 2.2 Product Management (CRUD)
-- **Product Catalog Table:** Searchable, filterable list of all products with stock indicators and pricing.
+### 2.2 Product Management (CRUD & Non-Destructive Archiving)
+- **Product Catalog Table:** Searchable, filterable list of all products with stock indicators, archive badges, and pricing.
+- **Product Archiving (Soft-Hide & Retrieval):**
+  - **Non-Destructive Archiving:** Rather than permanently deleting items that are out of season or temporarily paused, store owners can archive pieces with a single click.
+  - **Storefront Isolation:** Archived products are immediately filtered out from public viewing on the website (`/shop`, Homepage Essentials, Search Modal, and Bag suggestions).
+  - **Quick Status Filtering:** Administrative switcher tabs allow viewing **All**, **Active**, and **Archived** products in the catalogue.
+  - **1-Click Restoration:** Easy retrieval button (`ArchiveRestore`) on each archived piece to immediately unarchive and restore it to the live store catalogue.
+  - **In-Modal Archive Flag:** Checkbox inside the Add/Edit Product form to set or toggle archive state with clear visual warnings.
+  - **API Endpoint:** Supported by server-side `PATCH /api/products/:id/archive` and persistent storage syncing.
 - **Add / Edit Product Form:**
-  - Product name, slug, description, category, subcategory.
+  - Product name, slug, description, category, subcategory, subtype.
   - Base price, discounted/sale price.
   - Available sizes (`XS` through `XXL`) and custom size toggles.
   - Color swatches with hex color picker and label assignment.

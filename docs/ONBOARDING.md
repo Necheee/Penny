@@ -120,8 +120,13 @@ Open your browser to `http://localhost:5173` to explore the storefront!
 
 ### D. Admin Dashboard (`/admin`)
 Log in at `/admin/login` with your admin credentials to access:
-- **Overview:** High-level metrics (revenue, total orders, catalogue size, active clients) and recent transactions.
-- **Catalogue & Inventory:** Add new products, edit descriptions, adjust pricing, and upload images.
+- **Overview:** High-level metrics (revenue, active orders, total products breakdown showing active vs. archived counts) and recent transactions.
+- **Catalogue & Inventory (with Product Archiving):**
+  - Add new products, edit descriptions, adjust pricing, and upload images.
+  - **Archive / Soft-Hide Products:** Archive any product with one click using the archive icon button in the table or the archive checkbox inside the Add/Edit modal.
+  - **Storefront Isolation:** Archived products are instantly hidden from the live website (Shop collection, Homepage essentials, and Search modal) without losing any photos, descriptions, or presets.
+  - **Status Filter:** Switch between **All**, **Active**, and **Archived** views to easily manage current versus seasonal/inactive inventory.
+  - **1-Click Retrieval & Restore:** Click the restore icon on any archived piece to instantly unarchive and reactivate it on the storefront.
 - **Categories Manager:** Add or delete garment categories. Changes persist across page reloads and instantly sync with the storefront navigation.
 - **Announcement Bar Editor:** Edit the top announcement banner text and link in real time.
 - **Size Guide Editor:** Edit sizing headings, garment descriptions, and measurement tables.

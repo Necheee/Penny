@@ -31,7 +31,9 @@ import {
   Sparkles,
   Zap,
   Settings,
-  RotateCcw
+  RotateCcw,
+  Archive,
+  ArchiveRestore
 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 import { printOrderReceipt } from '../utils/printReceipt';
@@ -357,11 +359,15 @@ export default function AdminDashboard() {
 
   // Product, Category, Announcements & Size Guide State from Shared ProductContext
   const { 
-    products: productList = [], 
+    allProducts = [],
+    products: activeProductList = [], 
     categories: categoryList = [], 
     addProduct, 
     updateProduct, 
     deleteProduct, 
+    archiveProduct,
+    unarchiveProduct,
+    toggleArchive,
     toggleFeatured, 
     toggleStock, 
     addCategory, 
@@ -375,6 +381,10 @@ export default function AdminDashboard() {
     sizeGuideData = {},
     updateSizeGuide,
   } = useProducts();
+
+  const productList = allProducts.length ? allProducts : activeProductList;
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState('all'); // 'all' | 'active' | 'archived'
+  const [productFeedback, setProductFeedback] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
@@ -562,6 +572,7 @@ export default function AdminDashboard() {
     fit: '',
     featured: false,
     inStock: true,
+    isArchived: false,
     colors: ['Black', 'White'],
     availableSizes: ['S', 'M', 'L', 'XL'],
     imageUrl: ''
@@ -647,19 +658,32 @@ export default function AdminDashboard() {
 
   // Calculate Metrics
   const totalRevenue = orders.reduce((sum, ord) => sum + ord.total, 0);
-  const featuredCount = productList.filter(p => p.featured).length;
-  const outOfStockCount = productList.filter(p => !p.inStock).length;
+  const activeCount = productList.filter(p => !p.isArchived).length;
+  const archivedCount = productList.filter(p => !!p.isArchived).length;
+  const featuredCount = productList.filter(p => p.featured && !p.isArchived).length;
+  const outOfStockCount = productList.filter(p => !p.inStock && !p.isArchived).length;
 
   // Filter Products
   const filteredProducts = productList.filter(p => {
+    // 1. Status Filter (all / active / archived)
+    if (selectedStatusFilter === 'active' && p.isArchived) return false;
+    if (selectedStatusFilter === 'archived' && !p.isArchived) return false;
+
+    // 2. Search query
     const subName = typeof p.subcategory === 'string' ? p.subcategory : p.subcategory?.name || '';
     const catName = typeof p.category === 'string' ? p.category : p.category?.name || '';
-    const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = !searchQuery ||
+                          p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          subName.toLowerCase().includes(searchQuery.toLowerCase());
+                          subName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.id?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // 3. Category Filter
     const matchesCategory = selectedCategoryFilter === 'all' || 
                             p.category === selectedCategoryFilter || 
                             p.category === categoryList.find(c => c.id === selectedCategoryFilter)?.slug;
+
+    // 4. Subcategory Filter
     const matchesSubcategory = selectedSubcategoryFilter === 'all' || 
                                !selectedSubcategoryFilter || 
                                subName.toLowerCase() === selectedSubcategoryFilter.toLowerCase();
@@ -871,6 +895,7 @@ export default function AdminDashboard() {
       shipping: preset.shipping,
       featured: false,
       inStock: true,
+      isArchived: false,
       colors: [...preset.colors],
       availableSizes: [...preset.sizes],
       imageUrl: ''
@@ -898,6 +923,7 @@ export default function AdminDashboard() {
       shipping: product.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
       featured: !!product.featured,
       inStock: product.inStock !== false,
+      isArchived: false,
       colors: product.colors?.length ? [...product.colors] : ['Black'],
       availableSizes: product.availableSizes?.length ? [...product.availableSizes] : ['S', 'M', 'L', 'XL'],
       imageUrl: product.images?.primary || ''
@@ -925,6 +951,7 @@ export default function AdminDashboard() {
       shipping: product.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
       featured: !!product.featured,
       inStock: product.inStock !== false,
+      isArchived: !!product.isArchived,
       colors: product.colors?.length ? [...product.colors] : ['Black'],
       availableSizes: product.availableSizes?.length ? [...product.availableSizes] : ['M', 'L'],
       imageUrl: product.images?.primary || ''
@@ -1068,6 +1095,7 @@ export default function AdminDashboard() {
         shipping: productForm.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
         featured: productForm.featured,
         inStock: productForm.inStock,
+        isArchived: !!productForm.isArchived,
         colors: productForm.colors,
         availableSizes: productForm.availableSizes,
         images: {
@@ -1091,6 +1119,7 @@ export default function AdminDashboard() {
         shipping: productForm.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
         featured: productForm.featured,
         inStock: productForm.inStock,
+        isArchived: !!productForm.isArchived,
         colors: productForm.colors,
         availableSizes: productForm.availableSizes,
         images: {
@@ -1114,7 +1143,25 @@ export default function AdminDashboard() {
     toggleStock(productId);
   };
 
-  // Delete product with Context Sync
+  // Archive or Unarchive Product (Soft-hide from storefront while keeping data safe)
+  const handleToggleArchive = (product) => {
+    const willArchive = !product.isArchived;
+    if (willArchive) {
+      const confirmArchive = window.confirm(
+        `Archive "${product.name}"?\n\nThis piece will be hidden from the live website immediately, but all details, images, and presets will remain safely stored here for easy retrieval anytime.`
+      );
+      if (!confirmArchive) return;
+    }
+    toggleArchive(product.id);
+    setProductFeedback(
+      willArchive
+        ? `"${product.name}" archived. It is now hidden from the website.`
+        : `"${product.name}" unarchived. It has been restored to the live website!`
+    );
+    setTimeout(() => setProductFeedback(''), 4500);
+  };
+
+  // Delete product permanently with Context Sync
   const handleDeleteProduct = (productId) => {
     if (confirm('Are you sure you want to remove this piece from the catalogue?')) {
       deleteProduct(productId);
@@ -1505,7 +1552,7 @@ export default function AdminDashboard() {
                 {productList.length}
               </p>
               <span className="text-[11px] text-neutral-500 mt-1 block">
-                Across {categoryList.length} categories {outOfStockCount > 0 ? `(${outOfStockCount} out of stock)` : ''}
+                {activeCount} Active • {archivedCount} Archived {outOfStockCount > 0 ? `(${outOfStockCount} out of stock)` : ''}
               </span>
             </div>
 
@@ -1623,6 +1670,44 @@ export default function AdminDashboard() {
                 />
               </div>
 
+              {/* Status Filter (All / Active / Archived) */}
+              <div className="flex items-center border border-neutral-200 rounded-xs overflow-hidden bg-white text-xs">
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatusFilter('all')}
+                  className={`px-3 py-2 font-bold uppercase text-[10px] tracking-wider transition-colors cursor-pointer ${
+                    selectedStatusFilter === 'all'
+                      ? 'bg-brand-charcoal text-white'
+                      : 'text-neutral-500 hover:text-black hover:bg-neutral-50'
+                  }`}
+                >
+                  All ({productList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatusFilter('active')}
+                  className={`px-3 py-2 font-bold uppercase text-[10px] tracking-wider transition-colors cursor-pointer ${
+                    selectedStatusFilter === 'active'
+                      ? 'bg-brand-charcoal text-white'
+                      : 'text-neutral-500 hover:text-black hover:bg-neutral-50'
+                  }`}
+                >
+                  Active ({activeCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatusFilter('archived')}
+                  className={`px-3 py-2 font-bold uppercase text-[10px] tracking-wider transition-colors cursor-pointer flex items-center gap-1 ${
+                    selectedStatusFilter === 'archived'
+                      ? 'bg-amber-600 text-white'
+                      : 'text-neutral-500 hover:text-black hover:bg-neutral-50'
+                  }`}
+                >
+                  <Archive className="w-3 h-3" />
+                  Archived ({archivedCount})
+                </button>
+              </div>
+
               {/* Category Filter */}
               <select
                 value={selectedCategoryFilter}
@@ -1663,6 +1748,23 @@ export default function AdminDashboard() {
             </button>
           </div>
 
+          {/* Product Feedback Banner */}
+          {productFeedback && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between rounded-xs animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span>{productFeedback}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProductFeedback('')}
+                className="text-neutral-400 hover:text-black font-bold uppercase text-[10px]"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* Products Table */}
           <div className="bg-white border border-neutral-200 rounded-sm overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
@@ -1672,6 +1774,7 @@ export default function AdminDashboard() {
                     <th className="py-3.5 px-4">Piece</th>
                     <th className="py-3.5 px-4">Category</th>
                     <th className="py-3.5 px-4">Price</th>
+                    <th className="py-3.5 px-4 text-center">Status</th>
                     <th className="py-3.5 px-4 text-center">Featured on Home</th>
                     <th className="py-3.5 px-4 text-center">In Stock</th>
                     <th className="py-3.5 px-4 text-right">Actions</th>
@@ -1679,7 +1782,7 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-neutral-100 font-sans">
                   {filteredProducts.map((p) => (
-                    <tr key={p.id} className="hover:bg-neutral-50/60 transition-colors">
+                    <tr key={p.id} className={`hover:bg-neutral-50/60 transition-colors ${p.isArchived ? 'bg-amber-50/20' : ''}`}>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           <img 
@@ -1688,7 +1791,14 @@ export default function AdminDashboard() {
                             className="w-10 h-12 object-cover bg-neutral-100 border border-neutral-200 shrink-0" 
                           />
                           <div>
-                            <p className="font-bold text-brand-charcoal uppercase tracking-wider">{p.name}</p>
+                            <p className="font-bold text-brand-charcoal uppercase tracking-wider flex items-center gap-2">
+                              {p.name}
+                              {p.isArchived && (
+                                <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded-xs font-mono font-normal">
+                                  ARCHIVED
+                                </span>
+                              )}
+                            </p>
                             <p className="text-[10px] text-neutral-400 font-mono">{p.id}</p>
                           </div>
                         </div>
@@ -1704,11 +1814,23 @@ export default function AdminDashboard() {
                       <td className="py-3 px-4 font-serif font-bold text-sm text-brand-charcoal">
                         ₦ {p.price.toLocaleString()}
                       </td>
+                      {/* Status Column */}
+                      <td className="py-3 px-4 text-center">
+                        {p.isArchived ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xs bg-amber-100 text-amber-900 border border-amber-200">
+                            <Archive className="w-3 h-3 text-amber-700" /> Archived
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xs bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" /> Active
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 px-4 text-center">
                         <button
                           type="button"
                           onClick={() => handleToggleFeatured(p.id)}
-                          className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors ${
+                          className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors cursor-pointer ${
                             p.featured 
                               ? 'bg-brand-charcoal text-white' 
                               : 'bg-neutral-100 text-neutral-400 hover:text-neutral-700'
@@ -1721,7 +1843,7 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => handleToggleStock(p.id)}
-                          className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors ${
+                          className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors cursor-pointer ${
                             p.inStock 
                               ? 'bg-emerald-100 text-emerald-800' 
                               : 'bg-red-100 text-red-800'
@@ -1730,11 +1852,28 @@ export default function AdminDashboard() {
                           {p.inStock ? 'In Stock' : 'Sold Out'}
                         </button>
                       </td>
-                      <td className="py-3 px-4 text-right space-x-2">
+                      <td className="py-3 px-4 text-right space-x-1.5">
+                        {/* Archive / Unarchive Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleArchive(p)}
+                          className={`p-1.5 rounded-xs transition-colors cursor-pointer ${
+                            p.isArchived
+                              ? 'text-amber-700 hover:text-black hover:bg-amber-100'
+                              : 'text-neutral-500 hover:text-amber-700 hover:bg-amber-50'
+                          }`}
+                          title={p.isArchived ? "Unarchive / Restore Product to Storefront" : "Archive Product (Hide from Storefront)"}
+                        >
+                          {p.isArchived ? (
+                            <ArchiveRestore className="w-3.5 h-3.5 text-amber-700" />
+                          ) : (
+                            <Archive className="w-3.5 h-3.5" />
+                          )}
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleDuplicateProduct(p)}
-                          className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs"
+                          className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs cursor-pointer"
                           title="Duplicate / Clone Product (Instant copy of all tabs & details)"
                         >
                           <Copy className="w-3.5 h-3.5" />
@@ -1742,7 +1881,7 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => handleOpenEditProduct(p)}
-                          className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs"
+                          className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-xs cursor-pointer"
                           title="Edit Product"
                         >
                           <Edit className="w-3.5 h-3.5" />
@@ -1750,8 +1889,8 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => handleDeleteProduct(p.id)}
-                          className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-xs"
-                          title="Delete Product"
+                          className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-xs cursor-pointer"
+                          title="Delete Product Permanently"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -3645,30 +3784,54 @@ export default function AdminDashboard() {
               </div>
 
               {/* Toggles */}
-              <div className="pt-2 flex flex-wrap gap-6 border-t border-neutral-100">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={productForm.featured}
-                    onChange={(e) => setProductForm({ ...productForm, featured: e.target.checked })}
-                    className="accent-black"
-                  />
-                  <span className="font-bold uppercase tracking-wider text-[11px] text-brand-charcoal">
-                    Feature in Homepage Essentials
-                  </span>
-                </label>
+              <div className="pt-2 space-y-3 border-t border-neutral-100">
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={productForm.featured}
+                      onChange={(e) => setProductForm({ ...productForm, featured: e.target.checked })}
+                      className="accent-black"
+                    />
+                    <span className="font-bold uppercase tracking-wider text-[11px] text-brand-charcoal">
+                      Feature in Homepage Essentials
+                    </span>
+                  </label>
 
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={productForm.inStock}
-                    onChange={(e) => setProductForm({ ...productForm, inStock: e.target.checked })}
-                    className="accent-black"
-                  />
-                  <span className="font-bold uppercase tracking-wider text-[11px] text-brand-charcoal">
-                    Mark As In Stock
-                  </span>
-                </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={productForm.inStock}
+                      onChange={(e) => setProductForm({ ...productForm, inStock: e.target.checked })}
+                      className="accent-black"
+                    />
+                    <span className="font-bold uppercase tracking-wider text-[11px] text-brand-charcoal">
+                      Mark As In Stock
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!productForm.isArchived}
+                      onChange={(e) => setProductForm({ ...productForm, isArchived: e.target.checked })}
+                      className="accent-amber-600"
+                    />
+                    <span className="font-bold uppercase tracking-wider text-[11px] text-amber-900 flex items-center gap-1.5">
+                      <Archive className="w-3.5 h-3.5 text-amber-700" />
+                      Archive Product (Hide from storefront)
+                    </span>
+                  </label>
+                </div>
+
+                {productForm.isArchived && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xs flex items-center gap-2">
+                    <Archive className="w-4 h-4 text-amber-700 shrink-0" />
+                    <span>
+                      This product is marked as <strong>Archived</strong>. It will be hidden from the live website and customer search, but will stay safely preserved here in admin for easy one-click retrieval anytime.
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 flex justify-end gap-3 border-t border-neutral-200">

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { products as initialProducts, categories as initialCategories, sizes as initialSizes } from '../data/mockCatalogue';
-import { getProducts, getCategories } from '../services/api';
+import { getProducts, getCategories, toggleArchiveProduct } from '../services/api';
 
 const ProductContext = createContext();
 
@@ -18,13 +18,14 @@ const normalizeProduct = (p) => {
   return {
     ...p,
     category: cat,
-    subcategory: typeof sub === 'string' ? sub : String(sub || '')
+    subcategory: typeof sub === 'string' ? sub : String(sub || ''),
+    isArchived: !!p.isArchived,
   };
 };
 
 export function ProductProvider({ children }) {
-  // Load products from localStorage or fallback to mockCatalogue
-  const [products, setProducts] = useState(() => {
+  // Load products from localStorage or fallback to mockCatalogue (preserves archive status)
+  const [allProducts, setAllProducts] = useState(() => {
     const saved = localStorage.getItem('penny_products');
     if (saved) {
       try {
@@ -41,6 +42,7 @@ export function ProductProvider({ children }) {
               fit: p.fit || initP?.fit || 'Relaxed fit',
               care: p.care || initP?.care || 'Machine wash cold.',
               shipping: p.shipping || initP?.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+              isArchived: p.isArchived !== undefined ? !!p.isArchived : false,
             });
           });
           initialProducts.forEach(ip => {
@@ -56,6 +58,12 @@ export function ProductProvider({ children }) {
     }
     return initialProducts.map(normalizeProduct);
   });
+
+  // Active products for live customer storefront browsing
+  const products = allProducts.filter(p => !p.isArchived);
+
+  // Archived products saved in admin for easy retrieval
+  const archivedProducts = allProducts.filter(p => !!p.isArchived);
 
   // Load categories from localStorage or fallback (respects permanent deletions and excludes obsolete sets)
   const [categories, setCategories] = useState(() => {
@@ -198,12 +206,12 @@ export function ProductProvider({ children }) {
     async function syncBackendCatalogue() {
       try {
         const [liveProducts, liveCategories] = await Promise.all([
-          getProducts(),
+          getProducts({ includeArchived: true }),
           getCategories()
         ]);
         if (isMounted) {
           if (Array.isArray(liveProducts) && liveProducts.length > 0) {
-            setProducts(liveProducts.map(normalizeProduct));
+            setAllProducts(liveProducts.map(normalizeProduct));
           }
           if (Array.isArray(liveCategories) && liveCategories.length > 0) {
             let deletedIds = new Set(['sets', 'two-piece-sets']);
@@ -228,10 +236,10 @@ export function ProductProvider({ children }) {
     return () => { isMounted = false; };
   }, []);
 
-  // Sync products to localStorage whenever updated
+  // Sync all products (including archived) to localStorage whenever updated
   useEffect(() => {
-    localStorage.setItem('penny_products', JSON.stringify(products));
-  }, [products]);
+    localStorage.setItem('penny_products', JSON.stringify(allProducts));
+  }, [allProducts]);
 
   // Sync categories to localStorage whenever updated
   useEffect(() => {
@@ -242,32 +250,75 @@ export function ProductProvider({ children }) {
   // 1. Add Product
   const addProduct = (newProduct) => {
     const normalized = normalizeProduct(newProduct);
-    setProducts((prev) => [normalized, ...prev]);
+    setAllProducts((prev) => [normalized, ...prev]);
   };
 
   // 2. Update Product
   const updateProduct = (updatedProduct) => {
     const normalized = normalizeProduct(updatedProduct);
-    setProducts((prev) =>
+    setAllProducts((prev) =>
       prev.map((p) => (p.id === normalized.id ? normalized : p))
     );
   };
 
-  // 3. Delete Product
+  // 3. Delete Product permanently
   const deleteProduct = (productId) => {
-    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    setAllProducts((prev) => prev.filter((p) => p.id !== productId));
   };
 
-  // 4. Toggle Featured on Homepage
+  // 4. Archive Product (Soft-hide from storefront while keeping data saved)
+  const archiveProduct = (productId) => {
+    setAllProducts((prev) =>
+      prev.map((p) =>
+        p.id === productId
+          ? { ...p, isArchived: true, archivedAt: new Date().toISOString() }
+          : p
+      )
+    );
+    toggleArchiveProduct(productId, true).catch(() => {});
+  };
+
+  // 5. Unarchive / Restore Product to active storefront
+  const unarchiveProduct = (productId) => {
+    setAllProducts((prev) =>
+      prev.map((p) =>
+        p.id === productId
+          ? { ...p, isArchived: false, archivedAt: null }
+          : p
+      )
+    );
+    toggleArchiveProduct(productId, false).catch(() => {});
+  };
+
+  // 6. Toggle Archive state
+  const toggleArchive = (productId) => {
+    let nextStatus = false;
+    setAllProducts((prev) =>
+      prev.map((p) => {
+        if (p.id === productId) {
+          nextStatus = !p.isArchived;
+          return {
+            ...p,
+            isArchived: nextStatus,
+            archivedAt: nextStatus ? new Date().toISOString() : null,
+          };
+        }
+        return p;
+      })
+    );
+    toggleArchiveProduct(productId, nextStatus).catch(() => {});
+  };
+
+  // 7. Toggle Featured on Homepage
   const toggleFeatured = (productId) => {
-    setProducts((prev) =>
+    setAllProducts((prev) =>
       prev.map((p) => (p.id === productId ? { ...p, featured: !p.featured } : p))
     );
   };
 
-  // 5. Toggle Stock Availability
+  // 8. Toggle Stock Availability
   const toggleStock = (productId) => {
-    setProducts((prev) =>
+    setAllProducts((prev) =>
       prev.map((p) => (p.id === productId ? { ...p, inStock: !p.inStock } : p))
     );
   };
@@ -514,13 +565,16 @@ export function ProductProvider({ children }) {
   };
 
   // Queries for storefront:
-  const getProductById = (id) => products.find((p) => p.id === id);
+  const getProductById = (id, includeArchived = false) => 
+    (includeArchived ? allProducts : products).find((p) => p.id === id || p.slug === id);
   const featuredProducts = products.filter((p) => p.featured);
 
   return (
     <ProductContext.Provider
       value={{
+        allProducts,
         products,
+        archivedProducts,
         categories,
         sizes,
         featuredProducts,
@@ -532,6 +586,9 @@ export function ProductProvider({ children }) {
         addProduct,
         updateProduct,
         deleteProduct,
+        archiveProduct,
+        unarchiveProduct,
+        toggleArchive,
         toggleFeatured,
         toggleStock,
         addCategory,

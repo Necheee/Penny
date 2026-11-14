@@ -202,11 +202,15 @@ export default function ProductModal({ productId, closeModal }) {
         <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col">
           <div className="mb-6 flex justify-between items-start">
             <div>
-              {product.subcategory && (
+              {product.isArchived ? (
+                <span className="inline-block px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-amber-100 text-amber-900 border border-amber-200 mb-1">
+                  Archived Piece
+                </span>
+              ) : product.subcategory ? (
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-taupe mb-1 block">
                   {product.subcategory}
                 </span>
-              )}
+              ) : null}
               <h1 className="text-2xl font-serif text-brand-charcoal mb-2">{product.name}</h1>
               <p className="text-lg font-serif text-brand-charcoal/80">₦ {product.price.toLocaleString()}</p>
             </div>
@@ -295,12 +299,22 @@ export default function ProductModal({ productId, closeModal }) {
 
             <button 
               onClick={handleAddToBag}
-              disabled={isAdding}
-              className={`flex-grow flex items-center justify-center bg-brand-charcoal text-white text-xs font-bold tracking-[0.15em] uppercase transition-colors
-                ${isAdding ? 'opacity-80' : 'hover:bg-black'}
+              disabled={isAdding || product.isArchived || !product.inStock}
+              className={`flex-grow flex items-center justify-center text-xs font-bold tracking-[0.15em] uppercase transition-colors
+                ${product.isArchived || !product.inStock
+                  ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed py-3'
+                  : isAdding 
+                    ? 'bg-brand-charcoal text-white opacity-80 py-3' 
+                    : 'bg-brand-charcoal text-white hover:bg-black py-3'}
               `}
             >
-              {isAdding ? 'Adding...' : (
+              {product.isArchived ? (
+                'Archived Piece'
+              ) : !product.inStock ? (
+                'Sold Out'
+              ) : isAdding ? (
+                'Adding...'
+              ) : (
                 <>
                   <ShoppingBag className="w-4 h-4 mr-2" /> Add to Bag - ₦{(product.price * quantity).toLocaleString()}
                 </>

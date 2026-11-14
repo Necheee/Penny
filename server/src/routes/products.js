@@ -1,11 +1,27 @@
 import express from 'express';
 import { initialProducts, initialCategories } from '../data/initialCatalogue.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 
 const router = express.Router();
 
-// In-Memory Data Store (Active Cache synced across requests)
-let products = [...initialProducts];
+// Active Persistent Storage for Products with fallback to initial catalogue
+let storedProducts = readJsonFile('products.json', initialProducts) || initialProducts;
+
+// Ensure all initial catalogue products are preserved
+const storedIds = new Set(storedProducts.map(p => p.id));
+initialProducts.forEach(ip => {
+  if (!storedIds.has(ip.id)) {
+    storedProducts.push(ip);
+  }
+});
+
+let products = storedProducts.map(p => ({
+  ...p,
+  isArchived: !!p.isArchived,
+}));
+writeJsonFile('products.json', products);
+
 let categories = [...initialCategories];
 
 // ==========================================
@@ -14,15 +30,24 @@ let categories = [...initialCategories];
 
 /**
  * GET /api/products
- * Fetch catalogue with optional category, search, and featured filters
+ * Fetch catalogue with optional category, search, and featured filters.
+ * By default, archived products are excluded from the public storefront.
+ * Pass ?includeArchived=true to retrieve all products (e.g. for admin management).
+ * Pass ?archivedOnly=true to retrieve only archived pieces.
  */
 router.get('/', (req, res) => {
   try {
     let result = [...products];
-    const { category, featured, search } = req.query;
+    const { category, featured, search, includeArchived, archivedOnly } = req.query;
+
+    if (archivedOnly === 'true') {
+      result = result.filter(p => !!p.isArchived);
+    } else if (includeArchived !== 'true') {
+      result = result.filter(p => !p.isArchived);
+    }
 
     if (category && category !== 'all') {
-      result = result.filter(p => p.category.toLowerCase() === category.toLowerCase());
+      result = result.filter(p => p.category?.toLowerCase() === category.toLowerCase());
     }
 
     if (featured === 'true') {
@@ -32,9 +57,9 @@ router.get('/', (req, res) => {
     if (search && search.trim()) {
       const q = search.trim().toLowerCase();
       result = result.filter(p =>
-        p.name.toLowerCase().includes(q) ||
+        p.name?.toLowerCase().includes(q) ||
         p.description?.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
+        p.category?.toLowerCase().includes(q) ||
         p.subcategory?.toLowerCase().includes(q)
       );
     }
@@ -92,7 +117,7 @@ router.get('/:id', (req, res) => {
  */
 router.post('/', requireAuth, requireAdmin, (req, res) => {
   try {
-    const { name, category, price, description, images, colors, availableSizes, featured, inStock } = req.body;
+    const { name, category, price, description, images, colors, availableSizes, featured, inStock, isArchived } = req.body;
 
     if (!name || !price) {
       return res.status(400).json({
@@ -110,6 +135,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
       name,
       category: category || 'tops',
       subcategory: req.body.subcategory || '',
+      subtype: req.body.subtype || '',
       price: Number(price),
       description: description || '',
       material: req.body.material || '100% Cotton',
@@ -124,10 +150,12 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
       availableSizes: availableSizes || ['S', 'M', 'L', 'XL'],
       featured: !!featured,
       inStock: inStock !== false,
+      isArchived: !!isArchived,
       createdAt: new Date().toISOString(),
     };
 
     products.unshift(newProduct);
+    writeJsonFile('products.json', products);
 
     return res.status(201).json({
       success: true,
@@ -164,10 +192,12 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
       ...existing,
       ...req.body,
       price: req.body.price !== undefined ? Number(req.body.price) : existing.price,
+      isArchived: req.body.isArchived !== undefined ? !!req.body.isArchived : existing.isArchived,
       updatedAt: new Date().toISOString(),
     };
 
     products[index] = updated;
+    writeJsonFile('products.json', products);
 
     return res.status(200).json({
       success: true,
@@ -184,8 +214,54 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
 });
 
 /**
+ * PATCH /api/products/:id/archive
+ * Toggle or set product archived state (Admin only)
+ * Archived products are hidden from live storefront but saved for easy retrieval.
+ */
+router.patch('/:id/archive', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const index = products.findIndex(p => p.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({
+        success: false,
+        message: `Product with ID '${id}' not found.`,
+      });
+    }
+
+    const nextArchived = req.body.isArchived !== undefined
+      ? !!req.body.isArchived
+      : !products[index].isArchived;
+
+    products[index] = {
+      ...products[index],
+      isArchived: nextArchived,
+      archivedAt: nextArchived ? new Date().toISOString() : null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    writeJsonFile('products.json', products);
+
+    return res.status(200).json({
+      success: true,
+      message: nextArchived
+        ? 'Product archived successfully. Hidden from storefront.'
+        : 'Product unarchived and restored to storefront.',
+      data: products[index],
+    });
+  } catch (error) {
+    console.error('Error toggling archive status:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update product archive status.',
+    });
+  }
+});
+
+/**
  * DELETE /api/products/:id
- * Remove a product from the catalogue
+ * Remove a product from the catalogue permanently
  */
 router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   try {
@@ -200,6 +276,7 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
     }
 
     const removed = products.splice(index, 1)[0];
+    writeJsonFile('products.json', products);
 
     return res.status(200).json({
       success: true,

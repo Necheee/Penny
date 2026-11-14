@@ -31,9 +31,11 @@ const getStoredCategories = () => {
 const API_BASE = '/api';
 
 // Fetch catalogue from backend API with fallback to localStorage / mock
-export const getProducts = async () => {
+export const getProducts = async (options = {}) => {
+  const { includeArchived = true } = options;
   try {
-    const res = await fetch(`${API_BASE}/products`);
+    const url = includeArchived ? `${API_BASE}/products?includeArchived=true` : `${API_BASE}/products`;
+    const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
@@ -47,6 +49,27 @@ export const getProducts = async () => {
     console.warn("Backend API unavailable, falling back to local storage.", err.message);
   }
   return getStoredProducts();
+};
+
+export const toggleArchiveProduct = async (id, isArchived) => {
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('penny_token') : null;
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/products/${id}/archive`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ isArchived })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+  } catch (err) {
+    console.warn(`Failed to sync archive status to backend for product ${id}:`, err);
+  }
+  return null;
 };
 
 export const getProductById = async (id) => {

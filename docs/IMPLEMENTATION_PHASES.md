@@ -51,7 +51,7 @@ The objective of Phase 11 was to build the complete management interface for sto
 
 - **Phase 11.1 — Admin Shell & Navigation:** Built `AdminLayout.jsx` with mobile-responsive sidebar, quick store link, tab switching (`/admin`), and admin logout.
 - **Phase 11.2 — Metrics & Overview:** Real-time KPI cards for revenue, active orders, total products, and homepage featured pieces with recent orders overview.
-- **Phase 11.3 — Product Catalog Management & Image Uploader:** Searchable & filterable catalogue table, Add/Edit modal, drag-and-drop file uploader with live thumbnail preview and URL fallback, instant stock availability switch, and **Homepage Featured Toggle** syncing directly to Homepage Essentials.
+- **Phase 11.3 — Product Catalog Management & Image Uploader:** Searchable & filterable catalogue table, Add/Edit modal, drag-and-drop file uploader with live thumbnail preview and URL fallback, instant stock availability switch, **Product Archiving & Soft-Hide** (with quick retrieval and storefront isolation), and **Homepage Featured Toggle** syncing directly to Homepage Essentials.
 - **Phase 11.4 — Categories & Taxonomies Editor:** Dynamic creation and deletion of store categories with automatic URL slug generation and store synchronization.
 - **Phase 11.5 — Dynamic Size Guide Manager:** Centimeter (CM) measurement tables for tops and bottoms with instant save capability.
 - **Phase 11.6 — Order & Dispatch Workflow:** Orders table with status selector and detailed Order Inspection Drawer showing customer details, itemized garment breakdown, line subtotals, and printable packing slip/receipt generation.
@@ -86,6 +86,7 @@ The objective of Phase 11 was to build the complete management interface for sto
   - Color swatches builder (color name + color picker).
   - Stock quantity input and "In Stock" / "Sold Out" switches.
   - **"Featured on Homepage" Toggle:** Flag products to dynamically populate the storefront's **"Featured Essentials"** grid.
+  - **Product Archiving & Easy Retrieval:** Ability to soft-hide products without deletion, toggle between All/Active/Archived views in admin, and restore seasonal pieces with one click.
 - **Task 11.3.3:** Image uploader preview zone with drag-and-drop support, cover photo selector, and delete buttons.
 - **Task 11.3.4:** **Homepage Asset & Link Synchronization:**
   - Connect all homepage category cards and feature links directly to the corresponding filtered collection routes (`/shop?category=...`).
