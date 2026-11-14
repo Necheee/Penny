@@ -9,20 +9,16 @@
         "name": "T-Shirts",
         "subtypes": [
           "Regular Fit Tee",
-          "Oversize Fit Tee"
+          "Oversize Fit Tee",
+          "Long Sleeve Tee"
         ]
       },
       {
-        "name": "Long Sleeve Tees",
-        "subtypes": []
-      },
-      {
-        "name": "Long Sleeve Henleys",
-        "subtypes": []
-      },
-      {
-        "name": "Short Sleeve Henleys",
-        "subtypes": []
+        "name": "Henleys",
+        "subtypes": [
+          "Long Sleeve Henleys",
+          "Short Sleeve Henleys"
+        ]
       },
       {
         "name": "Knitwear Polos",
@@ -33,7 +29,7 @@
         "subtypes": []
       },
       {
-        "name": "Sweatshirts & Hoodies",
+        "name": "Q-zip, Sweats & Hoodies",
         "subtypes": [
           "Crewneck sweatshirt",
           "Quarter-Zip",
@@ -51,32 +47,24 @@
     "displayOrder": 2,
     "subcategories": [
       {
-        "name": "Trousers & Chinos",
+        "name": "Formal Pants & Chinos",
         "subtypes": [
-          "Classic Tailored Pants",
-          "Improved Tailored Pants"
+          "Classic Formal Pants",
+          "Improved Formal Pants",
+          "Chinos"
         ]
       },
       {
-        "name": "Denim",
+        "name": "Denim & Corduroy",
         "subtypes": []
       },
       {
-        "name": "Corduroy Trousers",
-        "subtypes": []
-      },
-      {
-        "name": "Utility Pants",
+        "name": "Sweatpants/Utility",
         "subtypes": [
           "Utility pants in chinos",
-          "Utility pants in heavyweight cotton"
-        ]
-      },
-      {
-        "name": "Sweatpants",
-        "subtypes": [
-          "Cuffed",
-          "Open-Hem"
+          "Utility pants in heavyweight cotton",
+          "Cuffed Sweatpants",
+          "Open-Hem Sweatpants"
         ]
       },
       {
@@ -124,29 +112,23 @@
         "subtypes": []
       },
       {
-        "name": "Pants",
+        "name": "Linen Pants",
         "subtypes": []
       },
       {
-        "name": "Shorts",
+        "name": "Linen Shorts",
         "subtypes": []
       }
     ]
   },
   {
-    "id": "care-accessories",
-    "name": "Care & Accessories",
-    "slug": "care-accessories",
+    "id": "care-essentials",
+    "name": "Care & Essentials",
+    "slug": "care-essentials",
     "displayOrder": 5,
     "subcategories": [
-      {
-        "name": "Lint Rollers",
-        "subtypes": []
-      },
-      {
-        "name": "Tote Bag",
-        "subtypes": []
-      }
+      "Lint Rollers",
+      "Tote Bag"
     ]
   }
 ]
