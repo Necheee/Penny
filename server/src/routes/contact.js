@@ -95,6 +95,7 @@ router.get('/messages', async (req, res) => {
         );
         ALTER TABLE contact_inquiries ADD COLUMN IF NOT EXISTS subject VARCHAR(255) DEFAULT 'General Inquiry';
         ALTER TABLE contact_inquiries ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'inquiry';
+        ALTER TABLE contact_inquiries ADD COLUMN IF NOT EXISTS user_id VARCHAR(100);
       `);
       const dbRes = await pool.query('SELECT * FROM contact_inquiries ORDER BY created_at DESC');
       if (dbRes.rows && dbRes.rows.length > 0) {
@@ -231,27 +232,29 @@ ${replyText.trim()}
 
 /**
  * GET /api/contact/my-inquiries
- * Retrieves inquiries submitted by a specific user email
+ * Retrieves inquiries submitted by a specific user email or userId
  */
 router.get('/my-inquiries', async (req, res) => {
   try {
-    const { email } = req.query;
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email query parameter required.' });
+    const { email, userId } = req.query;
+    if (!email && !userId) {
+      return res.status(400).json({ success: false, message: 'Email or userId query parameter required.' });
     }
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanUserId = (userId || '').trim();
 
     // Check PostgreSQL first
     try {
       if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
         const pool = getPool();
         const dbRes = await pool.query(
-          'SELECT * FROM contact_inquiries WHERE LOWER(email) = $1 ORDER BY created_at DESC',
-          [cleanEmail]
+          'SELECT * FROM contact_inquiries WHERE (LOWER(email) = $1 AND $1 != \'\') OR (user_id = $2 AND $2 != \'\') ORDER BY created_at DESC',
+          [cleanEmail, cleanUserId]
         );
         if (dbRes.rows && dbRes.rows.length > 0) {
           const mapped = dbRes.rows.map(r => ({
             id: r.id,
+            userId: r.user_id,
             name: r.name,
             email: r.email,
             orderNumber: r.order_number,
@@ -271,7 +274,7 @@ router.get('/my-inquiries', async (req, res) => {
     }
 
     const matched = inquiriesStore
-      .filter(i => (i.email || '').trim().toLowerCase() === cleanEmail)
+      .filter(i => ((i.email || '').trim().toLowerCase() === cleanEmail && cleanEmail !== '') || (i.userId && i.userId === cleanUserId))
       .map(i => ({
         ...i,
         subject: i.subject || (i.type === 'custom_color' ? 'Custom Color Request' : 'Customer Inquiry'),
@@ -289,7 +292,7 @@ router.get('/my-inquiries', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, email, orderNumber, message, subject, type } = req.body;
+    const { name, email, orderNumber, message, subject, type, userId } = req.body;
 
     if (!name || !email || !message) {
       return res.status(400).json({
@@ -302,6 +305,7 @@ router.post('/', async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanOrder = (orderNumber || '').trim();
     const cleanMessage = message.trim();
+    const cleanUserId = (userId || '').trim() || null;
     const finalType = type || (cleanOrder.startsWith('CUSTOM-COLOR') ? 'custom_color' : 'inquiry');
     const finalSubject = (subject || '').trim() || (finalType === 'custom_color' ? 'Custom Color Request' : 'Customer Inquiry');
 
@@ -311,6 +315,7 @@ router.post('/', async (req, res) => {
     // 1. Create and store persistent inquiry record
     const newInquiry = {
       id: `INQ-${Date.now().toString().slice(-6)}`,
+      userId: cleanUserId,
       name: cleanName,
       email: cleanEmail,
       orderNumber: cleanOrder,
@@ -331,12 +336,13 @@ router.post('/', async (req, res) => {
       if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
         const pool = getPool();
         await pool.query(`
-          INSERT INTO contact_inquiries (id, name, email, order_number, subject, message, type, status, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          INSERT INTO contact_inquiries (id, name, email, order_number, subject, message, type, status, user_id, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           ON CONFLICT (id) DO UPDATE SET
             subject = EXCLUDED.subject,
             type = EXCLUDED.type,
-            message = EXCLUDED.message;
+            message = EXCLUDED.message,
+            user_id = EXCLUDED.user_id;
         `, [
           newInquiry.id,
           newInquiry.name,
@@ -346,6 +352,7 @@ router.post('/', async (req, res) => {
           newInquiry.message,
           newInquiry.type,
           newInquiry.status,
+          newInquiry.userId,
           newInquiry.createdAt
         ]);
       }
@@ -457,6 +464,7 @@ router.post('/', async (req, res) => {
       success: true,
       message: 'Your inquiry has been received. Our client care team will respond to your email within 24 hours.',
       inquiry: newInquiry,
+      data: newInquiry,
     });
 
     // Dispatch notification email in the background without blocking the customer's HTTP response

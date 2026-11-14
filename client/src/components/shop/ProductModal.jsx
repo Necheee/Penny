@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getProductById, getSizes } from '../../services/api';
-import { Plus, Minus, X, ShoppingBag, Heart, Check, Sparkles, Send, Loader2, Palette } from 'lucide-react';
+import { Plus, Minus, X, ShoppingBag, Heart, Check, Sparkles, Send, Loader2, Palette, Lock, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 
@@ -93,16 +94,17 @@ export default function ProductModal({ productId, closeModal }) {
     e.preventDefault();
     setCustomColorError('');
 
+    if (!user) {
+      setCustomColorError('Please sign in to request a bespoke custom color formulation.');
+      return;
+    }
+
     if (!customColorName.trim()) {
       setCustomColorError('Please enter the custom color or shade you want.');
       return;
     }
     if (!customColorCustomerName.trim()) {
       setCustomColorError('Please enter your name.');
-      return;
-    }
-    if (!customColorEmail.trim() || !/\S+@\S+\.\S+/.test(customColorEmail)) {
-      setCustomColorError('Please enter a valid email address.');
       return;
     }
 
@@ -118,7 +120,7 @@ export default function ProductModal({ productId, closeModal }) {
       `| **Product** | ${product.name} (ID: ${product.id}) |`,
       `| **Requested Custom Color** | ${trimmedColor} |`,
       `| **Customer Name** | ${customColorCustomerName.trim()} |`,
-      `| **Customer Email** | ${customColorEmail.trim().toLowerCase()} |`,
+      `| **Customer Email** | ${user.email.trim().toLowerCase()} |`,
       `| **Phone / WhatsApp** | ${customColorPhone.trim() || 'N/A'} |`,
       `| **Special Notes / Finish** | ${customColorNotes.trim() || 'None provided'} |`,
       `| **Order Status** | Selected for bag / order placement by customer. |`
@@ -126,8 +128,9 @@ export default function ProductModal({ productId, closeModal }) {
     const formattedTableMsg = tableRows.join('\n');
 
     const payload = {
-      name: customColorCustomerName.trim(),
-      email: customColorEmail.trim().toLowerCase(),
+      name: customColorCustomerName.trim() || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email.split('@')[0],
+      email: user.email.trim().toLowerCase(),
+      userId: user.id || null,
       orderNumber: `COLOR-${product.id}`,
       subject: `Custom Color Request: ${product.name} (${trimmedColor})`,
       type: 'custom_color',
@@ -140,14 +143,17 @@ export default function ProductModal({ productId, closeModal }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && (data.success || data.inquiry || data.data)) {
         setCustomColorSuccess(true);
         setActiveCustomColor(trimmedColor);
         setSelectedColor(formattedCustomColor);
         try {
-          const localInquiries = JSON.parse(localStorage.getItem('penny_my_inquiries') || '[]');
-          localStorage.setItem('penny_my_inquiries', JSON.stringify([data.data, ...localInquiries]));
+          const inq = data.data || data.inquiry;
+          if (inq) {
+            const localInquiries = JSON.parse(localStorage.getItem('penny_my_inquiries') || '[]');
+            localStorage.setItem('penny_my_inquiries', JSON.stringify([inq, ...localInquiries]));
+          }
         } catch {}
         window.dispatchEvent(new Event('penny_inquiry_sent'));
       } else {
@@ -381,7 +387,7 @@ export default function ProductModal({ productId, closeModal }) {
                   </motion.button>
                 )}
 
-                {/* Custom Color Form */}
+                {/* Custom Color Gate / Form */}
                 {isCustomColorOpen && !customColorSuccess && (
                   <motion.div
                     key="form"
@@ -390,132 +396,173 @@ export default function ProductModal({ productId, closeModal }) {
                     exit={{ opacity: 0, y: -8, scale: 0.98 }}
                     className="p-4 bg-[#FAF9F6] border border-brand-charcoal/20 rounded-xs shadow-sm mt-2 text-xs space-y-3"
                   >
-                    <div className="flex items-center justify-between border-b border-brand-charcoal/10 pb-2">
-                      <div className="flex items-center gap-2">
-                        <Palette className="w-4 h-4 text-brand-charcoal" />
-                        <span className="font-bold uppercase tracking-wider text-brand-charcoal text-[11px]">
-                          PENNY Team • Custom Color Request
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsCustomColorOpen(false);
-                          setCustomColorError('');
-                        }}
-                        className="text-brand-charcoal/40 hover:text-brand-charcoal cursor-pointer p-0.5"
-                        aria-label="Close custom color form"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <p className="text-[11px] text-brand-charcoal/70 font-serif leading-relaxed">
-                      Specify your desired custom color or shade below. We will send this specification table to the PENNY team and equip this custom shade on your piece so you can place your order immediately.
-                    </p>
-
-                    <form onSubmit={handleSendCustomColor} className="space-y-3 pt-1">
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
-                          Desired Color / Shade *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={customColorName}
-                          onChange={(e) => setCustomColorName(e.target.value)}
-                          placeholder="e.g. Forest Green, Burnt Orange, Dusty Pink, Cobalt Blue"
-                          className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
-                            Your Name *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={customColorCustomerName}
-                            onChange={(e) => setCustomColorCustomerName(e.target.value)}
-                            placeholder="Full name"
-                            className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
-                          />
+                    {!user ? (
+                      /* Sign-in gate for custom color */
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between border-b border-brand-charcoal/10 pb-2">
+                          <div className="flex items-center gap-2">
+                            <Lock className="w-4 h-4 text-brand-charcoal" />
+                            <span className="font-bold uppercase tracking-wider text-brand-charcoal text-[11px]">
+                              Client Sign-In Required
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCustomColorOpen(false);
+                              setCustomColorError('');
+                            }}
+                            className="text-brand-charcoal/40 hover:text-brand-charcoal cursor-pointer p-0.5"
+                            aria-label="Close"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
-                            Email Address *
-                          </label>
-                          <input
-                            type="email"
-                            required
-                            value={customColorEmail}
-                            onChange={(e) => setCustomColorEmail(e.target.value)}
-                            placeholder="Email address"
-                            className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
-                          />
+                        <p className="text-[11px] text-brand-charcoal/70 font-serif leading-relaxed">
+                          Custom shade formulation and artisan dyeing is exclusively available to registered clients. Please sign in to submit a custom color request for the PENNY team.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                          <Link
+                            to="/signin?redirect=/shop"
+                            onClick={closeModal}
+                            className="flex-1 py-2.5 px-3 bg-brand-charcoal text-white text-[10px] font-bold uppercase tracking-wider text-center hover:bg-black transition-colors rounded-xs shadow-xs"
+                          >
+                            Sign In to Request
+                          </Link>
+                          <Link
+                            to="/create-account?redirect=/shop"
+                            onClick={closeModal}
+                            className="flex-1 py-2.5 px-3 border border-brand-charcoal text-brand-charcoal text-[10px] font-bold uppercase tracking-wider text-center hover:bg-neutral-100 transition-colors rounded-xs"
+                          >
+                            Create Account
+                          </Link>
                         </div>
                       </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
-                            Phone / WhatsApp (Optional)
-                          </label>
-                          <input
-                            type="tel"
-                            value={customColorPhone}
-                            onChange={(e) => setCustomColorPhone(e.target.value)}
-                            placeholder="e.g. +234 801 234 5678"
-                            className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
-                          />
+                    ) : (
+                      /* Authenticated Form */
+                      <>
+                        <div className="flex items-center justify-between border-b border-brand-charcoal/10 pb-2">
+                          <div className="flex items-center gap-2">
+                            <Palette className="w-4 h-4 text-brand-charcoal" />
+                            <span className="font-bold uppercase tracking-wider text-brand-charcoal text-[11px]">
+                              PENNY Team • Custom Color Request
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCustomColorOpen(false);
+                              setCustomColorError('');
+                            }}
+                            className="text-brand-charcoal/40 hover:text-brand-charcoal cursor-pointer p-0.5"
+                            aria-label="Close custom color form"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
-                            Notes or Preferences (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            value={customColorNotes}
-                            onChange={(e) => setCustomColorNotes(e.target.value)}
-                            placeholder="e.g. Matte finish, light pastel tone"
-                            className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
-                          />
-                        </div>
-                      </div>
+                        <p className="text-[11px] text-brand-charcoal/70 font-serif leading-relaxed">
+                          Specify your desired custom color or shade below. We will send this specification table to the PENNY team and equip this custom shade on your piece so you can place your order immediately.
+                        </p>
 
-                      {customColorError && (
-                        <p className="text-[11px] text-red-600 font-sans">{customColorError}</p>
-                      )}
+                        <form onSubmit={handleSendCustomColor} className="space-y-3 pt-1">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                              Desired Color / Shade *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={customColorName}
+                              onChange={(e) => setCustomColorName(e.target.value)}
+                              placeholder="e.g. Forest Green, Burnt Orange, Dusty Pink, Cobalt Blue"
+                              className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
+                            />
+                          </div>
 
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="submit"
-                          disabled={isSendingCustomColor}
-                          className="bg-brand-charcoal text-white hover:bg-black px-4 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors inline-flex items-center gap-1.5 rounded-xs cursor-pointer disabled:opacity-50"
-                        >
-                          {isSendingCustomColor ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin" /> Submitting...
-                            </>
-                          ) : (
-                            <>
-                              <Send className="w-3 h-3" /> Apply Custom Color & Notify PENNY Team
-                            </>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                                Client Name *
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={customColorCustomerName}
+                                onChange={(e) => setCustomColorCustomerName(e.target.value)}
+                                placeholder="Full name"
+                                className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1 flex items-center justify-between">
+                                <span>Email *</span>
+                                <span className="text-[9px] text-emerald-700 font-normal normal-case inline-flex items-center gap-0.5">
+                                  <ShieldCheck className="w-2.5 h-2.5" /> Verified
+                                </span>
+                              </label>
+                              <input
+                                type="email"
+                                readOnly
+                                value={user.email}
+                                className="w-full bg-neutral-100/70 border border-neutral-200 px-3 py-2 text-xs text-neutral-600 rounded-xs cursor-not-allowed"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                                Phone / WhatsApp (Optional)
+                              </label>
+                              <input
+                                type="tel"
+                                value={customColorPhone}
+                                onChange={(e) => setCustomColorPhone(e.target.value)}
+                                placeholder="e.g. +234 801 234 5678"
+                                className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                                Notes or Preferences (Optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={customColorNotes}
+                                onChange={(e) => setCustomColorNotes(e.target.value)}
+                                placeholder="Specific tone or fabric finish"
+                                className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
+                              />
+                            </div>
+                          </div>
+
+                          {customColorError && (
+                            <p className="text-[11px] text-rose-700 font-medium bg-rose-50 p-2 border border-rose-200 rounded-xs">
+                              {customColorError}
+                            </p>
                           )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsCustomColorOpen(false)}
-                          className="px-3 py-2 border border-brand-charcoal/20 text-[10px] font-bold uppercase tracking-wider text-brand-charcoal hover:bg-black/5 rounded-xs transition-colors cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
+
+                          <button
+                            type="submit"
+                            disabled={isSendingCustomColor}
+                            className="w-full py-2.5 bg-brand-charcoal text-white text-[10px] font-bold uppercase tracking-widest hover:bg-black transition-colors rounded-xs flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          >
+                            {isSendingCustomColor ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" /> Submitting...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-3 h-3" /> Apply Custom Color & Notify PENNY Team
+                              </>
+                            )}
+                          </button>
+                        </form>
+                      </>
+                    )}
                   </motion.div>
                 )}
 

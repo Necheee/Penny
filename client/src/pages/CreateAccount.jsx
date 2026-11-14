@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function CreateAccount() {
@@ -12,10 +12,13 @@ export default function CreateAccount() {
   const [errorMsg, setErrorMsg] = useState('');
   const { user, createAccount } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const redirectUrl = searchParams.get('redirect') || '/account';
 
-  // If already logged in, never show the create account form
+  // If already logged in, navigate to target or account
   if (user) {
-    return <Navigate to="/account" replace />;
+    return <Navigate to={redirectUrl} replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -25,7 +28,7 @@ export default function CreateAccount() {
     setErrorMsg('');
     try {
       await createAccount({ firstName, lastName, email, password });
-      navigate('/account');
+      navigate(redirectUrl);
     } catch (err) {
       console.error('Account creation error:', err);
       setErrorMsg('Failed to create account. Please try again.');
@@ -85,7 +88,7 @@ export default function CreateAccount() {
         </button>
       </form>
       <div className="mt-8 text-center">
-        <Link to="/account/login" className="text-[13px] underline underline-offset-4 hover:text-neutral-600 transition-colors">
+        <Link to={`/signin${redirectUrl !== '/account' ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`} className="text-[13px] underline underline-offset-4 hover:text-neutral-600 transition-colors">
           Return to login
         </Link>
       </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function SignIn() {
@@ -9,10 +9,13 @@ export default function SignIn() {
   const [errorMsg, setErrorMsg] = useState('');
   const { user, login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const redirectUrl = searchParams.get('redirect') || '/account';
 
-  // If already logged in, never show the login form
+  // If already logged in, navigate to target or account
   if (user) {
-    return <Navigate to="/account" replace />;
+    return <Navigate to={redirectUrl} replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -22,7 +25,7 @@ export default function SignIn() {
     setErrorMsg('');
     try {
       await login(email, password);
-      navigate('/account');
+      navigate(redirectUrl);
     } catch (err) {
       console.error('Sign-in error:', err);
       setErrorMsg('Unable to sign in. Please check your credentials and try again.');
@@ -70,7 +73,7 @@ export default function SignIn() {
         </button>
       </form>
       <div className="mt-8 text-center">
-        <Link to="/account/register" className="text-[13px] underline underline-offset-4 hover:text-neutral-600 transition-colors">
+        <Link to={`/create-account${redirectUrl !== '/account' ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`} className="text-[13px] underline underline-offset-4 hover:text-neutral-600 transition-colors">
           Create account
         </Link>
       </div>
