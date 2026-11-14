@@ -33,7 +33,8 @@ import {
   Settings,
   RotateCcw,
   Archive,
-  ArchiveRestore
+  ArchiveRestore,
+  Palette
 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 import { printOrderReceipt } from '../utils/printReceipt';
@@ -2780,10 +2781,11 @@ export default function AdminDashboard() {
           </div>
 
           {/* Filter Pills */}
-          <div className="flex items-center gap-2 border-b border-neutral-200 pb-3">
+          <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 pb-3">
             {[
               { id: 'all', label: `All (${messages.length})` },
               { id: 'unread', label: `Unread (${unreadMessagesCount})` },
+              { id: 'custom_color', label: `Custom Colors (${messages.filter(m => m.type === 'custom_color' || m.orderNumber?.startsWith('COLOR')).length})` },
               { id: 'replied', label: `Replied (${messages.filter(m => m.status === 'replied').length})` },
             ].map(tab => (
               <button
@@ -2806,19 +2808,22 @@ export default function AdminDashboard() {
             <div className="bg-white border border-neutral-200 rounded-xs p-12 text-center text-neutral-400">
               <Mail className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="font-bold uppercase tracking-wider text-xs">No Customer Inquiries Yet</p>
-              <p className="text-[11px] mt-1">When clients send a message through the Contact Us page, it will appear here instantly.</p>
+              <p className="text-[11px] mt-1">When clients send a message through the Contact Us page or request custom colors, it will appear here instantly.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {messages
                 .filter(m => {
+                  const isCustom = m.type === 'custom_color' || m.orderNumber?.startsWith('COLOR');
                   if (messageFilter === 'unread') return m.status === 'unread';
+                  if (messageFilter === 'custom_color') return isCustom;
                   if (messageFilter === 'replied') return m.status === 'replied';
                   return true;
                 })
                 .map((msg) => {
                   const isUnread = msg.status === 'unread';
                   const isReplied = msg.status === 'replied';
+                  const isCustom = msg.type === 'custom_color' || msg.orderNumber?.startsWith('COLOR');
                   return (
                     <div
                       key={msg.id}
@@ -2829,9 +2834,10 @@ export default function AdminDashboard() {
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-neutral-100 pb-3 mb-3">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                            isCustom ? 'bg-amber-100 text-amber-900 border border-amber-300' :
                             isUnread ? 'bg-amber-100 text-amber-900' : 'bg-neutral-100 text-neutral-700'
                           }`}>
-                            {msg.name ? msg.name.charAt(0).toUpperCase() : 'C'}
+                            {isCustom ? <Palette className="w-4 h-4" /> : (msg.name ? msg.name.charAt(0).toUpperCase() : 'C')}
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
@@ -2844,10 +2850,15 @@ export default function AdminDashboard() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isCustom && (
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 rounded-xs text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                              <Palette className="w-2.5 h-2.5" /> Custom Color Request
+                            </span>
+                          )}
                           {msg.orderNumber && (
                             <span className="px-2 py-0.5 bg-neutral-100 text-neutral-800 border border-neutral-200 rounded-xs text-[10px] font-mono font-bold">
-                              Order: {msg.orderNumber}
+                              Ref: {msg.orderNumber}
                             </span>
                           )}
                           <span className={`px-2 py-0.5 rounded-xs text-[10px] font-bold uppercase tracking-wider ${

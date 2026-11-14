@@ -85,12 +85,16 @@ router.get('/messages', async (req, res) => {
           name VARCHAR(255) NOT NULL,
           email VARCHAR(255) NOT NULL,
           order_number VARCHAR(100),
+          subject VARCHAR(255) DEFAULT 'General Inquiry',
           message TEXT NOT NULL,
+          type VARCHAR(50) DEFAULT 'inquiry',
           status VARCHAR(50) DEFAULT 'unread',
           reply TEXT,
           replied_at TIMESTAMP WITH TIME ZONE,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
+        ALTER TABLE contact_inquiries ADD COLUMN IF NOT EXISTS subject VARCHAR(255) DEFAULT 'General Inquiry';
+        ALTER TABLE contact_inquiries ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'inquiry';
       `);
       const dbRes = await pool.query('SELECT * FROM contact_inquiries ORDER BY created_at DESC');
       if (dbRes.rows && dbRes.rows.length > 0) {
@@ -99,7 +103,9 @@ router.get('/messages', async (req, res) => {
           name: r.name,
           email: r.email,
           orderNumber: r.order_number,
+          subject: r.subject || (r.type === 'custom_color' ? 'Custom Color Request' : 'General Inquiry'),
           message: r.message,
+          type: r.type || 'inquiry',
           status: r.status,
           reply: r.reply,
           repliedAt: r.replied_at,
@@ -249,7 +255,9 @@ router.get('/my-inquiries', async (req, res) => {
             name: r.name,
             email: r.email,
             orderNumber: r.order_number,
+            subject: r.subject || (r.type === 'custom_color' ? 'Custom Color Request' : 'Customer Inquiry'),
             message: r.message,
+            type: r.type || 'inquiry',
             status: r.status,
             reply: r.reply,
             repliedAt: r.replied_at,
@@ -262,7 +270,13 @@ router.get('/my-inquiries', async (req, res) => {
       console.warn('[MY INQUIRIES] DB query warning, falling back to local storage:', e.message);
     }
 
-    const matched = inquiriesStore.filter(i => (i.email || '').trim().toLowerCase() === cleanEmail);
+    const matched = inquiriesStore
+      .filter(i => (i.email || '').trim().toLowerCase() === cleanEmail)
+      .map(i => ({
+        ...i,
+        subject: i.subject || (i.type === 'custom_color' ? 'Custom Color Request' : 'Customer Inquiry'),
+        type: i.type || 'inquiry',
+      }));
     return res.status(200).json({ success: true, count: matched.length, data: matched });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to fetch inquiries.' });
@@ -275,7 +289,7 @@ router.get('/my-inquiries', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, email, orderNumber, message } = req.body;
+    const { name, email, orderNumber, message, subject, type } = req.body;
 
     if (!name || !email || !message) {
       return res.status(400).json({
@@ -288,6 +302,8 @@ router.post('/', async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanOrder = (orderNumber || '').trim();
     const cleanMessage = message.trim();
+    const finalType = type || (cleanOrder.startsWith('CUSTOM-COLOR') ? 'custom_color' : 'inquiry');
+    const finalSubject = (subject || '').trim() || (finalType === 'custom_color' ? 'Custom Color Request' : 'Customer Inquiry');
 
     const adminEmail = process.env.ADMIN_EMAIL || 'owner@penny.com';
     const senderFrom = process.env.SMTP_FROM || 'support@penny.com';
@@ -298,7 +314,9 @@ router.post('/', async (req, res) => {
       name: cleanName,
       email: cleanEmail,
       orderNumber: cleanOrder,
+      subject: finalSubject,
       message: cleanMessage,
+      type: finalType,
       status: 'unread',
       reply: null,
       repliedAt: null,
@@ -313,21 +331,23 @@ router.post('/', async (req, res) => {
       if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
         const pool = getPool();
         await pool.query(`
-          CREATE TABLE IF NOT EXISTS contact_inquiries (
-            id VARCHAR(100) PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            email VARCHAR(255) NOT NULL,
-            order_number VARCHAR(100),
-            message TEXT NOT NULL,
-            status VARCHAR(50) DEFAULT 'unread',
-            reply TEXT,
-            replied_at TIMESTAMP WITH TIME ZONE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-          );
-          INSERT INTO contact_inquiries (id, name, email, order_number, message, status, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-          ON CONFLICT (id) DO NOTHING;
-        `, [newInquiry.id, newInquiry.name, newInquiry.email, newInquiry.orderNumber, newInquiry.message, newInquiry.status, newInquiry.createdAt]);
+          INSERT INTO contact_inquiries (id, name, email, order_number, subject, message, type, status, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          ON CONFLICT (id) DO UPDATE SET
+            subject = EXCLUDED.subject,
+            type = EXCLUDED.type,
+            message = EXCLUDED.message;
+        `, [
+          newInquiry.id,
+          newInquiry.name,
+          newInquiry.email,
+          newInquiry.orderNumber,
+          newInquiry.subject,
+          newInquiry.message,
+          newInquiry.type,
+          newInquiry.status,
+          newInquiry.createdAt
+        ]);
       }
     } catch (dbErr) {
       console.warn('[CONTACT INQUIRY] DB insert warning, stored in local cache:', dbErr.message);

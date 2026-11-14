@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getProductById, getSizes } from '../../services/api';
-import { Plus, Minus, X, ShoppingBag, Heart, Check, Sparkles } from 'lucide-react';
+import { Plus, Minus, X, ShoppingBag, Heart, Check, Sparkles, Send, Loader2, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../../context/AuthContext';
 
 const getColorHex = (colorName) => {
   const map = {
@@ -57,6 +58,7 @@ export default function ProductModal({ productId, closeModal }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
 
+  const { user } = useAuth();
   const { addToCart, openCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
 
@@ -65,8 +67,89 @@ export default function ProductModal({ productId, closeModal }) {
   const [selectedSize, setSelectedSize] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
-  const [bespokeNotified, setBespokeNotified] = useState(false);
   const [sizeError, setSizeError] = useState(false);
+
+  // Custom Color Request Form State for the PENNY Team
+  const [isCustomColorOpen, setIsCustomColorOpen] = useState(false);
+  const [customColorName, setCustomColorName] = useState('');
+  const [customColorCustomerName, setCustomColorCustomerName] = useState('');
+  const [customColorEmail, setCustomColorEmail] = useState('');
+  const [customColorPhone, setCustomColorPhone] = useState('');
+  const [customColorNotes, setCustomColorNotes] = useState('');
+  const [isSendingCustomColor, setIsSendingCustomColor] = useState(false);
+  const [customColorSuccess, setCustomColorSuccess] = useState(false);
+  const [customColorError, setCustomColorError] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setCustomColorCustomerName(prev => prev || `${user.firstName || ''} ${user.lastName || ''}`.trim());
+      setCustomColorEmail(prev => prev || user.email || '');
+      setCustomColorPhone(prev => prev || user.phone || '');
+    }
+  }, [user]);
+
+  const handleSendCustomColor = async (e) => {
+    e.preventDefault();
+    setCustomColorError('');
+
+    if (!customColorName.trim()) {
+      setCustomColorError('Please enter the custom color or shade you want.');
+      return;
+    }
+    if (!customColorCustomerName.trim()) {
+      setCustomColorError('Please enter your name.');
+      return;
+    }
+    if (!customColorEmail.trim() || !/\S+@\S+\.\S+/.test(customColorEmail)) {
+      setCustomColorError('Please enter a valid email address.');
+      return;
+    }
+
+    setIsSendingCustomColor(true);
+
+    const formattedMsg = [
+      `Product: ${product.name} (ID: ${product.id})`,
+      `Requested Custom Color: ${customColorName.trim()}`,
+      `Customer Name: ${customColorCustomerName.trim()}`,
+      `Email: ${customColorEmail.trim().toLowerCase()}`,
+      customColorPhone.trim() ? `Phone: ${customColorPhone.trim()}` : null,
+      customColorNotes.trim() ? `Notes / Specifications: ${customColorNotes.trim()}` : null,
+      `Production Notice: Made-to-order custom colors take 2-3 weeks to produce by the PENNY team.`
+    ].filter(Boolean).join('\n');
+
+    const payload = {
+      name: customColorCustomerName.trim(),
+      email: customColorEmail.trim().toLowerCase(),
+      orderNumber: `COLOR-${product.id}`,
+      subject: `Custom Color Request: ${product.name} (${customColorName.trim()})`,
+      type: 'custom_color',
+      message: formattedMsg,
+    };
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCustomColorSuccess(true);
+        try {
+          const localInquiries = JSON.parse(localStorage.getItem('penny_my_inquiries') || '[]');
+          localStorage.setItem('penny_my_inquiries', JSON.stringify([data.data, ...localInquiries]));
+        } catch {}
+        window.dispatchEvent(new Event('penny_inquiry_updated'));
+      } else {
+        setCustomColorError(data.message || 'Could not send request. Please try again.');
+      }
+    } catch (err) {
+      console.warn('Error sending custom color message:', err);
+      setCustomColorError('Could not connect to server. Please try again.');
+    } finally {
+      setIsSendingCustomColor(false);
+    }
+  };
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -248,51 +331,216 @@ export default function ProductModal({ productId, closeModal }) {
             </div>
             <div className="mt-3">
               <AnimatePresence mode="wait">
-                {!bespokeNotified ? (
+                {!isCustomColorOpen && !customColorSuccess && (
                   <motion.button
                     key="btn"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setBespokeNotified(true);
+                    onClick={() => {
+                      setIsCustomColorOpen(true);
+                      setCustomColorError('');
                     }}
                     className="text-[10px] font-bold tracking-widest uppercase text-brand-taupe hover:text-brand-charcoal transition-colors underline underline-offset-4 decoration-brand-taupe/30 hover:decoration-brand-charcoal inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Sparkles className="w-3 h-3 text-amber-700/70" />
                     Request a custom color
                   </motion.button>
-                ) : (
+                )}
+
+                {/* Custom Color Form */}
+                {isCustomColorOpen && !customColorSuccess && (
                   <motion.div
-                    key="card"
+                    key="form"
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    className="p-4 bg-[#FAF9F6] border border-brand-charcoal/20 rounded-xs shadow-sm mt-2 text-xs space-y-3"
+                  >
+                    <div className="flex items-center justify-between border-b border-brand-charcoal/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Palette className="w-4 h-4 text-brand-charcoal" />
+                        <span className="font-bold uppercase tracking-wider text-brand-charcoal text-[11px]">
+                          PENNY Team • Custom Color Request
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomColorOpen(false);
+                          setCustomColorError('');
+                        }}
+                        className="text-brand-charcoal/40 hover:text-brand-charcoal cursor-pointer p-0.5"
+                        aria-label="Close custom color form"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <p className="text-[11px] text-brand-charcoal/70 font-serif leading-relaxed">
+                      Custom shades are individually made-to-order by the PENNY team (takes 2–3 weeks). Specify your desired color and our team will review fabric availability and send you a confirmation message.
+                    </p>
+
+                    <form onSubmit={handleSendCustomColor} className="space-y-3 pt-1">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                          Desired Color / Shade *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={customColorName}
+                          onChange={(e) => setCustomColorName(e.target.value)}
+                          placeholder="e.g. Forest Green, Burnt Orange, Dusty Pink, Cobalt Blue"
+                          className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                            Your Name *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={customColorCustomerName}
+                            onChange={(e) => setCustomColorCustomerName(e.target.value)}
+                            placeholder="Full name"
+                            className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                            Email Address *
+                          </label>
+                          <input
+                            type="email"
+                            required
+                            value={customColorEmail}
+                            onChange={(e) => setCustomColorEmail(e.target.value)}
+                            placeholder="Email address"
+                            className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                            Phone / WhatsApp (Optional)
+                          </label>
+                          <input
+                            type="tel"
+                            value={customColorPhone}
+                            onChange={(e) => setCustomColorPhone(e.target.value)}
+                            placeholder="e.g. +234 801 234 5678"
+                            className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-charcoal mb-1">
+                            Notes or Preferences (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={customColorNotes}
+                            onChange={(e) => setCustomColorNotes(e.target.value)}
+                            placeholder="e.g. Matte finish, light pastel tone"
+                            className="w-full bg-white border border-brand-charcoal/20 px-3 py-2 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {customColorError && (
+                        <p className="text-[11px] text-red-600 font-sans">{customColorError}</p>
+                      )}
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="submit"
+                          disabled={isSendingCustomColor}
+                          className="bg-brand-charcoal text-white hover:bg-black px-4 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors inline-flex items-center gap-1.5 rounded-xs cursor-pointer disabled:opacity-50"
+                        >
+                          {isSendingCustomColor ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" /> Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-3 h-3" /> Send to PENNY Team
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomColorOpen(false)}
+                          className="px-3 py-2 border border-brand-charcoal/20 text-[10px] font-bold uppercase tracking-wider text-brand-charcoal hover:bg-black/5 rounded-xs transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                )}
+
+                {/* Success Card */}
+                {customColorSuccess && (
+                  <motion.div
+                    key="success"
                     initial={{ opacity: 0, y: 6, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                    className="p-3.5 bg-[#fbf9f5] border border-brand-charcoal/15 rounded-sm relative shadow-sm"
+                    className="p-4 bg-[#fbf9f5] border border-brand-charcoal/20 rounded-xs relative shadow-xs text-xs space-y-2 mt-2"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-2.5">
-                        <div className="w-4 h-4 rounded-full bg-brand-charcoal text-white flex items-center justify-center shrink-0 mt-0.5">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        <div className="w-5 h-5 rounded-full bg-brand-charcoal text-white flex items-center justify-center shrink-0 mt-0.5">
+                          <Check className="w-3 h-3 stroke-[3]" />
                         </div>
                         <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-brand-charcoal">
-                            Bespoke Atelier Notified
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-brand-charcoal">
+                            Message Sent to the PENNY Team
                           </p>
-                          <p className="text-xs text-brand-charcoal/80 font-serif mt-0.5 leading-relaxed">
-                            Our bespoke team has been notified. Custom colors take 2–3 weeks to handcraft.
+                          <p className="text-xs text-brand-charcoal/80 font-serif mt-1 leading-relaxed">
+                            Thank you, <strong>{customColorCustomerName}</strong>! Your custom color request for <strong>{product.name}</strong> in <strong>"{customColorName}"</strong> has been sent directly to the PENNY team.
+                          </p>
+                          <p className="text-[11px] text-brand-charcoal/60 font-serif mt-1">
+                            This message is saved in your Account page, and our team will reply directly to your email address ({customColorEmail}). Custom colors take 2–3 weeks to produce.
                           </p>
                         </div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setBespokeNotified(false)}
+                        onClick={() => {
+                          setCustomColorSuccess(false);
+                          setIsCustomColorOpen(false);
+                          setCustomColorName('');
+                        }}
                         className="text-brand-charcoal/40 hover:text-brand-charcoal text-xs p-1 cursor-pointer transition-colors"
                         aria-label="Dismiss notice"
                       >
                         <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="pt-2 border-t border-brand-charcoal/10 flex items-center justify-between">
+                      <span className="text-[10px] text-brand-charcoal/50 uppercase tracking-widest font-mono">
+                        Ref: COLOR-{product.id}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomColorSuccess(false);
+                          setIsCustomColorOpen(true);
+                          setCustomColorName('');
+                        }}
+                        className="text-[10px] font-bold uppercase tracking-wider text-brand-charcoal underline underline-offset-4 hover:text-black cursor-pointer"
+                      >
+                        Request Another Color
                       </button>
                     </div>
                   </motion.div>

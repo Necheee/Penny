@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock, User, Printer } from 'lucide-react';
+import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock, User, Printer, MapPin, Phone, Mail, Edit3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { printOrderReceipt } from '../utils/printReceipt';
 
@@ -863,14 +863,81 @@ const Checkout = () => {
             ) : null}
           </div>
 
-          {/* STEP 3: Payment Options */}
+          {/* STEP 3: Delivery Confirmation & Payment */}
           <div className={`border border-brand-charcoal/10 p-6 md:p-8 bg-white transition-opacity ${step !== 3 ? 'opacity-60' : 'opacity-100'}`}>
             <h2 className="text-sm font-bold tracking-[0.15em] uppercase text-brand-charcoal mb-6">
-              3. Payment Method
+              3. Delivery Confirmation & Payment
             </h2>
 
             {step === 3 && (
               <form onSubmit={handlePlaceOrder} className="space-y-6">
+                {/* Given Delivery Details Confirmation Card */}
+                <div className="bg-[#FAF9F6] border border-brand-charcoal/20 p-5 rounded-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-brand-charcoal/10 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-brand-charcoal" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-brand-charcoal">
+                        Review Delivery Details
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStep(2)}
+                      className="text-[11px] font-bold uppercase tracking-wider text-brand-charcoal underline underline-offset-4 hover:text-black flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit3 className="w-3 h-3" /> Edit Details
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-brand-charcoal/50 block">Recipient & Contact</span>
+                      <p className="font-bold text-brand-charcoal text-sm">{formData.firstName} {formData.lastName}</p>
+                      <p className="text-brand-charcoal/80 font-serif flex items-center gap-1.5 pt-0.5">
+                        <Phone className="w-3 h-3 text-brand-charcoal/60" /> {formData.phone}
+                      </p>
+                      <p className="text-brand-charcoal/60 text-[11px] font-serif flex items-center gap-1.5">
+                        <Mail className="w-3 h-3 text-brand-charcoal/40" /> {formData.email}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-brand-charcoal/50 block">Delivery Address</span>
+                      <p className="font-bold text-brand-charcoal flex items-start gap-1.5">
+                        <MapPin className="w-3 h-3 text-brand-charcoal/60 shrink-0 mt-0.5" />
+                        <span>{formData.address}</span>
+                      </p>
+                      <p className="text-brand-charcoal/80 font-serif pl-4.5">
+                        {formData.city}, {formData.state} {formData.postalCode ? `(${formData.postalCode})` : ''}
+                      </p>
+                      <p className="text-[11px] text-brand-charcoal/70 pl-4.5 pt-1 font-sans">
+                        <span className="font-bold text-brand-charcoal">Dispatch:</span>{' '}
+                        {isLagos && formData.shippingMethod === 'express'
+                          ? 'Lagos Express (Same Day Dispatch)'
+                          : isLagos
+                          ? 'Lagos Standard (1-2 Days)'
+                          : 'Nationwide Courier (3-5 Days)'}
+                        {' • '}
+                        <span className="font-bold text-brand-charcoal">
+                          {shippingCost === 0 ? 'FREE' : `₦${shippingCost.toLocaleString()}`}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {formData.notes && (
+                    <div className="pt-2 border-t border-brand-charcoal/10 text-xs">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-brand-charcoal/50 block">Special Delivery Notes</span>
+                      <p className="text-brand-charcoal/80 font-serif italic mt-0.5">"{formData.notes}"</p>
+                    </div>
+                  )}
+
+                  <div className="p-2.5 bg-emerald-50/80 border border-emerald-200/70 rounded-xs text-[11px] text-emerald-900 flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                    <span>Please verify that your delivery and contact details above are accurate before completing your order.</span>
+                  </div>
+                </div>
+
                 <div className="space-y-3">
                   {/* Direct Bank Transfer (Primary Active Payment Method) */}
                   <label className={`flex items-start p-4 border cursor-pointer transition-all ${formData.paymentMethod === 'bank_transfer' ? 'border-brand-charcoal bg-brand-offwhite/40 ring-1 ring-brand-charcoal' : 'border-brand-charcoal/20'}`}>

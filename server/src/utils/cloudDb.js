@@ -132,6 +132,22 @@ export async function initCloudDatabase() {
         rows JSONB DEFAULT '[]'::jsonb,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS contact_inquiries (
+        id VARCHAR(100) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        order_number VARCHAR(100),
+        subject VARCHAR(255) DEFAULT 'General Inquiry',
+        message TEXT NOT NULL,
+        type VARCHAR(50) DEFAULT 'inquiry',
+        status VARCHAR(50) DEFAULT 'unread',
+        reply TEXT,
+        replied_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      ALTER TABLE contact_inquiries ADD COLUMN IF NOT EXISTS subject VARCHAR(255) DEFAULT 'General Inquiry';
+      ALTER TABLE contact_inquiries ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'inquiry';
     `);
 
     // Seed existing orders and bank config from local files if empty
