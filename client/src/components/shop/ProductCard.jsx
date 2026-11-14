@@ -1,4 +1,8 @@
+import { useNavigate } from 'react-router-dom';
 import { useModal } from '../../context/ModalContext';
+import { useWishlist } from '../../context/WishlistContext';
+import { useCart } from '../../context/CartContext';
+import { Heart, Zap } from 'lucide-react';
 
 // Helper to map color names to simple hex values for the swatches
 const getColorHex = (colorName) => {
@@ -12,18 +16,29 @@ const getColorHex = (colorName) => {
   return map[colorName] || '#cccccc'; // fallback gray
 };
 
-import { Heart } from 'lucide-react';
-import { useWishlist } from '../../context/WishlistContext';
-
 export default function ProductCard({ product }) {
   const { openModal } = useModal();
   const { isInWishlist, toggleWishlist } = useWishlist();
+  const { addToCart } = useCart();
+  const navigate = useNavigate();
 
   const isLiked = isInWishlist(product.id);
 
   const handleWishlistClick = (e) => {
     e.stopPropagation(); // prevent modal from opening
     toggleWishlist(product);
+  };
+
+  const handleBuyNow = (e) => {
+    e.stopPropagation(); // prevent modal from opening
+    const defaultSize = (product.availableSizes && product.availableSizes.length > 0)
+      ? product.availableSizes[0]
+      : 'M';
+    const defaultColor = (product.colors && product.colors.length > 0)
+      ? product.colors[0]
+      : 'Standard';
+    addToCart(product, defaultSize, defaultColor, 1);
+    navigate('/checkout');
   };
 
   return (
@@ -61,23 +76,37 @@ export default function ProductCard({ product }) {
         </p>
       )}
       
-      <p className="text-sm text-brand-charcoal/70 mb-3 font-serif">
+      <p className="text-sm text-brand-charcoal/70 mb-2 font-serif">
         ₦ {product.price.toLocaleString()}
       </p>
       
-      {/* Visual Color Swatches instead of text */}
-      {product.colors && product.colors.length > 0 && (
-        <div className="flex space-x-1.5 mt-auto">
-          {product.colors.map((color, idx) => (
-            <div 
-              key={idx} 
-              title={color}
-              className="w-3 h-3 rounded-full shadow-sm border border-black/10" 
-              style={{ backgroundColor: getColorHex(color) }} 
-            />
-          ))}
-        </div>
-      )}
+      {/* Visual Color Swatches & Buy Now Button */}
+      <div className="flex items-center justify-between gap-2 mt-auto pt-1">
+        {product.colors && product.colors.length > 0 ? (
+          <div className="flex space-x-1.5 items-center">
+            {product.colors.slice(0, 4).map((color, idx) => (
+              <div 
+                key={idx} 
+                title={color}
+                className="w-3 h-3 rounded-full shadow-xs border border-black/10 shrink-0" 
+                style={{ backgroundColor: getColorHex(color) }} 
+              />
+            ))}
+            {product.colors.length > 4 && (
+              <span className="text-[9px] text-neutral-400 font-mono">+{product.colors.length - 4}</span>
+            )}
+          </div>
+        ) : <div />}
+
+        <button
+          type="button"
+          onClick={handleBuyNow}
+          className="inline-flex items-center gap-1 px-3 py-1.5 bg-brand-charcoal text-white hover:bg-black text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors shadow-xs z-10 cursor-pointer"
+        >
+          <Zap className="w-3 h-3" />
+          Buy Now
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getProductById, getSizes } from '../../services/api';
-import { Plus, Minus, X, ShoppingBag, Heart, Check, Sparkles, Send, Loader2, Palette, Lock, ShieldCheck } from 'lucide-react';
+import { Plus, Minus, X, ShoppingBag, Heart, Check, Sparkles, Send, Loader2, Palette, Lock, ShieldCheck, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 
@@ -14,37 +14,6 @@ const getColorHex = (colorName) => {
     'Sage': '#9dc183', 'Off-White': '#f8f8f2'
   };
   return map[colorName] || '#cccccc';
-};
-
-const Accordion = ({ title, content, defaultOpen = false }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  return (
-    <div className="border-b border-brand-charcoal/20 py-4">
-      <button 
-        onClick={() => setIsOpen(!isOpen)} 
-        className="flex justify-between items-center w-full text-left uppercase tracking-[0.15em] text-xs font-bold text-brand-charcoal focus:outline-none"
-      >
-        {title}
-        <span className="text-brand-charcoal/50">
-          {isOpen ? <Minus className="w-4 h-4"/> : <Plus className="w-4 h-4"/>}
-        </span>
-      </button>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }} 
-            animate={{ height: 'auto', opacity: 1 }} 
-            exit={{ height: 0, opacity: 0 }} 
-            className="overflow-hidden"
-          >
-            <div className="pt-4 text-sm text-brand-charcoal/80 font-serif leading-relaxed">
-              {content}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
 };
 
 import { useCart } from '../../context/CartContext';
@@ -62,6 +31,7 @@ export default function ProductModal({ productId, closeModal }) {
   const { user } = useAuth();
   const { addToCart, openCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
+  const navigate = useNavigate();
 
   const [activeImage, setActiveImage] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
@@ -224,6 +194,19 @@ export default function ProductModal({ productId, closeModal }) {
       closeModal();
       openCart();
     }, 600);
+  };
+
+  const handleBuyNow = () => {
+    if (product.isArchived || !product.inStock) return;
+    if (!selectedSize) {
+      setSizeError(true);
+      return;
+    }
+    setSizeError(false);
+    const colorToUse = activeCustomColor ? `${activeCustomColor} (Custom Color)` : selectedColor;
+    addToCart(product, selectedSize, colorToUse, quantity);
+    closeModal();
+    navigate('/checkout');
   };
 
   return (
@@ -676,55 +659,59 @@ export default function ProductModal({ productId, closeModal }) {
             )}
           </div>
 
-          {/* Add to Bag */}
-          <div className="flex gap-3 mb-8">
-            <div className="flex items-center justify-between border border-brand-charcoal/20 w-28 px-3 py-3">
-              <button onClick={() => handleQuantity('dec')} aria-label="Decrease quantity" className="text-brand-charcoal/60 hover:text-brand-charcoal">
-                <Minus className="w-4 h-4" />
-              </button>
-              <span className="text-sm font-bold" aria-label="Quantity">{quantity}</span>
-              <button onClick={() => handleQuantity('inc')} aria-label="Increase quantity" className="text-brand-charcoal/60 hover:text-brand-charcoal">
-                <Plus className="w-4 h-4" />
+          {/* Action Buttons: Add to Bag & Buy Now */}
+          <div className="flex flex-col gap-3 mb-6 mt-auto pt-6 border-t border-brand-charcoal/15">
+            <div className="flex gap-3">
+              <div className="flex items-center justify-between border border-brand-charcoal/20 w-28 px-3 py-3">
+                <button onClick={() => handleQuantity('dec')} aria-label="Decrease quantity" className="text-brand-charcoal/60 hover:text-brand-charcoal cursor-pointer">
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className="text-sm font-bold" aria-label="Quantity">{quantity}</span>
+                <button onClick={() => handleQuantity('inc')} aria-label="Increase quantity" className="text-brand-charcoal/60 hover:text-brand-charcoal cursor-pointer">
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              <button 
+                onClick={handleAddToBag}
+                disabled={isAdding || product.isArchived || !product.inStock}
+                className={`flex-grow flex items-center justify-center text-xs font-bold tracking-[0.15em] uppercase transition-colors cursor-pointer py-3
+                  ${product.isArchived || !product.inStock
+                    ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed'
+                    : isAdding 
+                      ? 'bg-brand-charcoal/70 text-white' 
+                      : 'border border-brand-charcoal text-brand-charcoal hover:bg-neutral-100'}
+                `}
+              >
+                {product.isArchived ? (
+                  'Archived Piece'
+                ) : !product.inStock ? (
+                  'Sold Out'
+                ) : isAdding ? (
+                  'Adding...'
+                ) : selectedColor.includes('(Custom Color)') ? (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2 text-amber-500" />
+                    <span>Add in {activeCustomColor || 'Custom'}</span>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag className="w-4 h-4 mr-2" /> Add to Bag
+                  </>
+                )}
               </button>
             </div>
 
-            <button 
-              onClick={handleAddToBag}
-              disabled={isAdding || product.isArchived || !product.inStock}
-              className={`flex-grow flex items-center justify-center text-xs font-bold tracking-[0.15em] uppercase transition-colors
-                ${product.isArchived || !product.inStock
-                  ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed py-3'
-                  : isAdding 
-                    ? 'bg-brand-charcoal text-white opacity-80 py-3' 
-                    : 'bg-brand-charcoal text-white hover:bg-black py-3'}
-              `}
+            <button
+              type="button"
+              onClick={handleBuyNow}
+              disabled={product.isArchived || !product.inStock}
+              className={`w-full py-3.5 bg-brand-charcoal text-white hover:bg-black text-xs font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs rounded-xs ${
+                product.isArchived || !product.inStock ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              {product.isArchived ? (
-                'Archived Piece'
-              ) : !product.inStock ? (
-                'Sold Out'
-              ) : isAdding ? (
-                'Adding...'
-              ) : selectedColor.includes('(Custom Color)') ? (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2 text-amber-300" />
-                  <span>Order in {activeCustomColor || 'Custom Color'} - ₦{(product.price * quantity).toLocaleString()}</span>
-                </>
-              ) : (
-                <>
-                  <ShoppingBag className="w-4 h-4 mr-2" /> Add to Bag - ₦{(product.price * quantity).toLocaleString()}
-                </>
-              )}
+              <Zap className="w-4 h-4 text-amber-300" /> Buy Now - ₦{(product.price * quantity).toLocaleString()}
             </button>
-          </div>
-
-          {/* Accordions */}
-          <div className="border-t border-brand-charcoal/20 mt-auto pt-4">
-            <Accordion title="Description" content={product.description} defaultOpen={true} />
-            <Accordion title="Details & Material" content={product.material} />
-            <Accordion title="Fit & Sizing" content={product.fit} />
-            <Accordion title="Garment Care" content={product.care} />
-            <Accordion title="Shipping & Returns" content={product.shipping} />
           </div>
         </div>
 
