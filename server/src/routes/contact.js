@@ -353,6 +353,74 @@ router.post('/', async (req, res) => {
       console.warn('[CONTACT INQUIRY] DB insert warning, stored in local cache:', dbErr.message);
     }
 
+    function formatMessageForAdminEmail(message, type) {
+      if (!message) return '';
+      const rawLines = message.split('\n').map(l => l.trim()).filter(Boolean);
+      const tableLines = rawLines.filter(l => l.startsWith('|') && l.endsWith('|'));
+
+      if (tableLines.length >= 2) {
+        const parsedRows = tableLines.map(line => {
+          const parts = line.split('|').map(p => p.trim());
+          return parts.slice(1, parts.length - 1);
+        });
+        const header = parsedRows[0];
+        const bodyRows = parsedRows.slice(1).filter(row => !row.every(cell => /^:?-+:?$/.test(cell)));
+
+        return `
+          <table style="width: 100%; border-collapse: collapse; margin: 12px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; border: 1px solid #e2e0dc;">
+            <thead>
+              <tr style="background-color: #f6f5f2; border-bottom: 2px solid #232220;">
+                ${header.map(col => `<th style="padding: 10px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #232220;">${col.replace(/\*\*/g, '')}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyRows.map((row, idx) => `
+                <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#faf9f6'}; border-bottom: 1px solid #eeeeea;">
+                  <td style="padding: 10px 14px; font-weight: bold; color: #232220; width: 35%; vertical-align: top; font-size: 12px;">
+                    ${(row[0] || '').replace(/\*\*/g, '')}
+                  </td>
+                  <td style="padding: 10px 14px; color: #333330; vertical-align: top; font-size: 13px;">
+                    ${(row[1] || '').replace(/\*\*/g, '')}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      if ((type === 'custom_color' || rawLines.some(l => l.toLowerCase().includes('requested custom color'))) && rawLines.filter(l => l.includes(':')).length >= 2) {
+        const pairs = rawLines.filter(l => l.includes(':')).map(line => {
+          const idx = line.indexOf(':');
+          return { key: line.slice(0, idx).trim().replace(/\*\*/g, ''), val: line.slice(idx + 1).trim().replace(/\*\*/g, '') };
+        });
+        return `
+          <table style="width: 100%; border-collapse: collapse; margin: 12px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; border: 1px solid #e2e0dc;">
+            <thead>
+              <tr style="background-color: #f6f5f2; border-bottom: 2px solid #232220;">
+                <th style="padding: 10px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #232220; width: 35%;">Specification Field</th>
+                <th style="padding: 10px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #232220;">Customer Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pairs.map((p, idx) => `
+                <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#faf9f6'}; border-bottom: 1px solid #eeeeea;">
+                  <td style="padding: 10px 14px; font-weight: bold; color: #232220; vertical-align: top; font-size: 12px;">${p.key}</td>
+                  <td style="padding: 10px 14px; color: #333330; vertical-align: top; font-size: 13px;">${p.val}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      return `
+        <div style="padding: 16px; background-color: #ffffff; border-left: 3px solid #232220; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #232220;">
+          ${message}
+        </div>
+      `;
+    }
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -361,7 +429,7 @@ router.post('/', async (req, res) => {
         <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border: 1px solid #e8e7e4; padding: 36px; border-radius: 2px;">
           <div style="border-bottom: 2px solid #232220; padding-bottom: 16px; margin-bottom: 24px;">
             <h2 style="margin: 0; font-size: 18px; letter-spacing: 0.2em; text-transform: uppercase;">PENNY</h2>
-            <p style="margin: 4px 0 0 0; font-size: 11px; color: #767471; text-transform: uppercase; letter-spacing: 0.1em;">New Customer Inquiry #${newInquiry.id}</p>
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: #767471; text-transform: uppercase; letter-spacing: 0.1em;">${finalType === 'custom_color' ? 'Custom Color Request' : 'New Customer Inquiry'} #${newInquiry.id}</p>
           </div>
 
           <div style="background-color: #fcfbf9; border: 1px solid #eee; padding: 16px; margin-bottom: 24px; font-size: 13px;">
@@ -371,10 +439,8 @@ router.post('/', async (req, res) => {
           </div>
 
           <div style="margin-bottom: 28px;">
-            <h4 style="margin: 0 0 10px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #767471;">Customer Message:</h4>
-            <div style="padding: 16px; background-color: #ffffff; border-left: 3px solid #232220; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #232220;">
-${cleanMessage}
-            </div>
+            <h4 style="margin: 0 0 10px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #767471;">${finalType === 'custom_color' ? 'Custom Color Specifications Table:' : 'Customer Message:'}</h4>
+            ${formatMessageForAdminEmail(cleanMessage, finalType)}
           </div>
 
           <div style="border-top: 1px solid #e8e7e4; padding-top: 20px; font-size: 12px; color: #767471; text-align: center;">
@@ -403,7 +469,9 @@ ${cleanMessage}
             from: `"PENNY Customer Care" <${senderFrom}>`,
             to: adminEmail,
             replyTo: `"${cleanName}" <${cleanEmail}>`,
-            subject: `Inquiry from ${cleanName} ${cleanOrder ? `[Order #${cleanOrder}]` : ''} - PENNY`,
+            subject: finalType === 'custom_color'
+              ? `[Custom Color Request] ${finalSubject} - from ${cleanName}`
+              : `Inquiry from ${cleanName} ${cleanOrder ? `[Order #${cleanOrder}]` : ''} - PENNY`,
             html: htmlContent,
           });
           previewUrl = nodemailer.getTestMessageUrl(info) || null;

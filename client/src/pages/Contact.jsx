@@ -38,6 +38,13 @@ export default function Contact() {
 
       if (res.ok && (data.success || data.inquiry)) {
         setStatus('submitted');
+        try {
+          if (data.inquiry) {
+            const localInquiries = JSON.parse(localStorage.getItem('penny_my_inquiries') || '[]');
+            localStorage.setItem('penny_my_inquiries', JSON.stringify([data.inquiry, ...localInquiries]));
+          }
+        } catch {}
+        window.dispatchEvent(new Event('penny_inquiry_sent'));
       } else {
         throw new Error(data.message || 'Unable to submit your inquiry.');
       }

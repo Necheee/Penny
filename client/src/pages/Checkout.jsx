@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock, User, Printer, MapPin, Phone, Mail, Edit3 } from 'lucide-react';
+import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock, User, Printer, MapPin, Phone, Mail, Edit3, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { printOrderReceipt } from '../utils/printReceipt';
 
@@ -1112,6 +1112,11 @@ const Checkout = () => {
                       {item.name}
                     </h4>
                     <p className="text-brand-taupe mt-0.5">Size: {item.size} • {item.color}</p>
+                    {item.color?.includes('(Custom Color)') && (
+                      <span className="inline-flex items-center gap-1 text-[9px] bg-amber-100 text-amber-950 border border-amber-300 px-1.5 py-0.5 rounded-xs font-bold uppercase tracking-wider mt-1">
+                        <Sparkles className="w-2.5 h-2.5 text-amber-600" /> Custom Color
+                      </span>
+                    )}
                     <p className="text-brand-charcoal/60 mt-0.5">Qty: {item.quantity}</p>
                   </div>
                   <div className="font-serif text-brand-charcoal text-right shrink-0">

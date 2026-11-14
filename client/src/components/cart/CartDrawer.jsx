@@ -1,6 +1,6 @@
 import { useCart } from '../../context/CartContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Minus, ArrowRight } from 'lucide-react';
+import { X, Plus, Minus, ArrowRight, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function CartDrawer() {
@@ -94,6 +94,11 @@ export default function CartDrawer() {
                         <div>
                           <h3 className="text-xs font-bold tracking-wider uppercase text-brand-charcoal leading-tight pr-4">{item.name}</h3>
                           <p className="text-xs text-brand-taupe mt-1">{item.color} / Size {item.size}</p>
+                          {item.color?.includes('(Custom Color)') && (
+                            <span className="inline-flex items-center gap-1 text-[9px] bg-amber-100 text-amber-950 border border-amber-300 px-1.5 py-0.5 rounded-xs font-bold uppercase tracking-wider mt-1">
+                              <Sparkles className="w-2.5 h-2.5 text-amber-600" /> Custom Color
+                            </span>
+                          )}
                         </div>
                         <button onClick={() => removeFromCart(item.cartId)} aria-label={`Remove ${item.name} from cart`} className="text-brand-charcoal/40 hover:text-brand-charcoal transition-colors">
                           <X className="w-4 h-4" />

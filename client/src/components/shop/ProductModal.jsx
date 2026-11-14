@@ -70,6 +70,7 @@ export default function ProductModal({ productId, closeModal }) {
   const [sizeError, setSizeError] = useState(false);
 
   // Custom Color Request Form State for the PENNY Team
+  const [activeCustomColor, setActiveCustomColor] = useState('');
   const [isCustomColorOpen, setIsCustomColorOpen] = useState(false);
   const [customColorName, setCustomColorName] = useState('');
   const [customColorCustomerName, setCustomColorCustomerName] = useState('');
@@ -107,23 +108,30 @@ export default function ProductModal({ productId, closeModal }) {
 
     setIsSendingCustomColor(true);
 
-    const formattedMsg = [
-      `Product: ${product.name} (ID: ${product.id})`,
-      `Requested Custom Color: ${customColorName.trim()}`,
-      `Customer Name: ${customColorCustomerName.trim()}`,
-      `Email: ${customColorEmail.trim().toLowerCase()}`,
-      customColorPhone.trim() ? `Phone: ${customColorPhone.trim()}` : null,
-      customColorNotes.trim() ? `Notes / Specifications: ${customColorNotes.trim()}` : null,
-      `Production Notice: Made-to-order custom colors take 2-3 weeks to produce by the PENNY team.`
-    ].filter(Boolean).join('\n');
+    const trimmedColor = customColorName.trim();
+    const formattedCustomColor = `${trimmedColor} (Custom Color)`;
+
+    // Format readable table representation of custom color request
+    const tableRows = [
+      `| Field | Specification |`,
+      `| :--- | :--- |`,
+      `| **Product** | ${product.name} (ID: ${product.id}) |`,
+      `| **Requested Custom Color** | ${trimmedColor} |`,
+      `| **Customer Name** | ${customColorCustomerName.trim()} |`,
+      `| **Customer Email** | ${customColorEmail.trim().toLowerCase()} |`,
+      `| **Phone / WhatsApp** | ${customColorPhone.trim() || 'N/A'} |`,
+      `| **Special Notes / Finish** | ${customColorNotes.trim() || 'None provided'} |`,
+      `| **Order Status** | Selected for bag / order placement by customer. |`
+    ];
+    const formattedTableMsg = tableRows.join('\n');
 
     const payload = {
       name: customColorCustomerName.trim(),
       email: customColorEmail.trim().toLowerCase(),
       orderNumber: `COLOR-${product.id}`,
-      subject: `Custom Color Request: ${product.name} (${customColorName.trim()})`,
+      subject: `Custom Color Request: ${product.name} (${trimmedColor})`,
       type: 'custom_color',
-      message: formattedMsg,
+      message: formattedTableMsg,
     };
 
     try {
@@ -135,11 +143,13 @@ export default function ProductModal({ productId, closeModal }) {
       const data = await res.json();
       if (res.ok && data.success) {
         setCustomColorSuccess(true);
+        setActiveCustomColor(trimmedColor);
+        setSelectedColor(formattedCustomColor);
         try {
           const localInquiries = JSON.parse(localStorage.getItem('penny_my_inquiries') || '[]');
           localStorage.setItem('penny_my_inquiries', JSON.stringify([data.data, ...localInquiries]));
         } catch {}
-        window.dispatchEvent(new Event('penny_inquiry_updated'));
+        window.dispatchEvent(new Event('penny_inquiry_sent'));
       } else {
         setCustomColorError(data.message || 'Could not send request. Please try again.');
       }
@@ -313,21 +323,43 @@ export default function ProductModal({ productId, closeModal }) {
           {/* Color Selection */}
           <div className="mb-6">
             <div className="flex justify-between items-end mb-3">
-              <span className="text-xs font-bold tracking-[0.15em] uppercase text-brand-charcoal">
-                Color: <span className="text-brand-taupe ml-1">{selectedColor}</span>
+              <span className="text-xs font-bold tracking-[0.15em] uppercase text-brand-charcoal flex items-center gap-1.5 flex-wrap">
+                Color: <span className="text-brand-taupe">{selectedColor}</span>
+                {selectedColor.includes('(Custom Color)') && (
+                  <span className="ml-1 text-[9px] bg-amber-100 text-amber-950 border border-amber-300 px-2 py-0.5 font-bold uppercase tracking-wider rounded-xs inline-flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5 text-amber-600" /> Custom Order Selected
+                  </span>
+                )}
               </span>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 items-center">
               {product.colors.map(color => (
                 <button
                   key={color}
                   onClick={() => setSelectedColor(color)}
-                  className={`w-7 h-7 rounded-full shadow-sm transition-transform ${selectedColor === color ? 'ring-2 ring-offset-2 ring-brand-charcoal scale-110' : 'border border-black/10 hover:scale-110'}`}
+                  className={`w-7 h-7 rounded-full shadow-sm transition-transform cursor-pointer ${selectedColor === color ? 'ring-2 ring-offset-2 ring-brand-charcoal scale-110' : 'border border-black/10 hover:scale-110'}`}
                   style={{ backgroundColor: getColorHex(color) }}
                   aria-label={`Select color ${color}`}
                   aria-pressed={selectedColor === color}
                 />
               ))}
+
+              {/* Custom Color Swatch Pill when applied */}
+              {activeCustomColor && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedColor(`${activeCustomColor} (Custom Color)`)}
+                  className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
+                    selectedColor === `${activeCustomColor} (Custom Color)`
+                      ? 'bg-brand-charcoal text-white ring-2 ring-offset-2 ring-brand-charcoal'
+                      : 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
+                  }`}
+                  aria-label={`Select custom color ${activeCustomColor}`}
+                >
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  {activeCustomColor} (Custom)
+                </button>
+              )}
             </div>
             <div className="mt-3">
               <AnimatePresence mode="wait">
@@ -345,7 +377,7 @@ export default function ProductModal({ productId, closeModal }) {
                     className="text-[10px] font-bold tracking-widest uppercase text-brand-taupe hover:text-brand-charcoal transition-colors underline underline-offset-4 decoration-brand-taupe/30 hover:decoration-brand-charcoal inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Sparkles className="w-3 h-3 text-amber-700/70" />
-                    Request a custom color
+                    {activeCustomColor ? `Change custom color ("${activeCustomColor}")` : 'Request a custom color'}
                   </motion.button>
                 )}
 
@@ -379,7 +411,7 @@ export default function ProductModal({ productId, closeModal }) {
                     </div>
 
                     <p className="text-[11px] text-brand-charcoal/70 font-serif leading-relaxed">
-                      Custom shades are individually made-to-order by the PENNY team (takes 2–3 weeks). Specify your desired color and our team will review fabric availability and send you a confirmation message.
+                      Specify your desired custom color or shade below. We will send this specification table to the PENNY team and equip this custom shade on your piece so you can place your order immediately.
                     </p>
 
                     <form onSubmit={handleSendCustomColor} className="space-y-3 pt-1">
@@ -467,11 +499,11 @@ export default function ProductModal({ productId, closeModal }) {
                         >
                           {isSendingCustomColor ? (
                             <>
-                              <Loader2 className="w-3 h-3 animate-spin" /> Sending...
+                              <Loader2 className="w-3 h-3 animate-spin" /> Submitting...
                             </>
                           ) : (
                             <>
-                              <Send className="w-3 h-3" /> Send to PENNY Team
+                              <Send className="w-3 h-3" /> Apply Custom Color & Notify PENNY Team
                             </>
                           )}
                         </button>
@@ -494,7 +526,7 @@ export default function ProductModal({ productId, closeModal }) {
                     initial={{ opacity: 0, y: 6, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                    className="p-4 bg-[#fbf9f5] border border-brand-charcoal/20 rounded-xs relative shadow-xs text-xs space-y-2 mt-2"
+                    className="p-4 bg-[#fbf9f5] border border-brand-charcoal/20 rounded-xs relative shadow-xs text-xs space-y-3 mt-2"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-2.5">
@@ -503,13 +535,10 @@ export default function ProductModal({ productId, closeModal }) {
                         </div>
                         <div>
                           <p className="text-[11px] font-bold uppercase tracking-wider text-brand-charcoal">
-                            Message Sent to the PENNY Team
+                            Custom Color Applied & PENNY Team Notified
                           </p>
                           <p className="text-xs text-brand-charcoal/80 font-serif mt-1 leading-relaxed">
-                            Thank you, <strong>{customColorCustomerName}</strong>! Your custom color request for <strong>{product.name}</strong> in <strong>"{customColorName}"</strong> has been sent directly to the PENNY team.
-                          </p>
-                          <p className="text-[11px] text-brand-charcoal/60 font-serif mt-1">
-                            This message is saved in your Account page, and our team will reply directly to your email address ({customColorEmail}). Custom colors take 2–3 weeks to produce.
+                            <strong>"{customColorName}"</strong> is now selected for this piece! A readable specification table has been sent to the store admin and logged in your Account portal.
                           </p>
                         </div>
                       </div>
@@ -518,13 +547,17 @@ export default function ProductModal({ productId, closeModal }) {
                         onClick={() => {
                           setCustomColorSuccess(false);
                           setIsCustomColorOpen(false);
-                          setCustomColorName('');
                         }}
                         className="text-brand-charcoal/40 hover:text-brand-charcoal text-xs p-1 cursor-pointer transition-colors"
                         aria-label="Dismiss notice"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
+                    </div>
+
+                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xs text-[11px] text-emerald-950 font-medium flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Ready to order: Select your size below and click "Add to Bag" to complete your purchase in "{customColorName}".</span>
                     </div>
 
                     <div className="pt-2 border-t border-brand-charcoal/10 flex items-center justify-between">
@@ -540,7 +573,7 @@ export default function ProductModal({ productId, closeModal }) {
                         }}
                         className="text-[10px] font-bold uppercase tracking-wider text-brand-charcoal underline underline-offset-4 hover:text-black cursor-pointer"
                       >
-                        Request Another Color
+                        Change Custom Color
                       </button>
                     </div>
                   </motion.div>
@@ -625,6 +658,11 @@ export default function ProductModal({ productId, closeModal }) {
                 'Sold Out'
               ) : isAdding ? (
                 'Adding...'
+              ) : selectedColor.includes('(Custom Color)') ? (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2 text-amber-300" />
+                  <span>Order in {activeCustomColor || 'Custom Color'} - ₦{(product.price * quantity).toLocaleString()}</span>
+                </>
               ) : (
                 <>
                   <ShoppingBag className="w-4 h-4 mr-2" /> Add to Bag - ₦{(product.price * quantity).toLocaleString()}

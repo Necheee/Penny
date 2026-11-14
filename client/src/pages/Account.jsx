@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { printOrderReceipt } from '../utils/printReceipt';
+import FormattedMessage from '../components/common/FormattedMessage';
 
 export default function Account() {
   const { user, logout, updateProfile, updateAddresses, deleteAccount } = useAuth();
@@ -917,9 +918,18 @@ export default function Account() {
                                         <p className="font-bold text-xs text-brand-charcoal leading-tight">
                                           {item.name}
                                         </p>
-                                        <div className="text-[11px] text-brand-charcoal/60 font-serif mt-1 flex items-center gap-2">
+                                        <div className="text-[11px] text-brand-charcoal/60 font-serif mt-1 flex items-center gap-2 flex-wrap">
                                           {item.size && <span>Size: {item.size}</span>}
-                                          {item.color && <span>• Color: {item.color}</span>}
+                                          {item.color && (
+                                            <span className="inline-flex items-center gap-1">
+                                              • Color: {item.color}
+                                              {item.color.includes('(Custom Color)') && (
+                                                <span className="text-[9px] bg-amber-100 text-amber-950 border border-amber-300 px-1 py-0.2 rounded-xs font-sans font-bold uppercase">
+                                                  Custom
+                                                </span>
+                                              )}
+                                            </span>
+                                          )}
                                           <span>• Qty: {item.quantity || 1}</span>
                                         </div>
                                       </div>
@@ -1470,7 +1480,7 @@ export default function Account() {
                             <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">
                               Your Inquiry:
                             </span>
-                            <p className="font-serif leading-relaxed text-[12px]">{inq.message}</p>
+                            <FormattedMessage message={inq.message} type={inq.type} />
                           </div>
 
                           {/* Admin response */}

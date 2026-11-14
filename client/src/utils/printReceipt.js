@@ -29,7 +29,7 @@ export function printOrderReceipt(order) {
         <strong>${item.name || 'Penny Capsule Piece'}</strong>
         <div style="font-size: 11px; color: #666; margin-top: 2px;">
           ${item.size ? `Size: <strong>${item.size}</strong> &nbsp;` : ''}
-          ${item.color ? `Color: ${item.color}` : ''}
+          ${item.color ? `Color: <strong>${item.color}</strong>${item.color.includes('(Custom Color)') ? ' <span style="background: #fef3c7; color: #78350f; font-size: 9px; padding: 2px 4px; border-radius: 2px; text-transform: uppercase; font-weight: bold; border: 1px solid #fde68a;">Custom</span>' : ''}` : ''}
         </div>
       </td>
       <td style="padding: 10px 12px; border-bottom: 1px solid #eee; text-align: center; font-size: 13px; font-family: monospace;">

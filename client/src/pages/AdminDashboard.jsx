@@ -39,6 +39,7 @@ import {
 import { useProducts } from '../context/ProductContext';
 import { printOrderReceipt } from '../utils/printReceipt';
 import { generateOrderReceiptEmailHtml, generateInquiryReplyEmailHtml } from '../utils/emailPreviewGenerator';
+import FormattedMessage from '../components/common/FormattedMessage';
 
 // Curated 1-Click Accordion & Garment Presets to eliminate repetitive product entry
 const DEFAULT_GARMENT_PRESETS = {
@@ -2873,7 +2874,7 @@ export default function AdminDashboard() {
 
                       {/* Message Body */}
                       <div className="text-xs text-neutral-700 bg-neutral-50/70 p-3.5 rounded-xs border border-neutral-100 leading-relaxed font-sans mb-3">
-                        <p className="font-serif text-[13px]">{msg.message}</p>
+                        <FormattedMessage message={msg.message} type={msg.type} />
                       </div>
 
                       {/* Existing Reply Display if already replied */}
@@ -4241,7 +4242,14 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-2.5 px-3 text-neutral-600">
                               <span className="font-mono bg-neutral-100 px-1.5 py-0.5 rounded-xs mr-1 text-[10px] font-bold">{item.size}</span>
-                              <span className="text-[11px] text-neutral-500">{item.color}</span>
+                              <span className="text-[11px] text-neutral-700">{item.color}</span>
+                              {item.color && item.color.includes('(Custom Color)') && (
+                                <div className="mt-1">
+                                  <span className="inline-flex items-center gap-1 text-[9px] bg-amber-100 text-amber-950 border border-amber-300 px-1.5 py-0.5 font-bold uppercase tracking-wider rounded-xs">
+                                    <Palette className="w-2.5 h-2.5 text-amber-700" /> Custom Color Order
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td className="py-2.5 px-3 text-right font-serif">
                               ₦ {item.price.toLocaleString()}

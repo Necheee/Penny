@@ -22,7 +22,7 @@ export function generateOrderReceiptEmailHtml(order) {
     <tr style="border-bottom: 1px solid #f0f0f0;">
       <td style="padding: 12px 0; font-size: 13px; color: #232220;">
         <strong>${item.name || 'Penny Capsule Piece'}</strong><br/>
-        <span style="font-size: 11px; color: #767471;">Size: ${item.size || '—'} • Color: ${item.color || 'Standard'} • Qty: ${item.quantity || 1}</span>
+        <span style="font-size: 11px; color: #767471;">Size: ${item.size || '—'} • Color: ${item.color || 'Standard'}${item.color && item.color.includes('(Custom Color)') ? ' <span style="background: #fef3c7; color: #78350f; font-size: 9px; padding: 1px 4px; border-radius: 2px; text-transform: uppercase; font-weight: bold; border: 1px solid #fde68a;">Custom Color</span>' : ''} • Qty: ${item.quantity || 1}</span>
       </td>
       <td style="padding: 12px 0; text-align: right; font-size: 13px; color: #232220; font-family: monospace;">
         ₦ ${(Number(item.price || 0) * Number(item.quantity || 1)).toLocaleString()}
