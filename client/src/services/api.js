@@ -29,6 +29,33 @@ const getStoredCategories = () => {
 };
 
 const API_BASE = '/api';
+const LIVE_BACKEND_URL = 'https://penny-kbrh.onrender.com';
+
+/**
+ * Universal safeFetch with seamless live backend fallback for local development.
+ * If local dev proxy is offline (e.g. 502/503/504 or ECONNREFUSED on port 5000),
+ * it automatically routes the request to the live Render backend.
+ */
+const safeFetch = async (url, options = {}) => {
+  try {
+    const res = await fetch(url, options);
+    if ((res.status === 502 || res.status === 503 || res.status === 504) && typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      const cleanPath = url.startsWith('http') ? (new URL(url).pathname + new URL(url).search) : url;
+      const fallbackUrl = `${LIVE_BACKEND_URL}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+      console.warn(`[API] Local proxy returned status ${res.status}. Seamlessly falling back to live cloud backend:`, fallbackUrl);
+      return await fetch(fallbackUrl, options);
+    }
+    return res;
+  } catch (err) {
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      const cleanPath = url.startsWith('http') ? (new URL(url).pathname + new URL(url).search) : url;
+      const fallbackUrl = `${LIVE_BACKEND_URL}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+      console.warn('[API] Local fetch failed, retrying on live cloud backend:', fallbackUrl, err.message);
+      return await fetch(fallbackUrl, options);
+    }
+    throw err;
+  }
+};
 
 const getAuthHeaders = () => {
   let token = null;
@@ -45,7 +72,7 @@ export const getProducts = async (options = {}) => {
   const { includeArchived = true } = options;
   try {
     const url = includeArchived ? `${API_BASE}/products?includeArchived=true` : `${API_BASE}/products`;
-    const res = await fetch(url);
+    const res = await safeFetch(url);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
@@ -63,7 +90,7 @@ export const getProducts = async (options = {}) => {
 
 export const createProductApi = async (productData) => {
   try {
-    const res = await fetch(`${API_BASE}/products`, {
+    const res = await safeFetch(`${API_BASE}/products`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(productData),
@@ -84,7 +111,7 @@ export const createProductApi = async (productData) => {
 
 export const updateProductApi = async (id, productData) => {
   try {
-    const res = await fetch(`${API_BASE}/products/${id}`, {
+    const res = await safeFetch(`${API_BASE}/products/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(productData),
@@ -105,7 +132,7 @@ export const updateProductApi = async (id, productData) => {
 
 export const deleteProductApi = async (id) => {
   try {
-    const res = await fetch(`${API_BASE}/products/${id}`, {
+    const res = await safeFetch(`${API_BASE}/products/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -121,7 +148,7 @@ export const deleteProductApi = async (id) => {
 
 export const toggleArchiveProduct = async (id, isArchived) => {
   try {
-    const res = await fetch(`${API_BASE}/products/${id}/archive`, {
+    const res = await safeFetch(`${API_BASE}/products/${id}/archive`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify({ isArchived })
@@ -138,7 +165,7 @@ export const toggleArchiveProduct = async (id, isArchived) => {
 
 export const getAnnouncementsApi = async () => {
   try {
-    const res = await fetch(`${API_BASE}/categories/announcements`);
+    const res = await safeFetch(`${API_BASE}/categories/announcements`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
@@ -153,7 +180,7 @@ export const getAnnouncementsApi = async () => {
 
 export const saveAnnouncementsApi = async (messages) => {
   try {
-    const res = await fetch(`${API_BASE}/categories/announcements`, {
+    const res = await safeFetch(`${API_BASE}/categories/announcements`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ messages }),
@@ -170,7 +197,7 @@ export const saveAnnouncementsApi = async (messages) => {
 
 export const getSizeGuidesApi = async () => {
   try {
-    const res = await fetch(`${API_BASE}/categories/size-guides`);
+    const res = await safeFetch(`${API_BASE}/categories/size-guides`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
@@ -185,7 +212,7 @@ export const getSizeGuidesApi = async () => {
 
 export const updateSizeGuideApi = async (category, guideData) => {
   try {
-    const res = await fetch(`${API_BASE}/categories/size-guides/${encodeURIComponent(category)}`, {
+    const res = await safeFetch(`${API_BASE}/categories/size-guides/${encodeURIComponent(category)}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(guideData),
@@ -202,7 +229,7 @@ export const updateSizeGuideApi = async (category, guideData) => {
 
 export const getProductById = async (id) => {
   try {
-    const res = await fetch(`${API_BASE}/products/${id}`);
+    const res = await safeFetch(`${API_BASE}/products/${id}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.data) {
@@ -220,7 +247,7 @@ export const getProductById = async (id) => {
 
 export const getCategories = async () => {
   try {
-    const res = await fetch(`${API_BASE}/categories`);
+    const res = await safeFetch(`${API_BASE}/categories`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {

@@ -33,55 +33,55 @@ function App() {
         <ProductProvider>
           <WishlistProvider>
             <CartProvider>
-              <ModalProvider>
-                <DialogProvider>
               <Router>
-              <CartDrawer />
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/shop" element={<Shop />} />
-                  <Route path="/checkout" element={<Checkout />} />
-                  
-                  {/* Account & Auth Routes */}
-                  <Route path="/account/login" element={<SignIn />} />
-                  <Route path="/account/register" element={<CreateAccount />} />
-                  <Route path="/account/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/account" element={<Account />} />
-                  
-                  {/* Wishlist Route */}
-                  <Route path="/wishlist" element={<Wishlist />} />
+                <ModalProvider>
+                  <DialogProvider>
+                    <CartDrawer />
+                    <Layout>
+                      <Routes>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/shop" element={<Shop />} />
+                        <Route path="/checkout" element={<Checkout />} />
+                        
+                        {/* Account & Auth Routes */}
+                        <Route path="/account/login" element={<SignIn />} />
+                        <Route path="/account/register" element={<CreateAccount />} />
+                        <Route path="/account/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/account" element={<Account />} />
+                        
+                        {/* Wishlist Route */}
+                        <Route path="/wishlist" element={<Wishlist />} />
 
-                  {/* Informational / Supporting Pages */}
-                  <Route path="/about" element={<About />} />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/care-guide" element={<CareGuide />} />
-                  <Route path="/care" element={<CareGuide />} />
-                  <Route path="/shipping" element={<Shipping />} />
-                  <Route path="/privacy" element={<Privacy />} />
-                  <Route path="/terms" element={<Terms />} />
-                  <Route path="/orders" element={<Account />} />
-                  <Route path="/account/orders" element={<Account />} />
+                        {/* Informational / Supporting Pages */}
+                        <Route path="/about" element={<About />} />
+                        <Route path="/contact" element={<Contact />} />
+                        <Route path="/care-guide" element={<CareGuide />} />
+                        <Route path="/care" element={<CareGuide />} />
+                        <Route path="/shipping" element={<Shipping />} />
+                        <Route path="/privacy" element={<Privacy />} />
+                        <Route path="/terms" element={<Terms />} />
+                        <Route path="/orders" element={<Account />} />
+                        <Route path="/account/orders" element={<Account />} />
 
-                  {/* Admin Management Dashboard & Security Gate */}
-                  <Route path="/admin/login" element={<AdminLogin />} />
-                  <Route 
-                    path="/admin" 
-                    element={
-                      <AdminProtectedRoute>
-                        <AdminDashboard />
-                      </AdminProtectedRoute>
-                    } 
-                  />
+                        {/* Admin Management Dashboard & Security Gate */}
+                        <Route path="/admin/login" element={<AdminLogin />} />
+                        <Route 
+                          path="/admin" 
+                          element={
+                            <AdminProtectedRoute>
+                              <AdminDashboard />
+                            </AdminProtectedRoute>
+                          } 
+                        />
 
-                  {/* Temporary catch-all to prevent 404s while clicking header links */}
-                  <Route path="*" element={<Home />} />
-                </Routes>
-              </Layout>
-            </Router>
-                </DialogProvider>
-          </ModalProvider>
-        </CartProvider>
+                        {/* Temporary catch-all to prevent 404s while clicking header links */}
+                        <Route path="*" element={<Home />} />
+                      </Routes>
+                    </Layout>
+                  </DialogProvider>
+                </ModalProvider>
+              </Router>
+            </CartProvider>
       </WishlistProvider>
     </ProductProvider>
   </NotificationProvider>
