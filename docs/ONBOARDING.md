@@ -13,6 +13,31 @@ This guide provides everything you need to start, test, and understand the platf
 - **Node.js** (v18 or higher recommended) ([Download Node.js](https://nodejs.org/))
 - **npm** (included with Node.js)
 
+#### Linux and WSL users
+
+Install and run Node.js inside Linux rather than using a Windows Node.js installation from a WSL terminal. Mixing the two can make `npm` start Windows `cmd.exe`, which cannot resolve Linux/WSL paths and may produce errors such as `UNC paths are not supported` or `Cannot find module 'C:\Windows\src\index.js'`.
+
+The recommended approach is [`nvm`](https://github.com/nvm-sh/nvm):
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.bashrc
+nvm install 22
+nvm alias default 22
+nvm use 22
+```
+
+Verify that both commands resolve to Linux paths:
+
+```bash
+command -v node
+command -v npm
+node --version
+npm --version
+```
+
+The `node` and `npm` paths should begin with `~/.nvm/versions/node/`, not `/mnt/c/Program Files/nodejs/`.
+
 ---
 
 ### Step 1: Clone or Pull the Repository
@@ -222,6 +247,8 @@ Penny/
   If you have not set Gmail or custom SMTP in `server/.env`, PENNY uses **Ethereal Mail**. When an email or reply is dispatched, look at the terminal output or the Admin Dashboard for a link starting with `https://ethereal.email/message/...` to view the exact rendered email online.
 - **Port 5000 or 5173 is already in use?**  
   Close any other running node processes, or edit `PORT` in `server/.env` and adjust the proxy in `client/vite.config.js`.
+- **`sh: 1: vite: Permission denied` on Linux or WSL?**
+  The Vite launcher in `client/node_modules/.bin` is not executable. From the `client/` directory, run `chmod +x node_modules/.bin/vite node_modules/vite/bin/vite.js`, then run `npm run dev` again. If the problem returns after reinstalling dependencies, confirm that you are using Linux-native `node` and `npm` rather than the Windows installation.
 
 ---
 

@@ -9,6 +9,8 @@ PENNY is a sleek, modern e-commerce platform designed for a curated collection o
 
 ## Quick Start
 
+For complete setup instructions, including backend configuration and Linux/WSL guidance, see the **[Developer Onboarding Guide](docs/ONBOARDING.md)**.
+
 To run the project locally, start both the server and client:
 
 ```bash

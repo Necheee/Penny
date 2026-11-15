@@ -1,25 +1,41 @@
 [
   {
-    "id": "INQ-547224",
-    "name": "David Adeleke",
-    "email": "david.adeleke@gmail.com",
-    "orderNumber": "PNY-892140",
-    "message": "Hello, I just ordered the Linen Resort shirt. Can I request expedited courier shipping?",
+    "id": "INQ-980095",
+    "name": "Neche",
+    "email": "owner@penny.com",
+    "orderNumber": "",
+    "subject": "Customer Care Inquiry",
+    "message": "Bwhdh",
+    "type": "inquiry",
     "status": "replied",
-    "reply": "Hello David! Yes, we have received your request for expedited courier shipping. Our logistics partner will dispatch your Linen Resort shirt via Lagos Same-Day Express.",
-    "repliedAt": "2026-10-14T08:43:21.824Z",
-    "createdAt": "2026-10-14T08:29:07.224Z",
-    "previewUrl": "https://ethereal.email/message/as9AqKfttlACpqyHas9ArsAYPlgYjBCZAAAAARL4FwXtVjbk2M72NKeaoCU"
+    "reply": "ok",
+    "repliedAt": "2026-11-14T04:53:41.226Z",
+    "createdAt": "2026-11-14T04:53:00.095Z"
   },
   {
-    "id": "INQ-104921",
-    "name": "Adaobi Okonjo",
-    "email": "adaobi.okonjo@gmail.com",
-    "orderNumber": "PNY-892140",
-    "message": "Good morning, please can I confirm if my order will be delivered to Lekki Phase 1 before Friday?",
+    "id": "INQ-903688",
+    "name": "Test Customer",
+    "email": "test@example.com",
+    "orderNumber": "",
+    "subject": "Customer Inquiry",
+    "message": "Hello test message",
+    "type": "inquiry",
     "status": "read",
-    "reply": "Hello Adaobi, yes! Your order is currently processing and scheduled for Thursday morning dispatch.",
-    "repliedAt": "2026-10-13T14:30:00.000Z",
-    "createdAt": "2026-10-13T10:15:00.000Z"
+    "reply": null,
+    "repliedAt": null,
+    "createdAt": "2026-11-14T03:28:23.688Z"
+  },
+  {
+    "id": "INQ-591492",
+    "name": "Andaline Imekaeze",
+    "email": "chinaecheremimekaeze@gmail.com",
+    "orderNumber": "COLOR-p-032",
+    "subject": "Custom Color Request: The Relaxed Linen Shirt (green)",
+    "message": "Product: The Relaxed Linen Shirt (ID: p-032)\nRequested Custom Color: green\nCustomer Name: Andaline Imekaeze\nEmail: chinaecheremimekaeze@gmail.com\nPhone: +2349011460721\nProduction Notice: Made-to-order custom colors take 2-3 weeks to produce by the PENNY team.",
+    "type": "custom_color",
+    "status": "replied",
+    "reply": "Alright.\nSigned: PENNY",
+    "repliedAt": "2026-11-14T03:24:36.229Z",
+    "createdAt": "2026-11-14T03:06:31.492Z"
   }
 ]
