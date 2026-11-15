@@ -5,6 +5,9 @@
   publish = "dist"
   command = "npm run build"
 
+[build.environment]
+  NODE_VERSION = "20"
+
 # Proxy all backend API requests to the live Render Node.js backend
 [[redirects]]
   from = "/api/*"
