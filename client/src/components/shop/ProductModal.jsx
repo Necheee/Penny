@@ -16,39 +16,6 @@ const getColorHex = (colorName) => {
   return map[colorName] || '#cccccc';
 };
 
-const Accordion = ({ title, content, defaultOpen = false }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  if (!content) return null;
-  return (
-    <div className="border-b border-brand-charcoal/20 py-4">
-      <button 
-        type="button"
-        onClick={() => setIsOpen(!isOpen)} 
-        className="flex justify-between items-center w-full text-left uppercase tracking-[0.15em] text-xs font-bold text-brand-charcoal focus:outline-none cursor-pointer"
-      >
-        <span>{title}</span>
-        <span className="text-brand-charcoal/50">
-          {isOpen ? <Minus className="w-4 h-4"/> : <Plus className="w-4 h-4"/>}
-        </span>
-      </button>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }} 
-            animate={{ height: 'auto', opacity: 1 }} 
-            exit={{ height: 0, opacity: 0 }} 
-            className="overflow-hidden"
-          >
-            <div className="pt-4 text-sm text-brand-charcoal/80 font-serif leading-relaxed">
-              {content}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { useProducts } from '../../context/ProductContext';
@@ -760,15 +727,6 @@ export default function ProductModal({ productId, closeModal }) {
             >
               <Zap className="w-4 h-4 text-amber-300" /> Buy Now - ₦{((Number(product.price) || 0) * quantity).toLocaleString()}
             </button>
-          </div>
-
-          {/* Product Accordions: Description, Material, Fit, Care, Shipping */}
-          <div className="border-t border-brand-charcoal/20 mt-2 pt-2">
-            <Accordion title="Description" content={product.description} defaultOpen={true} />
-            <Accordion title="Details & Material" content={product.material} />
-            <Accordion title="Fit & Sizing" content={product.fit} />
-            <Accordion title="Garment Care" content={product.care} />
-            <Accordion title="Shipping & Returns" content={product.shipping} />
           </div>
         </div>
 
