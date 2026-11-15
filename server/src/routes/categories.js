@@ -559,17 +559,28 @@ router.post('/announcements', requireAuth, requireAdmin, async (req, res) => {
  * GET /api/categories/size-guides
  * Retrieve all size guides
  */
-router.get('/size-guides', (req, res) => {
+router.get('/size-guides', async (req, res) => {
   try {
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      const p = getPool();
+      const dbRes = await p.query('SELECT category, title, subtitle, columns, rows, updated_at FROM size_guides ORDER BY category ASC');
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        return res.status(200).json({
+          success: true,
+          data: dbRes.rows,
+        });
+      }
+    }
+
     return res.status(200).json({
       success: true,
       data: sizeGuides,
     });
   } catch (error) {
     console.error('Error fetching size guides:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve size guides.',
+    return res.status(200).json({
+      success: true,
+      data: sizeGuides,
     });
   }
 });
@@ -578,24 +589,58 @@ router.get('/size-guides', (req, res) => {
  * PUT /api/categories/size-guides/:category
  * Update size guide for a specific category (Admin only)
  */
-router.put('/size-guides/:category', requireAuth, requireAdmin, (req, res) => {
+router.put('/size-guides/:category', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { category } = req.params;
-    const { measurements } = req.body;
+    const { title, subtitle, columns, rows, measurements } = req.body;
 
-    const existingIndex = sizeGuides.findIndex(sg => sg.category.toLowerCase() === category.toLowerCase());
+    const catKey = category.toLowerCase();
+    const updatedTitle = title || (catKey.charAt(0).toUpperCase() + catKey.slice(1));
+    const updatedSubtitle = subtitle || '';
+    const updatedColumns = Array.isArray(columns) ? columns : [];
+    const updatedRows = Array.isArray(rows) 
+      ? rows 
+      : (Array.isArray(measurements) 
+          ? measurements 
+          : (typeof measurements === 'string' ? JSON.parse(measurements || '[]') : []));
+
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      const p = getPool();
+      await p.query(`
+        INSERT INTO size_guides (category, title, subtitle, columns, rows, updated_at)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+        ON CONFLICT (category) DO UPDATE SET
+          title = EXCLUDED.title,
+          subtitle = EXCLUDED.subtitle,
+          columns = EXCLUDED.columns,
+          rows = EXCLUDED.rows,
+          updated_at = CURRENT_TIMESTAMP
+      `, [
+        catKey,
+        updatedTitle,
+        updatedSubtitle,
+        JSON.stringify(updatedColumns),
+        JSON.stringify(updatedRows)
+      ]);
+    }
 
     const updatedGuide = {
-      category: category.toLowerCase(),
-      measurements: typeof measurements === 'string' ? measurements : JSON.stringify(measurements || []),
+      category: catKey,
+      title: updatedTitle,
+      subtitle: updatedSubtitle,
+      columns: updatedColumns,
+      rows: updatedRows,
+      measurements: JSON.stringify(updatedRows),
       updatedAt: new Date().toISOString(),
     };
 
+    const existingIndex = sizeGuides.findIndex(sg => sg.category.toLowerCase() === catKey);
     if (existingIndex >= 0) {
       sizeGuides[existingIndex] = updatedGuide;
     } else {
       sizeGuides.push(updatedGuide);
     }
+    writeJsonFile('sizeGuides.json', sizeGuides);
 
     return res.status(200).json({
       success: true,

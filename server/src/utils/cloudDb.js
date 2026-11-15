@@ -8,6 +8,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config();
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+}
 
 const { Pool } = pg;
 
@@ -259,6 +262,35 @@ export async function initCloudDatabase() {
         ]);
       }
       console.log(`[DATABASE] Seeded ${prodData.length} products to Neon Cloud!`);
+    }
+
+    // Seed size guides ONLY if table is currently empty
+    const sizeGuideCountRes = await client.query('SELECT COUNT(*) as count FROM size_guides');
+    const sizeGuideCount = parseInt(sizeGuideCountRes.rows[0]?.count || 0, 10);
+    if (sizeGuideCount === 0) {
+      const sgFile = path.resolve(__dirname, '../data/storage/sizeGuides.json');
+      let sgData = [];
+      if (fs.existsSync(sgFile)) {
+        try {
+          sgData = JSON.parse(fs.readFileSync(sgFile, 'utf-8'));
+        } catch {}
+      }
+      if (Array.isArray(sgData) && sgData.length > 0) {
+        for (const g of sgData) {
+          await client.query(`
+            INSERT INTO size_guides (category, title, subtitle, columns, rows)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (category) DO NOTHING
+          `, [
+            g.category,
+            g.title,
+            g.subtitle,
+            JSON.stringify(g.columns || []),
+            JSON.stringify(g.rows || [])
+          ]);
+        }
+        console.log(`[DATABASE] Seeded ${sgData.length} size guides to Neon Cloud!`);
+      }
     }
 
     client.release();

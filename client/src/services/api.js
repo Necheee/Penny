@@ -168,6 +168,38 @@ export const saveAnnouncementsApi = async (messages) => {
   return null;
 };
 
+export const getSizeGuidesApi = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/categories/size-guides`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not fetch size guides from API:", err.message);
+  }
+  return null;
+};
+
+export const updateSizeGuideApi = async (category, guideData) => {
+  try {
+    const res = await fetch(`${API_BASE}/categories/size-guides/${encodeURIComponent(category)}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(guideData),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.data;
+    }
+  } catch (err) {
+    console.warn(`Could not update size guide for ${category} on API:`, err.message);
+  }
+  return null;
+};
+
 export const getProductById = async (id) => {
   try {
     const res = await fetch(`${API_BASE}/products/${id}`);

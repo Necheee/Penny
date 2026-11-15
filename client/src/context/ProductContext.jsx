@@ -8,7 +8,9 @@ import {
   updateProductApi,
   deleteProductApi,
   getAnnouncementsApi,
-  saveAnnouncementsApi
+  saveAnnouncementsApi,
+  getSizeGuidesApi,
+  updateSizeGuideApi
 } from '../services/api';
 
 const ProductContext = createContext();
@@ -244,10 +246,11 @@ export function ProductProvider({ children }) {
           }
         } catch {}
 
-        const [liveProducts, liveCategories, liveAnnouncements] = await Promise.all([
+        const [liveProducts, liveCategories, liveAnnouncements, liveSizeGuides] = await Promise.all([
           getProducts({ includeArchived: true }),
           getCategories(),
           getAnnouncementsApi().catch(() => null),
+          getSizeGuidesApi().catch(() => null),
         ]);
 
         if (isMounted) {
@@ -290,6 +293,24 @@ export function ProductProvider({ children }) {
           if (Array.isArray(liveAnnouncements) && liveAnnouncements.length > 0) {
             setAnnouncements(liveAnnouncements);
             localStorage.setItem('penny_announcements', JSON.stringify(liveAnnouncements));
+          }
+          if (Array.isArray(liveSizeGuides) && liveSizeGuides.length > 0) {
+            const guidesMap = {};
+            liveSizeGuides.forEach(sg => {
+              if (sg.category) {
+                guidesMap[sg.category] = {
+                  title: sg.title || (sg.category.charAt(0).toUpperCase() + sg.category.slice(1)),
+                  subtitle: sg.subtitle || '',
+                  columns: Array.isArray(sg.columns) ? sg.columns : [],
+                  rows: Array.isArray(sg.rows) ? sg.rows : []
+                };
+              }
+            });
+            setSizeGuideData(prev => {
+              const merged = { ...prev, ...guidesMap };
+              localStorage.setItem('penny_size_guide', JSON.stringify(merged));
+              return merged;
+            });
           }
         }
       } catch (err) {
@@ -710,14 +731,24 @@ export function ProductProvider({ children }) {
   };
 
   // 8. Size Guide Content & Headings Management
-  const updateSizeGuide = (categoryKey, updatedCategoryData) => {
-    setSizeGuideData((prev) => ({
-      ...prev,
-      [categoryKey]: {
-        ...prev[categoryKey],
-        ...updatedCategoryData,
-      },
-    }));
+  const updateSizeGuide = async (categoryKey, updatedCategoryData) => {
+    const nextGuide = {
+      ...(sizeGuideData[categoryKey] || {}),
+      ...updatedCategoryData,
+    };
+    setSizeGuideData((prev) => {
+      const updated = {
+        ...prev,
+        [categoryKey]: nextGuide,
+      };
+      localStorage.setItem('penny_size_guide', JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      await updateSizeGuideApi(categoryKey, nextGuide);
+    } catch (e) {
+      console.warn('Failed to sync size guide to backend API:', e);
+    }
   };
 
   // Queries for storefront:
