@@ -46,51 +46,8 @@ const normalizeProduct = (p) => {
 };
 
 export function ProductProvider({ children }) {
-  // Load products from localStorage or fallback to mockCatalogue (preserves archive status)
-  const [allProducts, setAllProducts] = useState(() => {
-    let deletedProductIds = new Set();
-    try {
-      const delSaved = localStorage.getItem('penny_deleted_products');
-      if (delSaved) {
-        JSON.parse(delSaved).forEach(id => deletedProductIds.add(id));
-      }
-    } catch {}
-
-    const saved = localStorage.getItem('penny_products');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map(p => p.id));
-          const updated = parsed
-            .filter(p => !deletedProductIds.has(p.id))
-            .map(p => {
-              const initP = initialProducts.find(ip => ip.id === p.id);
-              return normalizeProduct({
-                ...initP,
-                ...p,
-                subtype: p.subtype || initP?.subtype || '',
-                material: p.material || initP?.material || '100% Cotton',
-                fit: p.fit || initP?.fit || 'Relaxed fit',
-                care: p.care || initP?.care || 'Machine wash cold.',
-                shipping: p.shipping || initP?.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
-                isArchived: p.isArchived !== undefined ? !!p.isArchived : false,
-                featured: p.featured !== undefined ? !!p.featured : false,
-              });
-            });
-          initialProducts.forEach(ip => {
-            if (!existingIds.has(ip.id) && !deletedProductIds.has(ip.id)) {
-              updated.push(normalizeProduct(ip));
-            }
-          });
-          return updated;
-        }
-      } catch (e) {
-        console.error("Failed to parse saved products", e);
-      }
-    }
-    return initialProducts.filter(ip => !deletedProductIds.has(ip.id)).map(normalizeProduct);
-  });
+  // Products initialized with standard catalogue, synced directly with Neon Cloud DB
+  const [allProducts, setAllProducts] = useState(() => initialProducts.map(normalizeProduct));
 
   // Active products for live customer storefront browsing
   const products = allProducts.filter(p => !p.isArchived);
@@ -98,154 +55,95 @@ export function ProductProvider({ children }) {
   // Archived products saved in admin for easy retrieval
   const archivedProducts = allProducts.filter(p => !!p.isArchived);
 
-  // Load categories from localStorage or fallback (respects permanent deletions and excludes obsolete sets)
-  const [categories, setCategories] = useState(() => {
-    let deletedIds = new Set(['sets', 'two-piece-sets']);
-    try {
-      const deletedSaved = localStorage.getItem('penny_deleted_categories');
-      if (deletedSaved) {
-        const parsedDeleted = JSON.parse(deletedSaved);
-        parsedDeleted.forEach(id => deletedIds.add(id));
-      }
-      deletedIds.add('sets');
-      deletedIds.add('two-piece-sets');
-      localStorage.setItem('penny_deleted_categories', JSON.stringify(Array.from(deletedIds)));
-    } catch {}
-
-    const saved = localStorage.getItem('penny_categories');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const filtered = parsed.filter(c => !deletedIds.has(c.id) && !deletedIds.has(c.slug));
-          return filtered;
-        }
-      } catch (e) {
-        console.error("Failed to parse saved categories", e);
-      }
-    }
-    return initialCategories.filter(c => !deletedIds.has(c.id) && !deletedIds.has(c.slug));
-  });
+  // Load categories directly from Neon Cloud DB or initial mock (excluding obsolete sets)
+  const [categories, setCategories] = useState(() => 
+    initialCategories.filter(c => c.id !== 'sets' && c.id !== 'two-piece-sets' && c.slug !== 'sets' && c.slug !== 'two-piece-sets')
+  );
 
   const [sizes] = useState(initialSizes);
 
   // Dynamic Announcement Bar Messages
-  const [announcements, setAnnouncements] = useState(() => {
-    const saved = localStorage.getItem('penny_announcements');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error("Failed to parse saved announcements", e);
-      }
-    }
-    return [
-      "Enjoy free shipping on orders above ₦200,000",
-      "Lagos delivery in 1 to 3 days",
-      "Pieces designed to work perfectly together"
-    ];
-  });
+  const [announcements, setAnnouncements] = useState([
+    "Enjoy free shipping on orders above ₦200,000",
+    "Lagos delivery in 1 to 3 days",
+    "Pieces designed to work perfectly together"
+  ]);
 
   // Dynamic Size Guide Data: Exactly 3 categories as specified (Shirts, Shorts, Trousers)
-  const [sizeGuideData, setSizeGuideData] = useState(() => {
-    const defaultGuides = {
-      shirts: {
-        title: "Shirts",
-        subtitle: "Oxford Shirts, Linen Tops & Shackets",
-        columns: [
-          { key: "size", label: "Size" },
-          { key: "collar", label: "Collar (CM)" },
-          { key: "chest", label: "Chest (CM)" },
-          { key: "sleeve", label: "Sleeve (CM)" }
-        ],
-        rows: [
-          { size: "XS", collar: "37", chest: "88 - 93", sleeve: "82" },
-          { size: "S", collar: "38 - 39", chest: "93 - 98", sleeve: "84" },
-          { size: "M", collar: "40 - 41", chest: "98 - 103", sleeve: "86" },
-          { size: "L", collar: "42 - 43", chest: "103 - 108", sleeve: "88" },
-          { size: "XL", collar: "44 - 45", chest: "108 - 113", sleeve: "90" },
-          { size: "XXL", collar: "46 - 47", chest: "113 - 118", sleeve: "92" }
-        ]
-      },
-      shorts: {
-        title: "Shorts",
-        subtitle: "Chino Shorts, Sweatshorts, Utility & Linen Shorts",
-        columns: [
-          { key: "size", label: "Size" },
-          { key: "waist", label: "Waist (CM)" },
-          { key: "hips", label: "Hips (CM)" },
-          { key: "inseam", label: "Inseam (CM)" }
-        ],
-        rows: [
-          { size: "XS", waist: "71 - 76", hips: "88 - 93", inseam: "16" },
-          { size: "S", waist: "76 - 81", hips: "93 - 98", inseam: "17" },
-          { size: "M", waist: "81 - 86", hips: "98 - 103", inseam: "18" },
-          { size: "L", waist: "86 - 91", hips: "103 - 108", inseam: "19" },
-          { size: "XL", waist: "91 - 96", hips: "108 - 113", inseam: "20" },
-          { size: "XXL", waist: "96 - 101", hips: "113 - 118", inseam: "21" }
-        ]
-      },
-      trousers: {
-        title: "Trousers",
-        subtitle: "Classic Tailored Pants, Chinos, Utility Pants & Sweatpants",
-        columns: [
-          { key: "size", label: "Size" },
-          { key: "waist", label: "Waist (CM)" },
-          { key: "hips", label: "Hips (CM)" },
-          { key: "inseam", label: "Inseam (CM)" }
-        ],
-        rows: [
-          { size: "XS", waist: "71 - 76", hips: "88 - 93", inseam: "78" },
-          { size: "S", waist: "76 - 81", hips: "93 - 98", inseam: "80" },
-          { size: "M", waist: "81 - 86", hips: "98 - 103", inseam: "81" },
-          { size: "L", waist: "86 - 91", hips: "103 - 108", inseam: "82" },
-          { size: "XL", waist: "91 - 96", hips: "108 - 113", inseam: "83" },
-          { size: "XXL", waist: "96 - 101", hips: "113 - 118", inseam: "84" }
-        ]
-      }
-    };
-
-    const saved = localStorage.getItem('penny_size_guide');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        delete parsed.sets; // permanently purge sets
-        delete parsed.bottoms; // migrated to shorts and trousers
-        delete parsed.tops; // user requested only shirts, shorts, trousers
-        return {
-          ...defaultGuides,
-          ...parsed
-        };
-      } catch (e) {
-        console.error("Failed to parse saved size guide", e);
-      }
+  const [sizeGuideData, setSizeGuideData] = useState(() => ({
+    shirts: {
+      title: "Shirts",
+      subtitle: "Oxford Shirts, Linen Tops & Shackets",
+      columns: [
+        { key: "size", label: "Size" },
+        { key: "collar", label: "Collar (CM)" },
+        { key: "chest", label: "Chest (CM)" },
+        { key: "sleeve", label: "Sleeve (CM)" }
+      ],
+      rows: [
+        { size: "XS", collar: "37", chest: "88 - 93", sleeve: "82" },
+        { size: "S", collar: "38 - 39", chest: "93 - 98", sleeve: "84" },
+        { size: "M", collar: "40 - 41", chest: "98 - 103", sleeve: "86" },
+        { size: "L", collar: "42 - 43", chest: "103 - 108", sleeve: "88" },
+        { size: "XL", collar: "44 - 45", chest: "108 - 113", sleeve: "90" },
+        { size: "XXL", collar: "46 - 47", chest: "113 - 118", sleeve: "92" }
+      ]
+    },
+    shorts: {
+      title: "Shorts",
+      subtitle: "Chino Shorts, Sweatshorts, Utility & Linen Shorts",
+      columns: [
+        { key: "size", label: "Size" },
+        { key: "waist", label: "Waist (CM)" },
+        { key: "hips", label: "Hips (CM)" },
+        { key: "inseam", label: "Inseam (CM)" }
+      ],
+      rows: [
+        { size: "XS", waist: "71 - 76", hips: "88 - 93", inseam: "16" },
+        { size: "S", waist: "76 - 81", hips: "93 - 98", inseam: "17" },
+        { size: "M", waist: "81 - 86", hips: "98 - 103", inseam: "18" },
+        { size: "L", waist: "86 - 91", hips: "103 - 108", inseam: "19" },
+        { size: "XL", waist: "91 - 96", hips: "108 - 113", inseam: "20" },
+        { size: "XXL", waist: "96 - 101", hips: "113 - 118", inseam: "21" }
+      ]
+    },
+    trousers: {
+      title: "Trousers",
+      subtitle: "Classic Tailored Pants, Chinos, Utility Pants & Sweatpants",
+      columns: [
+        { key: "size", label: "Size" },
+        { key: "waist", label: "Waist (CM)" },
+        { key: "hips", label: "Hips (CM)" },
+        { key: "inseam", label: "Inseam (CM)" }
+      ],
+      rows: [
+        { size: "XS", waist: "71 - 76", hips: "88 - 93", inseam: "78" },
+        { size: "S", waist: "76 - 81", hips: "93 - 98", inseam: "80" },
+        { size: "M", waist: "81 - 86", hips: "98 - 103", inseam: "81" },
+        { size: "L", waist: "86 - 91", hips: "103 - 108", inseam: "82" },
+        { size: "XL", waist: "91 - 96", hips: "108 - 113", inseam: "83" },
+        { size: "XXL", waist: "96 - 101", hips: "113 - 118", inseam: "84" }
+      ]
     }
-    return defaultGuides;
-  });
+  }));
 
-  // Sync announcements & size guide to storage
+  // Clear legacy localStorage catalogue caches on mount so outdated items never conflict
   useEffect(() => {
-    localStorage.setItem('penny_announcements', JSON.stringify(announcements));
-  }, [announcements]);
+    try {
+      localStorage.removeItem('penny_products');
+      localStorage.removeItem('penny_deleted_products');
+      localStorage.removeItem('penny_categories');
+      localStorage.removeItem('penny_deleted_categories');
+      localStorage.removeItem('penny_announcements');
+      localStorage.removeItem('penny_size_guide');
+    } catch {}
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('penny_size_guide', JSON.stringify(sizeGuideData));
-  }, [sizeGuideData]);
-
-  // Sync with live backend API on mount
+  // Sync catalogue with live Neon backend API on mount
   useEffect(() => {
     let isMounted = true;
     async function syncBackendCatalogue() {
       try {
-        let deletedProductIds = new Set();
-        try {
-          const delSaved = localStorage.getItem('penny_deleted_products');
-          if (delSaved) {
-            JSON.parse(delSaved).forEach(id => deletedProductIds.add(id));
-          }
-        } catch {}
-
         const [liveProducts, liveCategories, liveAnnouncements, liveSizeGuides] = await Promise.all([
           getProducts({ includeArchived: true }),
           getCategories(),
@@ -255,44 +153,16 @@ export function ProductProvider({ children }) {
 
         if (isMounted) {
           if (Array.isArray(liveProducts) && liveProducts.length > 0) {
-            const activeLive = liveProducts
-              .filter(p => !deletedProductIds.has(p.id))
-              .map(normalizeProduct);
-            const liveMap = new Map(activeLive.map(p => [p.id, p]));
-
-            setAllProducts((prev) => {
-              const combined = [...activeLive];
-              // Preserve client-added products not yet in backend
-              prev.forEach(localP => {
-                if (!liveMap.has(localP.id) && !deletedProductIds.has(localP.id) && (localP.id.startsWith('p-custom') || !initialProducts.some(ip => ip.id === localP.id))) {
-                  combined.unshift(normalizeProduct(localP));
-                }
-              });
-              try {
-                localStorage.setItem('penny_products', JSON.stringify(combined));
-              } catch (storageErr) {
-                console.warn('localStorage quota warning on catalogue sync:', storageErr);
-              }
-              return combined;
-            });
+            setAllProducts(liveProducts.map(normalizeProduct));
           }
           if (Array.isArray(liveCategories) && liveCategories.length > 0) {
-            let deletedIds = new Set(['sets', 'two-piece-sets']);
-            try {
-              const deletedSaved = localStorage.getItem('penny_deleted_categories');
-              if (deletedSaved) {
-                const parsed = JSON.parse(deletedSaved);
-                parsed.forEach(id => deletedIds.add(id));
-              }
-            } catch {}
-
-            const activeLiveCats = liveCategories.filter(c => !deletedIds.has(c.id) && !deletedIds.has(c.slug));
+            const activeLiveCats = liveCategories.filter(
+              c => c.id !== 'sets' && c.id !== 'two-piece-sets' && c.slug !== 'sets' && c.slug !== 'two-piece-sets'
+            );
             setCategories(activeLiveCats);
-            localStorage.setItem('penny_categories', JSON.stringify(activeLiveCats));
           }
           if (Array.isArray(liveAnnouncements) && liveAnnouncements.length > 0) {
             setAnnouncements(liveAnnouncements);
-            localStorage.setItem('penny_announcements', JSON.stringify(liveAnnouncements));
           }
           if (Array.isArray(liveSizeGuides) && liveSizeGuides.length > 0) {
             const guidesMap = {};
@@ -306,30 +176,16 @@ export function ProductProvider({ children }) {
                 };
               }
             });
-            setSizeGuideData(prev => {
-              const merged = { ...prev, ...guidesMap };
-              localStorage.setItem('penny_size_guide', JSON.stringify(merged));
-              return merged;
-            });
+            setSizeGuideData(prev => ({ ...prev, ...guidesMap }));
           }
         }
       } catch (err) {
-        console.warn("Could not sync with live backend catalogue, using local cached data.", err);
+        console.warn("Could not sync with live backend catalogue:", err);
       }
     }
     syncBackendCatalogue();
     return () => { isMounted = false; };
   }, []);
-
-  // Sync all products (including archived) to localStorage whenever updated
-  useEffect(() => {
-    localStorage.setItem('penny_products', JSON.stringify(allProducts));
-  }, [allProducts]);
-
-  // Sync categories to localStorage whenever updated
-  useEffect(() => {
-    localStorage.setItem('penny_categories', JSON.stringify(categories));
-  }, [categories]);
 
   // Admin Actions:
   // 1. Add Product with immediate Cloud Database & Storage persistence
@@ -344,15 +200,7 @@ export function ProductProvider({ children }) {
     }
 
     const finalProduct = persisted ? normalizeProduct(persisted) : normalized;
-    setAllProducts((prev) => {
-      const updated = [finalProduct, ...prev.filter(p => p.id !== finalProduct.id)];
-      try {
-        localStorage.setItem('penny_products', JSON.stringify(updated));
-      } catch (storageErr) {
-        console.warn('localStorage quota warning on addProduct:', storageErr);
-      }
-      return updated;
-    });
+    setAllProducts((prev) => [finalProduct, ...prev.filter(p => p.id !== finalProduct.id)]);
     return finalProduct;
   };
 
@@ -366,32 +214,13 @@ export function ProductProvider({ children }) {
       throw e;
     }
 
-    setAllProducts((prev) => {
-      const updated = prev.map((p) => (p.id === normalized.id ? normalized : p));
-      try {
-        localStorage.setItem('penny_products', JSON.stringify(updated));
-      } catch (storageErr) {
-        console.warn('localStorage quota warning on updateProduct:', storageErr);
-      }
-      return updated;
-    });
+    setAllProducts((prev) => prev.map((p) => (p.id === normalized.id ? normalized : p)));
     return normalized;
   };
 
   // 3. Delete Product permanently from Cloud Database & Storage
   const deleteProduct = async (productId) => {
-    try {
-      const delSaved = localStorage.getItem('penny_deleted_products');
-      const delIds = new Set(delSaved ? JSON.parse(delSaved) : []);
-      delIds.add(productId);
-      localStorage.setItem('penny_deleted_products', JSON.stringify(Array.from(delIds)));
-    } catch {}
-
-    setAllProducts((prev) => {
-      const filtered = prev.filter((p) => p.id !== productId);
-      localStorage.setItem('penny_products', JSON.stringify(filtered));
-      return filtered;
-    });
+    setAllProducts((prev) => prev.filter((p) => p.id !== productId));
     try {
       await deleteProductApi(productId);
     } catch (e) {
@@ -401,15 +230,13 @@ export function ProductProvider({ children }) {
 
   // 4. Archive Product (Soft-hide from storefront while keeping data saved)
   const archiveProduct = async (productId) => {
-    setAllProducts((prev) => {
-      const updated = prev.map((p) =>
+    setAllProducts((prev) =>
+      prev.map((p) =>
         p.id === productId
           ? { ...p, isArchived: true, archivedAt: new Date().toISOString() }
           : p
-      );
-      localStorage.setItem('penny_products', JSON.stringify(updated));
-      return updated;
-    });
+      )
+    );
     try {
       await toggleArchiveProduct(productId, true);
     } catch (e) {}
@@ -417,15 +244,13 @@ export function ProductProvider({ children }) {
 
   // 5. Unarchive / Restore Product to active storefront
   const unarchiveProduct = async (productId) => {
-    setAllProducts((prev) => {
-      const updated = prev.map((p) =>
+    setAllProducts((prev) =>
+      prev.map((p) =>
         p.id === productId
           ? { ...p, isArchived: false, archivedAt: null }
           : p
-      );
-      localStorage.setItem('penny_products', JSON.stringify(updated));
-      return updated;
-    });
+      )
+    );
     try {
       await toggleArchiveProduct(productId, false);
     } catch (e) {}
@@ -434,8 +259,8 @@ export function ProductProvider({ children }) {
   // 6. Toggle Archive state
   const toggleArchive = async (productId) => {
     let nextStatus = false;
-    setAllProducts((prev) => {
-      const updated = prev.map((p) => {
+    setAllProducts((prev) =>
+      prev.map((p) => {
         if (p.id === productId) {
           nextStatus = !p.isArchived;
           return {
@@ -445,10 +270,8 @@ export function ProductProvider({ children }) {
           };
         }
         return p;
-      });
-      localStorage.setItem('penny_products', JSON.stringify(updated));
-      return updated;
-    });
+      })
+    );
     try {
       await toggleArchiveProduct(productId, nextStatus);
     } catch (e) {}
@@ -457,17 +280,15 @@ export function ProductProvider({ children }) {
   // 7. Toggle Featured on Homepage
   const toggleFeatured = async (productId) => {
     let nextVal = false;
-    setAllProducts((prev) => {
-      const updated = prev.map((p) => {
+    setAllProducts((prev) =>
+      prev.map((p) => {
         if (p.id === productId) {
           nextVal = !p.featured;
           return { ...p, featured: nextVal };
         }
         return p;
-      });
-      localStorage.setItem('penny_products', JSON.stringify(updated));
-      return updated;
-    });
+      })
+    );
     try {
       await updateProductApi(productId, { featured: nextVal });
     } catch (e) {
@@ -494,28 +315,13 @@ export function ProductProvider({ children }) {
     }
   };
 
-  // 6. Category & Subcategory Management
+  // 9. Category & Subcategory Management
   const addCategory = async (newCat) => {
-    // If it was previously recorded as deleted, restore it
-    try {
-      const deletedSaved = localStorage.getItem('penny_deleted_categories');
-      if (deletedSaved) {
-        const deletedIds = new Set(JSON.parse(deletedSaved));
-        deletedIds.delete(newCat.id);
-        if (newCat.slug) deletedIds.delete(newCat.slug);
-        localStorage.setItem('penny_deleted_categories', JSON.stringify(Array.from(deletedIds)));
-      }
-    } catch {}
-
     const catWithSubs = {
       ...newCat,
       subcategories: Array.isArray(newCat.subcategories) ? newCat.subcategories : []
     };
-    setCategories((prev) => {
-      const updated = [...prev, catWithSubs];
-      localStorage.setItem('penny_categories', JSON.stringify(updated));
-      return updated;
-    });
+    setCategories((prev) => [...prev, catWithSubs]);
 
     try {
       await fetch('/api/categories', {
@@ -529,22 +335,7 @@ export function ProductProvider({ children }) {
   };
 
   const deleteCategory = async (catId) => {
-    // Record in deleted categories set so it NEVER resurrects
-    try {
-      const deletedSaved = localStorage.getItem('penny_deleted_categories');
-      const deletedIds = new Set(deletedSaved ? JSON.parse(deletedSaved) : []);
-      deletedIds.add(catId);
-      const targetCat = categories.find(c => c.id === catId || c.slug === catId);
-      if (targetCat?.id) deletedIds.add(targetCat.id);
-      if (targetCat?.slug) deletedIds.add(targetCat.slug);
-      localStorage.setItem('penny_deleted_categories', JSON.stringify(Array.from(deletedIds)));
-    } catch {}
-
-    setCategories((prev) => {
-      const updated = prev.filter((c) => c.id !== catId && c.slug !== catId);
-      localStorage.setItem('penny_categories', JSON.stringify(updated));
-      return updated;
-    });
+    setCategories((prev) => prev.filter((c) => c.id !== catId && c.slug !== catId));
 
     try {
       await fetch(`/api/categories/${encodeURIComponent(catId)}`, {
@@ -560,8 +351,8 @@ export function ProductProvider({ children }) {
 
   // Update an existing category (name, slug, displayOrder, subcategories)
   const updateCategory = async (categoryId, updatedData) => {
-    setCategories((prev) => {
-      const updated = prev.map((cat) => {
+    setCategories((prev) =>
+      prev.map((cat) => {
         if (cat.id === categoryId || cat.slug === categoryId) {
           return {
             ...cat,
@@ -570,10 +361,8 @@ export function ProductProvider({ children }) {
           };
         }
         return cat;
-      });
-      localStorage.setItem('penny_categories', JSON.stringify(updated));
-      return updated;
-    });
+      })
+    );
 
     try {
       await fetch(`/api/categories/${encodeURIComponent(categoryId)}`, {
@@ -601,8 +390,8 @@ export function ProductProvider({ children }) {
       targetSubtypes = Array.isArray(newSubData.subtypes) ? newSubData.subtypes : [];
     }
 
-    setCategories((prev) => {
-      const updated = prev.map((cat) => {
+    setCategories((prev) =>
+      prev.map((cat) => {
         if (cat.id === categoryId || cat.slug === categoryId) {
           const currentSubs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
           const newSubs = currentSubs.map((s) => {
@@ -619,10 +408,8 @@ export function ProductProvider({ children }) {
           return { ...cat, subcategories: newSubs };
         }
         return cat;
-      });
-      localStorage.setItem('penny_categories', JSON.stringify(updated));
-      return updated;
-    });
+      })
+    );
 
     try {
       await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories/${encodeURIComponent(typeof oldSubName === 'string' ? oldSubName : oldSubName?.name || '')}`, {
@@ -659,8 +446,8 @@ export function ProductProvider({ children }) {
       subtypes: cleanSubtypes
     };
 
-    setCategories((prev) => {
-      const updated = prev.map((cat) => {
+    setCategories((prev) =>
+      prev.map((cat) => {
         if (cat.id === categoryId || cat.slug === categoryId) {
           const currentSubs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
           if (currentSubs.some(s => getSubName(s).toLowerCase() === cleanSub.toLowerCase())) {
@@ -672,10 +459,8 @@ export function ProductProvider({ children }) {
           };
         }
         return cat;
-      });
-      localStorage.setItem('penny_categories', JSON.stringify(updated));
-      return updated;
-    });
+      })
+    );
 
     try {
       await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories`, {
@@ -693,8 +478,8 @@ export function ProductProvider({ children }) {
     const cleanSub = rawSubName.trim().toLowerCase();
     if (!cleanSub) return;
 
-    setCategories((prev) => {
-      const updated = prev.map((cat) => {
+    setCategories((prev) =>
+      prev.map((cat) => {
         if (cat.id === categoryId || cat.slug === categoryId) {
           const currentSubs = Array.isArray(cat.subcategories) ? cat.subcategories : [];
           return {
@@ -703,10 +488,8 @@ export function ProductProvider({ children }) {
           };
         }
         return cat;
-      });
-      localStorage.setItem('penny_categories', JSON.stringify(updated));
-      return updated;
-    });
+      })
+    );
 
     try {
       await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories/${encodeURIComponent(rawSubName)}`, {
@@ -717,11 +500,10 @@ export function ProductProvider({ children }) {
     }
   };
 
-  // 7. Announcement Bar Management
+  // 10. Announcement Bar Management
   const updateAnnouncements = async (newAnnouncements) => {
     if (Array.isArray(newAnnouncements)) {
       setAnnouncements(newAnnouncements);
-      localStorage.setItem('penny_announcements', JSON.stringify(newAnnouncements));
       try {
         await saveAnnouncementsApi(newAnnouncements);
       } catch (e) {
@@ -730,20 +512,16 @@ export function ProductProvider({ children }) {
     }
   };
 
-  // 8. Size Guide Content & Headings Management
+  // 11. Size Guide Content & Headings Management
   const updateSizeGuide = async (categoryKey, updatedCategoryData) => {
     const nextGuide = {
       ...(sizeGuideData[categoryKey] || {}),
       ...updatedCategoryData,
     };
-    setSizeGuideData((prev) => {
-      const updated = {
-        ...prev,
-        [categoryKey]: nextGuide,
-      };
-      localStorage.setItem('penny_size_guide', JSON.stringify(updated));
-      return updated;
-    });
+    setSizeGuideData((prev) => ({
+      ...prev,
+      [categoryKey]: nextGuide,
+    }));
     try {
       await updateSizeGuideApi(categoryKey, nextGuide);
     } catch (e) {

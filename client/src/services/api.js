@@ -1,33 +1,5 @@
 import { products as defaultProducts, categories as defaultCategories, sizes as defaultSizes } from '../data/mockCatalogue';
 
-const getStoredProducts = () => {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('penny_products');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse stored products in api.js", e);
-      }
-    }
-  }
-  return defaultProducts;
-};
-
-const getStoredCategories = () => {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('penny_categories');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse stored categories in api.js", e);
-      }
-    }
-  }
-  return defaultCategories;
-};
-
 const API_BASE = '/api';
 const LIVE_BACKEND_URL = 'https://penny-kbrh.onrender.com';
 
@@ -67,7 +39,7 @@ const getAuthHeaders = () => {
   return headers;
 };
 
-// Fetch catalogue from backend API with fallback to localStorage / mock
+// Fetch catalogue from backend API with fallback to default mock catalogue
 export const getProducts = async (options = {}) => {
   const { includeArchived = true } = options;
   try {
@@ -76,16 +48,13 @@ export const getProducts = async (options = {}) => {
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('penny_products', JSON.stringify(data.data));
-        }
         return data.data;
       }
     }
   } catch (err) {
-    console.warn("Backend API unavailable, falling back to local storage.", err.message);
+    console.warn("Backend API unavailable, falling back to default catalogue.", err.message);
   }
-  return getStoredProducts();
+  return defaultProducts;
 };
 
 export const createProductApi = async (productData) => {
@@ -251,28 +220,13 @@ export const getCategories = async () => {
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
-        const stored = getStoredCategories();
-        const map = new Map();
-        stored.forEach(c => map.set(c.id, c));
-        data.data.forEach(c => {
-          const prev = map.get(c.id) || {};
-          map.set(c.id, {
-            ...prev,
-            ...c,
-            subcategories: Array.isArray(c.subcategories) ? c.subcategories : (prev.subcategories || []),
-          });
-        });
-        const merged = Array.from(map.values());
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('penny_categories', JSON.stringify(merged));
-        }
-        return merged;
+        return data.data;
       }
     }
   } catch (err) {
-    console.warn("Backend API unavailable, falling back to local categories.", err.message);
+    console.warn("Backend API unavailable, falling back to default categories.", err.message);
   }
-  return getStoredCategories();
+  return defaultCategories;
 };
 
 export const getSizes = async () => {
