@@ -24,11 +24,22 @@ const normalizeProduct = (p) => {
   if (cat === 'sets' || cat === 'two-piece-sets') {
     cat = 'the-linen-shop';
   }
+  const primaryImg = p.images?.primary || (typeof p.images === 'string' ? p.images : (p.image || '/images/products/linen-set-1.jpg'));
+  const galleryImgs = Array.isArray(p.images?.gallery) ? p.images.gallery : [];
+
   return {
     ...p,
     category: cat,
     subcategory: typeof sub === 'string' ? sub : String(sub || ''),
     isArchived: !!p.isArchived,
+    availableSizes: Array.isArray(p.availableSizes) && p.availableSizes.length > 0 ? p.availableSizes : ['XS', 'S', 'M', 'L', 'XL'],
+    colors: Array.isArray(p.colors) && p.colors.length > 0 ? p.colors : ['Black', 'White', 'Charcoal'],
+    images: {
+      primary: primaryImg,
+      gallery: galleryImgs
+    },
+    price: Number(p.price) || 0,
+    inStock: p.inStock !== undefined ? !!p.inStock : true,
   };
 };
 

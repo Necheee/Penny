@@ -158,12 +158,14 @@ export default function ProductModal({ productId, closeModal }) {
 
   useEffect(() => {
     if (product) {
-      setActiveImage(product.images.primary);
-      if (product.colors.length > 0) setSelectedColor(product.colors[0]);
+      const primary = product.images?.primary || (typeof product.images === 'string' ? product.images : '/images/products/linen-set-1.jpg');
+      setActiveImage(primary);
+      const cols = Array.isArray(product.colors) ? product.colors : [];
+      if (cols.length > 0) setSelectedColor(cols[0]);
     }
   }, [product]);
 
-  if (isLoading || !product) {
+  if (isLoading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
         <div className="bg-white p-8 shadow-2xl flex flex-col items-center justify-center">
@@ -174,7 +176,20 @@ export default function ProductModal({ productId, closeModal }) {
     );
   }
 
-  const allImages = [product.images.primary, ...(product.images.gallery || [])];
+  if (!product) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="bg-white p-8 shadow-2xl flex flex-col items-center justify-center max-w-sm w-full text-center">
+          <p className="text-sm font-sans mb-4 text-brand-charcoal">Piece not found.</p>
+          <button onClick={closeModal} className="px-4 py-2 border border-brand-charcoal text-xs uppercase tracking-wider cursor-pointer hover:bg-neutral-100">Close</button>
+        </div>
+      </div>
+    );
+  }
+
+  const primaryImg = product.images?.primary || (typeof product.images === 'string' ? product.images : '/images/products/linen-set-1.jpg');
+  const galleryImgs = Array.isArray(product.images?.gallery) ? product.images.gallery : [];
+  const allImages = [primaryImg, ...galleryImgs].filter(Boolean);
 
   const handleQuantity = (type) => {
     if (type === 'inc') setQuantity(prev => prev + 1);
@@ -296,7 +311,7 @@ export default function ProductModal({ productId, closeModal }) {
                 </span>
               ) : null}
               <h1 className="text-2xl font-serif text-brand-charcoal mb-2">{product.name}</h1>
-              <p className="text-lg font-serif text-brand-charcoal/80">₦ {product.price.toLocaleString()}</p>
+              <p className="text-lg font-serif text-brand-charcoal/80">₦ {(Number(product.price) || 0).toLocaleString()}</p>
             </div>
             <button 
               onClick={() => toggleWishlist(product)}
@@ -314,7 +329,7 @@ export default function ProductModal({ productId, closeModal }) {
             <div className="flex justify-between items-end mb-3">
               <span className="text-xs font-bold tracking-[0.15em] uppercase text-brand-charcoal flex items-center gap-1.5 flex-wrap">
                 Color: <span className="text-brand-taupe">{selectedColor}</span>
-                {selectedColor.includes('(Custom Color)') && (
+                {typeof selectedColor === 'string' && selectedColor.includes('(Custom Color)') && (
                   <span className="ml-1 text-[9px] bg-amber-100 text-amber-950 border border-amber-300 px-2 py-0.5 font-bold uppercase tracking-wider rounded-xs inline-flex items-center gap-1">
                     <Sparkles className="w-2.5 h-2.5 text-amber-600" /> Custom Order Selected
                   </span>
@@ -322,7 +337,7 @@ export default function ProductModal({ productId, closeModal }) {
               </span>
             </div>
             <div className="flex flex-wrap gap-3 items-center">
-              {product.colors.map(color => (
+              {(Array.isArray(product.colors) ? product.colors : []).map(color => (
                 <button
                   key={color}
                   onClick={() => setSelectedColor(color)}
@@ -488,7 +503,7 @@ export default function ProductModal({ productId, closeModal }) {
                               <input
                                 type="email"
                                 readOnly
-                                value={user.email}
+                                value={user?.email || ''}
                                 className="w-full bg-neutral-100/70 border border-neutral-200 px-3 py-2 text-xs text-neutral-600 rounded-xs cursor-not-allowed"
                               />
                             </div>
@@ -626,7 +641,7 @@ export default function ProductModal({ productId, closeModal }) {
             </div>
             <div className="grid grid-cols-3 gap-2">
               {globalSizes.map(size => {
-                const isAvailable = product.availableSizes.includes(size);
+                const isAvailable = (Array.isArray(product.availableSizes) ? product.availableSizes : []).includes(size);
                 return (
                   <button
                     key={size}
@@ -689,7 +704,7 @@ export default function ProductModal({ productId, closeModal }) {
                   'Sold Out'
                 ) : isAdding ? (
                   'Adding...'
-                ) : selectedColor.includes('(Custom Color)') ? (
+                ) : (typeof selectedColor === 'string' && selectedColor.includes('(Custom Color)')) ? (
                   <>
                     <Sparkles className="w-4 h-4 mr-2 text-amber-500" />
                     <span>Add in {activeCustomColor || 'Custom'}</span>
@@ -710,7 +725,7 @@ export default function ProductModal({ productId, closeModal }) {
                 product.isArchived || !product.inStock ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
-              <Zap className="w-4 h-4 text-amber-300" /> Buy Now - ₦{(product.price * quantity).toLocaleString()}
+              <Zap className="w-4 h-4 text-amber-300" /> Buy Now - ₦{((Number(product.price) || 0) * quantity).toLocaleString()}
             </button>
           </div>
         </div>
