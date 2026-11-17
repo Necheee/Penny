@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 /**
  * Checks whether all required Cloudflare R2 credentials are provided in environment variables.
@@ -37,4 +37,34 @@ export const getR2Client = () => {
   return r2ClientInstance;
 };
 
-export { PutObjectCommand };
+/**
+ * Deletes an object from Cloudflare R2 by its public URL or storage key.
+ */
+export const deleteR2Object = async (imageUrlOrKey) => {
+  if (!isR2Configured() || !imageUrlOrKey) return false;
+  try {
+    const r2Client = getR2Client();
+    const bucketName = (process.env.R2_BUCKET_NAME || '').trim();
+
+    let key = imageUrlOrKey;
+    if (imageUrlOrKey.startsWith('http://') || imageUrlOrKey.startsWith('https://')) {
+      const urlObj = new URL(imageUrlOrKey);
+      key = urlObj.pathname.replace(/^\/+/, '');
+    }
+
+    if (!key) return false;
+
+    await r2Client.send(
+      new DeleteObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+      })
+    );
+    return true;
+  } catch (err) {
+    console.warn('[R2 CLEANUP] Could not delete object from R2:', err.message);
+    return false;
+  }
+};
+
+export { PutObjectCommand, DeleteObjectCommand };

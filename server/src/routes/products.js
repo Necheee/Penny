@@ -3,6 +3,7 @@ import { initialProducts, initialCategories } from '../data/initialCatalogue.js'
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
+import { deleteR2Object } from '../utils/r2.js';
 
 const router = express.Router();
 
@@ -660,6 +661,23 @@ router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
         success: false,
         message: `Product with ID '${id}' not found.`,
       });
+    }
+
+    // Automatically clean up associated images from Cloudflare R2 bucket
+    try {
+      const primaryImg = removed.images?.primary || (typeof removed.images === 'string' ? removed.images : '');
+      if (primaryImg && (primaryImg.includes('r2.dev') || primaryImg.includes('r2.cloudflarestorage.com'))) {
+        deleteR2Object(primaryImg).catch(() => {});
+      }
+      if (Array.isArray(removed.images?.gallery)) {
+        removed.images.gallery.forEach(img => {
+          if (img && (img.includes('r2.dev') || img.includes('r2.cloudflarestorage.com'))) {
+            deleteR2Object(img).catch(() => {});
+          }
+        });
+      }
+    } catch (cleanupErr) {
+      console.warn('[PRODUCTS API] R2 image cleanup notice:', cleanupErr.message);
     }
 
     return res.status(200).json({
