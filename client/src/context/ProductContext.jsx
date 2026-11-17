@@ -46,8 +46,19 @@ const normalizeProduct = (p) => {
 };
 
 export function ProductProvider({ children }) {
-  // Products initialized with standard catalogue, synced directly with Neon Cloud DB
-  const [allProducts, setAllProducts] = useState(() => initialProducts.map(normalizeProduct));
+  // Products initialized directly from persistent live DB cache so on refresh there is NEVER a flicker of mock items!
+  const [allProducts, setAllProducts] = useState(() => {
+    try {
+      const cached = localStorage.getItem('penny_live_catalogue_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(normalizeProduct);
+        }
+      }
+    } catch {}
+    return initialProducts.map(normalizeProduct);
+  });
 
   // Active products for live customer storefront browsing
   const products = allProducts.filter(p => !p.isArchived);
@@ -55,10 +66,19 @@ export function ProductProvider({ children }) {
   // Archived products saved in admin for easy retrieval
   const archivedProducts = allProducts.filter(p => !!p.isArchived);
 
-  // Load categories directly from Neon Cloud DB or initial mock (excluding obsolete sets)
-  const [categories, setCategories] = useState(() => 
-    initialCategories.filter(c => c.id !== 'sets' && c.id !== 'two-piece-sets' && c.slug !== 'sets' && c.slug !== 'two-piece-sets')
-  );
+  // Load categories directly from persistent cache or initial mock (excluding obsolete sets)
+  const [categories, setCategories] = useState(() => {
+    try {
+      const cached = localStorage.getItem('penny_live_categories_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter(c => c.id !== 'sets' && c.id !== 'two-piece-sets' && c.slug !== 'sets' && c.slug !== 'two-piece-sets');
+        }
+      }
+    } catch {}
+    return initialCategories.filter(c => c.id !== 'sets' && c.id !== 'two-piece-sets' && c.slug !== 'sets' && c.slug !== 'two-piece-sets');
+  });
 
   const [sizes] = useState(initialSizes);
 
@@ -127,17 +147,22 @@ export function ProductProvider({ children }) {
     }
   }));
 
-  // Clear legacy localStorage catalogue caches on mount so outdated items never conflict
+  // Persist live products and categories to cache whenever updated so page refresh never flickers
   useEffect(() => {
-    try {
-      localStorage.removeItem('penny_products');
-      localStorage.removeItem('penny_deleted_products');
-      localStorage.removeItem('penny_categories');
-      localStorage.removeItem('penny_deleted_categories');
-      localStorage.removeItem('penny_announcements');
-      localStorage.removeItem('penny_size_guide');
-    } catch {}
-  }, []);
+    if (Array.isArray(allProducts) && allProducts.length > 0) {
+      try {
+        localStorage.setItem('penny_live_catalogue_cache', JSON.stringify(allProducts));
+      } catch {}
+    }
+  }, [allProducts]);
+
+  useEffect(() => {
+    if (Array.isArray(categories) && categories.length > 0) {
+      try {
+        localStorage.setItem('penny_live_categories_cache', JSON.stringify(categories));
+      } catch {}
+    }
+  }, [categories]);
 
   // Sync catalogue with live Neon backend API on mount
   useEffect(() => {
@@ -153,13 +178,20 @@ export function ProductProvider({ children }) {
 
         if (isMounted) {
           if (Array.isArray(liveProducts) && liveProducts.length > 0) {
-            setAllProducts(liveProducts.map(normalizeProduct));
+            const normalized = liveProducts.map(normalizeProduct);
+            setAllProducts(normalized);
+            try {
+              localStorage.setItem('penny_live_catalogue_cache', JSON.stringify(normalized));
+            } catch {}
           }
           if (Array.isArray(liveCategories) && liveCategories.length > 0) {
             const activeLiveCats = liveCategories.filter(
               c => c.id !== 'sets' && c.id !== 'two-piece-sets' && c.slug !== 'sets' && c.slug !== 'two-piece-sets'
             );
             setCategories(activeLiveCats);
+            try {
+              localStorage.setItem('penny_live_categories_cache', JSON.stringify(activeLiveCats));
+            } catch {}
           }
           if (Array.isArray(liveAnnouncements) && liveAnnouncements.length > 0) {
             setAnnouncements(liveAnnouncements);

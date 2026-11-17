@@ -97,7 +97,7 @@
     "inStock": true,
     "isArchived": false,
     "createdAt": "2026-11-14T02:37:00.305Z",
-    "updatedAt": "2026-11-14T04:39:57.394Z"
+    "updatedAt": "2026-11-17T07:22:44.943Z"
   },
   {
     "id": "p-033",
@@ -273,11 +273,11 @@
       "L",
       "XL"
     ],
-    "featured": false,
+    "featured": true,
     "inStock": true,
     "isArchived": false,
     "createdAt": "2026-11-14T02:36:59.091Z",
-    "updatedAt": "2026-11-14T02:36:59.091Z"
+    "updatedAt": "2026-11-17T07:23:22.041Z"
   },
   {
     "id": "p-037",

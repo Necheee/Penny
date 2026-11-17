@@ -40,7 +40,7 @@ export default function Home() {
   const goToSlide = (index) => setCurrentSlide(index);
 
   return (
-    <div className="flex flex-col w-full overflow-hidden">
+    <div className="flex flex-col w-full overflow-x-clip">
       {/* 1. Hero Carousel */}
       <section className="relative h-[85vh] w-full bg-brand-charcoal overflow-hidden group">
         
@@ -81,25 +81,25 @@ export default function Home() {
         {/* Hero Content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 pointer-events-none z-10">
           <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.2 }}
+            transition={{ duration: 0.9, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className="text-4xl md:text-6xl lg:text-7xl font-serif text-brand-offwhite mb-6 tracking-wide pointer-events-auto drop-shadow-sm"
           >
             EFFORTLESS DRESSING,<br/> BY DESIGN.
           </motion.h1>
           <motion.p 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.4 }}
+            transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className="text-brand-beige text-xs md:text-sm max-w-lg mb-10 tracking-[0.2em] uppercase font-medium pointer-events-auto"
           >
             Modern men's essentials designed to work together.
           </motion.p>
           <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.6 }}
+            transition={{ duration: 0.9, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6 mt-4 pointer-events-auto"
           >
             <Link to="/shop?category=tops" className="bg-brand-offwhite text-brand-charcoal px-10 py-4 text-xs font-bold tracking-[0.2em] uppercase hover:bg-brand-beige transition-colors text-center w-full sm:w-auto">
@@ -132,10 +132,10 @@ export default function Home() {
 
       {/* 2. Brand Introduction (Scroll Reveal Animation) */}
       <motion.section 
-        initial={{ opacity: 0, y: 40 }}
+        initial={{ opacity: 0, y: 50 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}
+        viewport={{ once: true, amount: 0.15 }}
+        transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
         className="py-24 px-6 md:px-12 max-w-4xl mx-auto text-center"
       >
         <h2 className="text-3xl md:text-4xl font-serif mb-8 text-brand-charcoal">The Capsule Philosophy</h2>
@@ -147,63 +147,43 @@ export default function Home() {
         </Link>
       </motion.section>
 
-      {/* 3. Featured Collection (Scroll Reveal with Staggered Entrance) */}
+      {/* 3. Featured Collection (Scroll Reveal) */}
       {displayedFeatured.length > 0 && (
-        <motion.section 
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="py-12 px-6 md:px-12 max-w-7xl mx-auto w-full"
-        >
-          <div className="flex justify-between items-end mb-12">
+        <section className="py-12 px-6 md:px-12 max-w-7xl mx-auto w-full">
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.15 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="flex justify-between items-end mb-12"
+          >
             <h2 className="text-3xl font-serif text-brand-charcoal">Featured Essentials</h2>
             <Link to="/shop" className="hidden md:inline-flex items-center text-xs font-bold tracking-[0.15em] uppercase hover:text-brand-taupe transition-colors">
               View All <ArrowRight className="ml-2 w-4 h-4" />
             </Link>
-          </div>
+          </motion.div>
           
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-12 md:gap-x-8">
-            {displayedFeatured.map((product, idx) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{ duration: 0.7, delay: idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <ProductCard product={product} />
-              </motion.div>
+            {displayedFeatured.map((product) => (
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
-        </motion.section>
+        </section>
       )}
 
       {/* 4. Two-Piece Set Feature (Scroll Reveal Split Showcase) */}
       <motion.section 
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+        initial={{ opacity: 0, y: 50 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.12 }}
+        transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
         className="bg-brand-charcoal text-brand-offwhite py-24"
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.96 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="order-2 md:order-1 relative aspect-[4/5] md:aspect-auto md:h-[80vh] overflow-hidden"
-          >
+          <div className="order-2 md:order-1 relative aspect-[4/5] md:aspect-auto md:h-[80vh] overflow-hidden">
             <img src={linenSet?.images.gallery[0] || '/images/products/linen-set-1.jpg'} alt="Linen Set" className="w-full h-full object-cover" />
-          </motion.div>
-          <motion.div 
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="order-1 md:order-2 flex flex-col items-start md:pl-12"
-          >
+          </div>
+          <div className="order-1 md:order-2 flex flex-col items-start md:pl-12">
             <h2 className="text-4xl md:text-5xl font-serif mb-6 leading-tight">Pieces designed to work together.</h2>
             <p className="text-gray-400 mb-8 max-w-md font-serif text-lg leading-relaxed">
               Our signature Linen Two-Piece Set perfectly embodies the PENNY philosophy. Wear them together for a cohesive, sophisticated look, or style the pieces separately to multiply your wardrobe options.
@@ -214,16 +194,16 @@ export default function Home() {
             >
               Explore The Set
             </Link>
-          </motion.div>
+          </div>
         </div>
       </motion.section>
 
       {/* 5. Newsletter (Scroll Reveal) */}
       <motion.section 
-        initial={{ opacity: 0, y: 35 }}
+        initial={{ opacity: 0, y: 45 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-60px" }}
-        transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}
+        viewport={{ once: true, amount: 0.15 }}
+        transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
         className="py-32 px-6 text-center max-w-2xl mx-auto"
       >
         <h2 className="text-3xl md:text-4xl font-serif text-brand-charcoal mb-4">Join The Club</h2>

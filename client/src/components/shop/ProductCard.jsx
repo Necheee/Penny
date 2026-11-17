@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useModal } from '../../context/ModalContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { useCart } from '../../context/CartContext';
@@ -42,7 +43,14 @@ export default function ProductCard({ product }) {
   };
 
   return (
-    <div onClick={() => openModal(product.id)} className="group flex flex-col cursor-pointer">
+    <motion.div 
+      initial={{ opacity: 0, y: 35 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.08 }}
+      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+      onClick={() => openModal(product.id)} 
+      className="group flex flex-col cursor-pointer"
+    >
       <div className="relative aspect-[4/5] mb-4 bg-[#f4f4f0] overflow-hidden">
         <img 
           src={product.images?.primary || '/images/products/linen-set-1.jpg'} 
@@ -107,6 +115,6 @@ export default function ProductCard({ product }) {
           Buy Now
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
