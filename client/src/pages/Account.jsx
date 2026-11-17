@@ -33,7 +33,7 @@ import FormattedMessage from '../components/common/FormattedMessage';
 import { useDialog } from '../context/DialogContext';
 
 export default function Account() {
-  const { user, logout, updateProfile, updateAddresses, deleteAccount, refreshProfile } = useAuth();
+  const { user, logout, updateProfile, updateAddresses, deleteAccount, refreshProfile, changePassword } = useAuth();
   const { markAllAsSeen, refreshNotifications, hasUnreadNotifications } = useNotifications();
   const { confirm, alert: showAlertDialog } = useDialog();
   const navigate = useNavigate();
@@ -202,7 +202,7 @@ export default function Account() {
     updateAddresses(updated);
   };
 
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
     setPasswordFeedback({ type: '', text: '' });
 
@@ -216,23 +216,14 @@ export default function Account() {
       return;
     }
 
-    // Update in local accounts registry
-    const cleanEmail = (user.email || '').trim().toLowerCase();
-    const savedAccounts = JSON.parse(localStorage.getItem('penny_registered_users') || '[]');
-    const idx = savedAccounts.findIndex(a => 
-      (a.id && a.id === user.id) || 
-      (a.email && a.email.trim().toLowerCase() === cleanEmail)
-    );
-    if (idx !== -1) {
-      savedAccounts[idx].password = passwordForm.newPassword;
-    } else {
-      savedAccounts.push({ ...user, password: passwordForm.newPassword });
+    try {
+      await changePassword(passwordForm.currentPassword, passwordForm.newPassword);
+      setPasswordFeedback({ type: 'success', text: 'Your password has been securely updated and hashed.' });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setTimeout(() => setPasswordFeedback({ type: '', text: '' }), 5000);
+    } catch (err) {
+      setPasswordFeedback({ type: 'error', text: err.message || 'Could not update password. Please check your current password.' });
     }
-    localStorage.setItem('penny_registered_users', JSON.stringify(savedAccounts));
-
-    setPasswordFeedback({ type: 'success', text: 'Your password has been securely updated.' });
-    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    setTimeout(() => setPasswordFeedback({ type: '', text: '' }), 5000);
   };
 
   // Order History State

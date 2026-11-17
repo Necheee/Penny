@@ -692,8 +692,17 @@ export default function AdminDashboard() {
     }
   };
 
-  // Toggle Featured status directly in table (syncs to homepage immediately)
+  // Toggle Featured status directly in table (syncs to homepage immediately, capped at 4)
   const handleToggleFeatured = (productId) => {
+    const target = productList.find(p => p.id === productId);
+    if (target && !target.featured && featuredCount >= 4) {
+      showAlertDialog({
+        title: 'Featured Limit Reached (4)',
+        message: 'A maximum of 4 products can be featured on the homepage. Please unfeature a piece first to make room for this one.',
+        type: 'warning',
+      });
+      return;
+    }
     toggleFeatured(productId);
   };
 
@@ -1415,17 +1424,35 @@ export default function AdminDashboard() {
                         )}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleFeatured(p.id)}
-                          className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors cursor-pointer ${
-                            p.featured 
-                              ? 'bg-brand-charcoal text-white' 
-                              : 'bg-neutral-100 text-neutral-400 hover:text-neutral-700'
-                          }`}
-                        >
-                          {p.featured ? 'Featured' : 'Standard'}
-                        </button>
+                        {(() => {
+                          const isMaxReached = featuredCount >= 4;
+                          const isCurrentFeatured = !!p.featured;
+                          const isInactive = !isCurrentFeatured && isMaxReached;
+
+                          return (
+                            <button
+                              type="button"
+                              disabled={isInactive}
+                              onClick={() => handleToggleFeatured(p.id)}
+                              title={
+                                isInactive
+                                  ? 'Maximum of 4 featured products reached. Inactive until another piece is unfeatured.'
+                                  : isCurrentFeatured
+                                    ? 'Click to remove from Homepage Featured'
+                                    : 'Click to feature on Homepage'
+                              }
+                              className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-all ${
+                                isCurrentFeatured 
+                                  ? 'bg-brand-charcoal text-white hover:bg-black cursor-pointer shadow-xs' 
+                                  : isInactive
+                                    ? 'bg-neutral-100 text-neutral-300 border border-dashed border-neutral-300 cursor-not-allowed opacity-60'
+                                    : 'bg-neutral-100 text-neutral-500 hover:text-brand-charcoal hover:bg-neutral-200 cursor-pointer'
+                              }`}
+                            >
+                              {isCurrentFeatured ? 'Featured' : isInactive ? 'Inactive' : 'Standard'}
+                            </button>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-4 text-center">
                         <button
@@ -3148,17 +3175,26 @@ export default function AdminDashboard() {
               {/* Toggles */}
               <div className="pt-2 space-y-3 border-t border-neutral-100">
                 <div className="flex flex-wrap gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={productForm.featured}
-                      onChange={(e) => setProductForm({ ...productForm, featured: e.target.checked })}
-                      className="accent-black"
-                    />
-                    <span className="font-bold uppercase tracking-wider text-[11px] text-brand-charcoal">
-                      Feature in Homepage Essentials
-                    </span>
-                  </label>
+                  {(() => {
+                    const isFormFeaturedDisabled = !productForm.featured && featuredCount >= 4 && (!editingProduct || !editingProduct.featured);
+                    return (
+                      <label 
+                        className={`flex items-center gap-2 ${isFormFeaturedDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                        title={isFormFeaturedDisabled ? 'Maximum of 4 featured products reached. Unfeature another piece first.' : ''}
+                      >
+                        <input
+                          type="checkbox"
+                          disabled={isFormFeaturedDisabled}
+                          checked={productForm.featured}
+                          onChange={(e) => setProductForm({ ...productForm, featured: e.target.checked })}
+                          className="accent-black"
+                        />
+                        <span className="font-bold uppercase tracking-wider text-[11px] text-brand-charcoal">
+                          Feature in Homepage Essentials {isFormFeaturedDisabled ? '(Limit 4 Reached)' : ''}
+                        </span>
+                      </label>
+                    );
+                  })()}
 
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input

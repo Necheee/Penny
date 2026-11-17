@@ -38,7 +38,7 @@ export default function CreateAccount() {
       navigate(redirectUrl);
     } catch (err) {
       console.error('Account creation error:', err);
-      setErrorMsg('Failed to create account. Please try again.');
+      setErrorMsg(err.message || 'Failed to create account. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

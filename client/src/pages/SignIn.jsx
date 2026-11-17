@@ -28,7 +28,7 @@ export default function SignIn() {
       navigate(redirectUrl);
     } catch (err) {
       console.error('Sign-in error:', err);
-      setErrorMsg('Unable to sign in. Please check your credentials and try again.');
+      setErrorMsg(err.message || 'Unable to sign in. Please check your credentials and try again.');
     } finally {
       setIsSubmitting(false);
     }

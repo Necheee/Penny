@@ -277,13 +277,21 @@ export function ProductProvider({ children }) {
     } catch (e) {}
   };
 
-  // 7. Toggle Featured on Homepage
+  // 7. Toggle Featured on Homepage (Capped at strictly 4 active featured items)
   const toggleFeatured = async (productId) => {
-    let nextVal = false;
+    const target = allProducts.find(p => p.id === productId);
+    if (!target) return;
+
+    const currentFeaturedCount = allProducts.filter(p => p.featured && !p.isArchived).length;
+    if (!target.featured && currentFeaturedCount >= 4) {
+      // Reject enabling featured if 4 are already featured
+      return false;
+    }
+
+    const nextVal = !target.featured;
     setAllProducts((prev) =>
       prev.map((p) => {
         if (p.id === productId) {
-          nextVal = !p.featured;
           return { ...p, featured: nextVal };
         }
         return p;
@@ -291,8 +299,10 @@ export function ProductProvider({ children }) {
     );
     try {
       await updateProductApi(productId, { featured: nextVal });
+      return true;
     } catch (e) {
       console.warn("Failed to persist featured state:", e);
+      return false;
     }
   };
 

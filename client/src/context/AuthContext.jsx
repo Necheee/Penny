@@ -13,134 +13,153 @@ export function AuthProvider({ children }) {
   });
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
+  // Security cleanup: Remove any legacy plaintext passwords stored in browser localStorage
+  useEffect(() => {
+    try {
+      const reg = JSON.parse(localStorage.getItem('penny_registered_users') || '[]');
+      let modified = false;
+      const cleaned = reg.map(account => {
+        if (account.password) {
+          modified = true;
+          const { password, ...rest } = account;
+          return rest;
+        }
+        return account;
+      });
+      if (modified) {
+        localStorage.setItem('penny_registered_users', JSON.stringify(cleaned));
+      }
+    } catch {}
+  }, []);
+
+  /**
+   * Secure client sign in with backend bcrypt verification
+   */
   const login = async (email, password) => {
     const cleanEmail = (email || '').trim().toLowerCase();
-    const savedAccounts = JSON.parse(localStorage.getItem('penny_registered_users') || '[]');
-    let localFound = savedAccounts.find(a => a.email && a.email.trim().toLowerCase() === cleanEmail);
 
-    let cloudUser = null;
+    setIsAuthLoading(true);
     try {
-      const res = await fetch(`/api/auth/customer-profile?email=${encodeURIComponent(cleanEmail)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
-          cloudUser = data.user;
-        }
+      const res = await fetch('/api/auth/customer-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Invalid email or password. Please verify your credentials.');
       }
-    } catch (e) {
-      console.warn('Backend customer profile lookup note:', e.message);
+
+      const authenticatedUser = data.user;
+      if (data.token) {
+        localStorage.setItem('penny_customer_token', data.token);
+      }
+
+      setUser(authenticatedUser);
+      localStorage.setItem('penny_user', JSON.stringify(authenticatedUser));
+
+      // Update in registered accounts registry (without password)
+      const savedAccounts = JSON.parse(localStorage.getItem('penny_registered_users') || '[]');
+      const idx = savedAccounts.findIndex(a => a.email && a.email.trim().toLowerCase() === cleanEmail);
+      if (idx !== -1) {
+        savedAccounts[idx] = { ...savedAccounts[idx], ...authenticatedUser };
+        delete savedAccounts[idx].password;
+      } else {
+        savedAccounts.push(authenticatedUser);
+      }
+      localStorage.setItem('penny_registered_users', JSON.stringify(savedAccounts));
+
+      return true;
+    } finally {
+      setIsAuthLoading(false);
     }
-
-    let found = null;
-    if (cloudUser && localFound) {
-      found = {
-        ...localFound,
-        ...cloudUser,
-        firstName: cloudUser.firstName || localFound.firstName || '',
-        lastName: cloudUser.lastName || localFound.lastName || '',
-        phone: cloudUser.phone || localFound.phone || '',
-        addresses: (cloudUser.addresses && cloudUser.addresses.length > 0) ? cloudUser.addresses : (localFound.addresses || []),
-      };
-    } else if (cloudUser) {
-      found = cloudUser;
-    } else if (localFound) {
-      found = localFound;
-    }
-
-    if (!found) {
-      const namePart = cleanEmail.split('@')[0] || 'Client';
-      const defaultFirstName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
-
-      found = {
-        id: `usr_${Date.now()}`,
-        email: cleanEmail,
-        firstName: defaultFirstName,
-        lastName: '',
-        phone: '',
-        addresses: [
-          {
-            id: 'addr_1',
-            label: 'Default Shipping Address',
-            fullName: defaultFirstName,
-            street: '14 Victoria Island Crescent, Apt 4B',
-            city: 'Victoria Island',
-            state: 'Lagos',
-            isDefault: true,
-          }
-        ]
-      };
-    }
-
-    // Ensure user is permanently saved in registered accounts registry
-    const idx = savedAccounts.findIndex(a => a.email && a.email.trim().toLowerCase() === cleanEmail);
-    if (idx !== -1) {
-      savedAccounts[idx] = { ...savedAccounts[idx], ...found };
-    } else {
-      savedAccounts.push(found);
-    }
-    localStorage.setItem('penny_registered_users', JSON.stringify(savedAccounts));
-
-    setUser(found);
-    localStorage.setItem('penny_user', JSON.stringify(found));
-
-    // Also sync to backend Neon Cloud in background
-    fetch('/api/auth/customer-sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(found),
-    }).catch(() => {});
-
-    return true;
   };
 
+  /**
+   * Secure client logout
+   */
   const logout = () => {
     setUser(null);
     localStorage.removeItem('penny_user');
+    localStorage.removeItem('penny_customer_token');
   };
 
+  /**
+   * Secure client registration with bcrypt hashing on the server
+   */
   const createAccount = async (userData) => {
     const cleanEmail = (userData.email || '').trim().toLowerCase();
-    const newUser = {
-      id: `usr_${Date.now()}`,
-      email: cleanEmail,
-      firstName: (userData.firstName || '').trim(),
-      lastName: (userData.lastName || '').trim(),
-      phone: (userData.phone || '').trim(),
-      addresses: [
-        {
-          id: 'addr_1',
-          label: 'Primary Delivery Address',
-          fullName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-          street: userData.address || '',
-          city: userData.city || 'Lagos',
-          state: userData.state || 'Lagos',
-          isDefault: true,
-        }
-      ]
-    };
 
-    // Save to local registry so login remembers name and credentials
-    const savedAccounts = JSON.parse(localStorage.getItem('penny_registered_users') || '[]');
-    const idx = savedAccounts.findIndex(a => a.email && a.email.trim().toLowerCase() === cleanEmail);
-    if (idx !== -1) {
-      savedAccounts[idx] = { ...savedAccounts[idx], ...newUser, password: userData.password };
-    } else {
-      savedAccounts.push({ ...newUser, password: userData.password });
-    }
-    localStorage.setItem('penny_registered_users', JSON.stringify(savedAccounts));
-
-    setUser(newUser);
-    localStorage.setItem('penny_user', JSON.stringify(newUser));
-
-    // Sync to backend Neon Cloud
+    setIsAuthLoading(true);
     try {
-      await fetch('/api/auth/customer-sync', {
+      const res = await fetch('/api/auth/customer-register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUser),
+        body: JSON.stringify({
+          email: cleanEmail,
+          password: userData.password,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          phone: userData.phone,
+          address: userData.address,
+          city: userData.city,
+          state: userData.state,
+        }),
       });
-    } catch (err) {
-      console.warn('Could not sync new account to backend:', err.message);
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to create your account. Please try again.');
+      }
+
+      const newUser = data.user;
+      if (data.token) {
+        localStorage.setItem('penny_customer_token', data.token);
+      }
+
+      setUser(newUser);
+      localStorage.setItem('penny_user', JSON.stringify(newUser));
+
+      // Save to local registry without password
+      const savedAccounts = JSON.parse(localStorage.getItem('penny_registered_users') || '[]');
+      const idx = savedAccounts.findIndex(a => a.email && a.email.trim().toLowerCase() === cleanEmail);
+      if (idx !== -1) {
+        savedAccounts[idx] = { ...savedAccounts[idx], ...newUser };
+        delete savedAccounts[idx].password;
+      } else {
+        savedAccounts.push(newUser);
+      }
+      localStorage.setItem('penny_registered_users', JSON.stringify(savedAccounts));
+
+      return true;
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  /**
+   * Changes password securely with current password check and bcrypt hashing
+   */
+  const changePassword = async (currentPassword, newPassword) => {
+    if (!user) throw new Error('You must be signed in to change your password.');
+
+    const res = await fetch('/api/auth/customer-change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: user.email,
+        userId: user.id,
+        currentPassword,
+        newPassword,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to update password.');
     }
 
     return true;
@@ -169,6 +188,7 @@ export function AuthProvider({ children }) {
 
     if (idx !== -1) {
       savedAccounts[idx] = { ...savedAccounts[idx], ...updatedUser };
+      delete savedAccounts[idx].password;
     } else {
       savedAccounts.push(updatedUser);
     }
@@ -199,7 +219,6 @@ export function AuthProvider({ children }) {
   const deleteAccount = () => {
     if (!user) return;
     const cleanEmail = (user.email || '').trim().toLowerCase();
-    // Remove from local registered users
     const savedAccounts = JSON.parse(localStorage.getItem('penny_registered_users') || '[]');
     const remaining = savedAccounts.filter(a => 
       a.id !== user.id && 
@@ -207,9 +226,9 @@ export function AuthProvider({ children }) {
     );
     localStorage.setItem('penny_registered_users', JSON.stringify(remaining));
 
-    // Clear active session
     setUser(null);
     localStorage.removeItem('penny_user');
+    localStorage.removeItem('penny_customer_token');
   };
 
   // Background refresh user profile from cloud with cross-device sync
@@ -265,7 +284,6 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     refreshProfile();
 
-    // Check cloud for profile changes made on other devices every 10s and on window focus
     const interval = setInterval(refreshProfile, 10000);
     const onFocus = () => refreshProfile();
     window.addEventListener('focus', onFocus);
@@ -277,7 +295,18 @@ export function AuthProvider({ children }) {
   }, [user?.email, user?.id]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthLoading, login, logout, createAccount, updateProfile, updateAddresses, deleteAccount, refreshProfile }}>
+    <AuthContext.Provider value={{
+      user,
+      isAuthLoading,
+      login,
+      logout,
+      createAccount,
+      changePassword,
+      updateProfile,
+      updateAddresses,
+      deleteAccount,
+      refreshProfile,
+    }}>
       {children}
     </AuthContext.Provider>
   );

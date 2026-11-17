@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getProductById, getSizes } from '../../services/api';
 import { Plus, Minus, X, ShoppingBag, Heart, Check, Sparkles, Send, Loader2, Palette, Lock, ShieldCheck, Zap } from 'lucide-react';
@@ -22,11 +22,19 @@ import { useProducts } from '../../context/ProductContext';
 import SizeGuideModal from './SizeGuideModal';
 
 export default function ProductModal({ productId, closeModal }) {
-  const { getProductById: getContextProductById } = useProducts();
+  const { products, getProductById: getContextProductById } = useProducts();
+  const [currentProductId, setCurrentProductId] = useState(productId);
+  const modalContainerRef = useRef(null);
+
   const [product, setProduct] = useState(null);
   const [globalSizes, setGlobalSizes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+
+  // Sync internal state when parent props change
+  useEffect(() => {
+    setCurrentProductId(productId);
+  }, [productId]);
 
   const { user } = useAuth();
   const { addToCart, openCart } = useCart();
@@ -141,8 +149,8 @@ export default function ProductModal({ productId, closeModal }) {
     const fetchProduct = async () => {
       setIsLoading(true);
       try {
-        const found = getContextProductById ? getContextProductById(productId) : null;
-        const fetchedProduct = found || await getProductById(productId);
+        const found = getContextProductById ? getContextProductById(currentProductId) : null;
+        const fetchedProduct = found || await getProductById(currentProductId);
         const fetchedSizes = await getSizes();
         setProduct(fetchedProduct);
         setGlobalSizes(fetchedSizes);
@@ -152,8 +160,8 @@ export default function ProductModal({ productId, closeModal }) {
         setIsLoading(false);
       }
     };
-    if (productId) fetchProduct();
-  }, [productId, getContextProductById]);
+    if (currentProductId) fetchProduct();
+  }, [currentProductId, getContextProductById]);
 
 
   useEffect(() => {
@@ -161,9 +169,28 @@ export default function ProductModal({ productId, closeModal }) {
       const primary = product.images?.primary || (typeof product.images === 'string' ? product.images : '/images/products/linen-set-1.jpg');
       setActiveImage(primary);
       const cols = Array.isArray(product.colors) ? product.colors : [];
-      if (cols.length > 0) setSelectedColor(cols[0]);
+      setSelectedColor(cols[0] || '');
+      setSelectedSize('');
+      setSizeError(false);
+      setQuantity(1);
+      setActiveCustomColor('');
+      setIsCustomColorOpen(false);
+      setCustomColorSuccess(false);
+      setCustomColorError('');
     }
   }, [product]);
+
+  // Compute up to 4 similar items from the active catalogue, prioritizing same category
+  const similarProducts = (products || [])
+    .filter(p => p && p.id !== (product?.id || currentProductId) && !p.isArchived)
+    .sort((a, b) => {
+      const aSameCat = a.category === product?.category ? 2 : 0;
+      const bSameCat = b.category === product?.category ? 2 : 0;
+      const aSameSub = (a.subcategory && a.subcategory === product?.subcategory) ? 1 : 0;
+      const bSameSub = (b.subcategory && b.subcategory === product?.subcategory) ? 1 : 0;
+      return (bSameCat + bSameSub) - (aSameCat + aSameSub);
+    })
+    .slice(0, 4);
 
   if (isLoading) {
     return (
@@ -238,13 +265,14 @@ export default function ProductModal({ productId, closeModal }) {
 
       {/* Modal Content Box */}
       <motion.div 
+        ref={modalContainerRef}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
         role="dialog"
         aria-modal="true"
         aria-label={product.name}
-        className="relative bg-white w-full max-w-6xl max-h-[90vh] overflow-y-auto hide-scrollbar shadow-2xl flex flex-col md:flex-row"
+        className="relative bg-white w-full max-w-5xl max-h-[92vh] overflow-y-auto hide-scrollbar shadow-2xl flex flex-col"
       >
         {/* Close Button */}
         <button 
@@ -255,8 +283,10 @@ export default function ProductModal({ productId, closeModal }) {
           <X className="w-5 h-5" />
         </button>
 
-        {/* Left Column: Image Gallery */}
-        <div className="w-full md:w-1/2 flex flex-col-reverse sm:flex-row bg-[#f8f8f8]">
+        {/* Primary Product Showcase: Gallery on Left, Details & Checkout on Right */}
+        <div className="flex flex-col md:flex-row w-full">
+          {/* Left Column: Image Gallery */}
+          <div className="w-full md:w-1/2 flex flex-col-reverse sm:flex-row bg-[#f8f8f8]">
           <div className="flex sm:flex-col gap-2 p-4 overflow-x-auto sm:overflow-y-auto hide-scrollbar shrink-0">
             {allImages.map((img, idx) => (
               <button 
@@ -729,14 +759,74 @@ export default function ProductModal({ productId, closeModal }) {
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Size Guide Modal */}
-        <SizeGuideModal 
-          isOpen={isSizeGuideOpen} 
-          onClose={() => setIsSizeGuideOpen(false)} 
-          initialCategory={product.category}
-        />
-      </motion.div>
+      {/* You May Also Like Section (Similar Pieces Recommendation) */}
+      {similarProducts.length > 0 && (
+        <div className="border-t border-brand-charcoal/10 p-6 md:p-10 bg-white">
+          <div className="flex items-baseline justify-between mb-6">
+            <h2 className="text-xl md:text-2xl font-serif text-brand-charcoal tracking-wide">
+              You may also like
+            </h2>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-taupe">
+              Similar Pieces
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {similarProducts.map((simProduct) => {
+              const simImg = simProduct.images?.primary || (typeof simProduct.images === 'string' ? simProduct.images : '/images/products/linen-set-1.jpg');
+              return (
+                <div
+                  key={simProduct.id}
+                  onClick={() => {
+                    setCurrentProductId(simProduct.id);
+                    if (modalContainerRef.current) {
+                      modalContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                  className="group flex flex-col cursor-pointer"
+                >
+                  <div className="relative aspect-[3/4] mb-3 bg-[#f4f4f0] overflow-hidden">
+                    <img
+                      src={simImg}
+                      alt={simProduct.name}
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = '/images/products/linen-set-1.jpg';
+                      }}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                    />
+                    <div className="absolute inset-0 border border-brand-charcoal/0 group-hover:border-brand-charcoal/10 transition-colors duration-500 pointer-events-none" />
+                  </div>
+
+                  <h3 className="text-xs font-bold tracking-[0.1em] uppercase text-brand-charcoal mb-0.5 line-clamp-1 truncate" title={simProduct.name}>
+                    {simProduct.name}
+                  </h3>
+
+                  {simProduct.subcategory && (
+                    <p className="text-[9px] text-brand-taupe font-medium uppercase tracking-wider mb-1 line-clamp-1">
+                      {simProduct.subcategory}
+                    </p>
+                  )}
+
+                  <p className="text-xs md:text-sm text-brand-charcoal/80 font-serif">
+                    ₦ {(Number(simProduct.price) || 0).toLocaleString()}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Size Guide Modal */}
+      <SizeGuideModal 
+        isOpen={isSizeGuideOpen} 
+        onClose={() => setIsSizeGuideOpen(false)} 
+        initialCategory={product.category}
+      />
+    </motion.div>
     </div>
   );
 }

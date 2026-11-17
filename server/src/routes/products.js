@@ -222,6 +222,29 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       });
     }
 
+    // Enforce maximum 4 featured products rule
+    if (featured === true) {
+      let activeFeaturedCount = 0;
+      if (hasDatabase()) {
+        try {
+          const pool = getPool();
+          const countRes = await pool.query(
+            "SELECT count(*) FROM products WHERE featured = true AND is_archived = false"
+          );
+          activeFeaturedCount = parseInt(countRes.rows[0]?.count || 0, 10);
+        } catch {}
+      } else {
+        activeFeaturedCount = products.filter(p => p.featured && !p.isArchived).length;
+      }
+
+      if (activeFeaturedCount >= 4) {
+        return res.status(400).json({
+          success: false,
+          message: 'Maximum limit of 4 featured products reached. Please unfeature another piece before featuring this one.',
+        });
+      }
+    }
+
     const newId = id || `p-${Date.now().toString().slice(-4)}`;
     const slug = req.body.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
 
@@ -366,6 +389,30 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
       });
     }
 
+    // Enforce maximum 4 featured products rule when updating
+    if (body.featured === true && !existing.featured) {
+      let activeFeaturedCount = 0;
+      if (hasDatabase()) {
+        try {
+          const pool = getPool();
+          const countRes = await pool.query(
+            "SELECT count(*) FROM products WHERE featured = true AND is_archived = false AND id != $1",
+            [id]
+          );
+          activeFeaturedCount = parseInt(countRes.rows[0]?.count || 0, 10);
+        } catch {}
+      } else {
+        activeFeaturedCount = products.filter(p => p.featured && !p.isArchived && p.id !== id).length;
+      }
+
+      if (activeFeaturedCount >= 4) {
+        return res.status(400).json({
+          success: false,
+          message: 'Maximum limit of 4 featured products reached. Please unfeature another piece before featuring this one.',
+        });
+      }
+    }
+
     const updated = {
       ...existing,
       ...body,
@@ -490,6 +537,30 @@ router.patch('/:id/archive', requireAuth, requireAdmin, async (req, res) => {
         success: false,
         message: `Product with ID '${id}' not found.`,
       });
+    }
+
+    // Enforce maximum 4 featured products rule when updating
+    if (body.featured === true && !existing.featured) {
+      let activeFeaturedCount = 0;
+      if (hasDatabase()) {
+        try {
+          const pool = getPool();
+          const countRes = await pool.query(
+            "SELECT count(*) FROM products WHERE featured = true AND is_archived = false AND id != $1",
+            [id]
+          );
+          activeFeaturedCount = parseInt(countRes.rows[0]?.count || 0, 10);
+        } catch {}
+      } else {
+        activeFeaturedCount = products.filter(p => p.featured && !p.isArchived && p.id !== id).length;
+      }
+
+      if (activeFeaturedCount >= 4) {
+        return res.status(400).json({
+          success: false,
+          message: 'Maximum limit of 4 featured products reached. Please unfeature another piece before featuring this one.',
+        });
+      }
     }
 
     const nextArchived = req.body.isArchived !== undefined

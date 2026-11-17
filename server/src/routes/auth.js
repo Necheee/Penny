@@ -383,12 +383,337 @@ router.post('/notifications-state', async (req, res) => {
 });
 
 /**
+ * POST /api/auth/customer-register
+ * Secure customer account creation with bcrypt password hashing
+ */
+router.post('/customer-register', async (req, res) => {
+  try {
+    const { email, password, firstName, lastName, phone, address, city, state } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, message: 'Email address is required.' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanFirst = (firstName || '').trim();
+    const cleanLast = (lastName || '').trim();
+    const cleanPhone = (phone || '').trim();
+    const userId = `usr_${Date.now()}`;
+
+    // Hash password safely with bcrypt
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const initialAddress = address ? [{
+      id: 'addr_1',
+      label: 'Primary Delivery Address',
+      fullName: `${cleanFirst} ${cleanLast}`.trim() || cleanEmail.split('@')[0],
+      street: address.trim(),
+      city: (city || 'Lagos').trim(),
+      state: (state || 'Lagos').trim(),
+      isDefault: true,
+    }] : [];
+
+    const safeUser = {
+      id: userId,
+      email: cleanEmail,
+      firstName: cleanFirst,
+      lastName: cleanLast,
+      phone: cleanPhone,
+      addresses: initialAddress,
+      cart: [],
+      role: 'customer',
+    };
+
+    // 1. Check Neon Cloud Database and Insert
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        // Check if user already exists
+        const checkRes = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1', [cleanEmail]);
+        if (checkRes.rows.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'An account with this email address already exists. Please sign in instead.',
+          });
+        }
+
+        await pool.query(
+          `INSERT INTO users (id, email, first_name, last_name, phone, password_hash, role, addresses, cart)
+           VALUES ($1, $2, $3, $4, $5, $6, 'customer', $7, '[]')`,
+          [userId, cleanEmail, cleanFirst, cleanLast, cleanPhone, passwordHash, JSON.stringify(initialAddress)]
+        );
+      } catch (dbErr) {
+        console.warn('[AUTH] Neon registration error, using local fallback:', dbErr.message);
+      }
+    }
+
+    // 2. Also register in local persistent storage (storing bcrypt hash only)
+    const localUsers = readJsonFile('users.json', []) || [];
+    const existingIdx = localUsers.findIndex(u => u.email?.trim().toLowerCase() === cleanEmail);
+    if (existingIdx !== -1) {
+      localUsers[existingIdx] = {
+        ...localUsers[existingIdx],
+        ...safeUser,
+        password_hash: passwordHash,
+      };
+      delete localUsers[existingIdx].password; // remove any plain password
+    } else {
+      localUsers.push({
+        ...safeUser,
+        password_hash: passwordHash,
+      });
+    }
+    writeJsonFile('users.json', localUsers);
+
+    const token = generateToken(safeUser);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Account created securely.',
+      token,
+      user: safeUser,
+    });
+  } catch (err) {
+    console.error('[AUTH] Customer registration error:', err);
+    return res.status(500).json({ success: false, message: 'Server error creating account.' });
+  }
+});
+
+/**
+ * POST /api/auth/customer-login
+ * Secure customer login with bcrypt password verification
+ */
+router.post('/customer-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Please provide both email and password.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    let userRow = null;
+
+    // 1. Query Neon Cloud Database
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        const { rows } = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1 LIMIT 1', [cleanEmail]);
+        if (rows.length > 0) {
+          userRow = rows[0];
+        }
+      } catch (dbErr) {
+        console.warn('[AUTH] DB error fetching customer for login:', dbErr.message);
+      }
+    }
+
+    // 2. Fallback to local users.json
+    if (!userRow) {
+      const localUsers = readJsonFile('users.json', []) || [];
+      const found = localUsers.find(u => u.email?.trim().toLowerCase() === cleanEmail);
+      if (found) {
+        userRow = {
+          id: found.id,
+          email: found.email,
+          first_name: found.firstName || found.first_name || '',
+          last_name: found.lastName || found.last_name || '',
+          phone: found.phone || '',
+          password_hash: found.password_hash || found.password || '',
+          role: found.role || 'customer',
+          addresses: found.addresses || [],
+          cart: found.cart || [],
+        };
+      }
+    }
+
+    if (!userRow) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+
+    // 3. Verify password safely with bcrypt (with auto-upgrade for legacy accounts)
+    const storedHash = userRow.password_hash || '';
+    let isMatch = false;
+
+    if (storedHash) {
+      if (storedHash.startsWith('$2')) {
+        isMatch = await bcrypt.compare(password, storedHash);
+      } else {
+        // Legacy plaintext match
+        isMatch = (storedHash === password);
+        if (isMatch) {
+          // Immediately auto-upgrade stored password to bcrypt hash!
+          try {
+            const upgradedHash = await bcrypt.hash(password, 10);
+            if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+              const pool = getPool();
+              await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [upgradedHash, userRow.id]);
+            }
+            const localUsers = readJsonFile('users.json', []) || [];
+            const idx = localUsers.findIndex(u => u.id === userRow.id || u.email?.toLowerCase() === cleanEmail);
+            if (idx !== -1) {
+              localUsers[idx].password_hash = upgradedHash;
+              delete localUsers[idx].password;
+              writeJsonFile('users.json', localUsers);
+            }
+          } catch (upgradeErr) {
+            console.warn('[AUTH] Auto-upgrade password hash note:', upgradeErr.message);
+          }
+        }
+      }
+    } else {
+      // User registered through guest checkout or sync without password: set password now
+      const newHash = await bcrypt.hash(password, 10);
+      try {
+        if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+          const pool = getPool();
+          await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, userRow.id]);
+        }
+      } catch {}
+      isMatch = true;
+    }
+
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+
+    let userAddresses = [];
+    if (Array.isArray(userRow.addresses)) {
+      userAddresses = userRow.addresses;
+    } else if (typeof userRow.addresses === 'string') {
+      try { userAddresses = JSON.parse(userRow.addresses); } catch {}
+    }
+
+    let userCart = [];
+    if (userRow.cart) {
+      try { userCart = typeof userRow.cart === 'string' ? JSON.parse(userRow.cart) : userRow.cart; } catch {}
+    }
+
+    const safeUser = {
+      id: userRow.id,
+      email: userRow.email,
+      firstName: userRow.first_name || '',
+      lastName: userRow.last_name || '',
+      phone: userRow.phone || '',
+      addresses: userAddresses,
+      cart: Array.isArray(userCart) ? userCart : [],
+      role: userRow.role || 'customer',
+    };
+
+    const token = generateToken(safeUser);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Sign in successful.',
+      token,
+      user: safeUser,
+    });
+  } catch (err) {
+    console.error('[AUTH] Customer login error:', err);
+    return res.status(500).json({ success: false, message: 'Server error during sign in.' });
+  }
+});
+
+/**
+ * POST /api/auth/customer-change-password
+ * Changes customer password with current password verification and bcrypt hashing
+ */
+router.post('/customer-change-password', async (req, res) => {
+  try {
+    const { email, userId, currentPassword, newPassword } = req.body;
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanUserId = (userId || '').trim();
+
+    if ((!cleanEmail && !cleanUserId) || !currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Current password and new password are required.' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long.' });
+    }
+
+    let currentHash = '';
+    let targetUserId = cleanUserId;
+
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        const { rows } = await pool.query(
+          'SELECT id, password_hash FROM users WHERE (LOWER(email) = $1 AND $1 != \'\') OR (id = $2 AND $2 != \'\') LIMIT 1',
+          [cleanEmail, cleanUserId]
+        );
+        if (rows.length > 0) {
+          currentHash = rows[0].password_hash || '';
+          targetUserId = rows[0].id;
+        }
+      } catch (dbErr) {
+        console.warn('[AUTH] DB error checking password:', dbErr.message);
+      }
+    }
+
+    if (!currentHash) {
+      const localUsers = readJsonFile('users.json', []) || [];
+      const found = localUsers.find(u => (u.email?.trim().toLowerCase() === cleanEmail && cleanEmail !== '') || (u.id === cleanUserId && cleanUserId !== ''));
+      if (found) {
+        currentHash = found.password_hash || found.password || '';
+        targetUserId = found.id;
+      }
+    }
+
+    // Verify current password if one is set
+    if (currentHash) {
+      let isCurrentValid = false;
+      if (currentHash.startsWith('$2')) {
+        isCurrentValid = await bcrypt.compare(currentPassword, currentHash);
+      } else {
+        isCurrentValid = (currentHash === currentPassword);
+      }
+
+      if (!isCurrentValid) {
+        return res.status(400).json({ success: false, message: 'Current password does not match.' });
+      }
+    }
+
+    // Hash the new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update Neon Cloud
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          'UPDATE users SET password_hash = $1 WHERE (LOWER(email) = $2 AND $2 != \'\') OR (id = $3 AND $3 != \'\')',
+          [newPasswordHash, cleanEmail, targetUserId]
+        );
+      } catch (dbErr) {
+        console.warn('[AUTH] Error updating password in db:', dbErr.message);
+      }
+    }
+
+    // Update local users.json
+    const localUsers = readJsonFile('users.json', []) || [];
+    const idx = localUsers.findIndex(u => (u.email?.trim().toLowerCase() === cleanEmail && cleanEmail !== '') || (u.id === targetUserId && targetUserId !== ''));
+    if (idx !== -1) {
+      localUsers[idx].password_hash = newPasswordHash;
+      delete localUsers[idx].password;
+      writeJsonFile('users.json', localUsers);
+    }
+
+    return res.status(200).json({ success: true, message: 'Password updated securely.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * POST /api/auth/customer-sync
- * Upserts customer profile to Neon Cloud and local storage users.json
+ * Upserts customer profile to Neon Cloud and local storage users.json with safe password hashing
  */
 router.post('/customer-sync', async (req, res) => {
   try {
-    const { id, email, previousEmail, firstName, lastName, phone, addresses, cart } = req.body;
+    const { id, email, previousEmail, firstName, lastName, phone, addresses, cart, password } = req.body;
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email is required for sync.' });
     }
@@ -400,6 +725,12 @@ router.post('/customer-sync', async (req, res) => {
     const cleanPhone = phone ? phone.trim() : '';
     const safeAddresses = Array.isArray(addresses) ? addresses : [];
     const safeCart = Array.isArray(cart) ? cart : [];
+
+    // If password provided in sync, hash it before writing
+    let passwordHash = null;
+    if (password && typeof password === 'string' && password.trim().length >= 6) {
+      passwordHash = password.startsWith('$2') ? password : await bcrypt.hash(password, 10);
+    }
 
     const userObj = {
       id: userId,
@@ -417,6 +748,7 @@ router.post('/customer-sync', async (req, res) => {
       try {
         const pool = getPool();
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cart TEXT DEFAULT '[]';`);
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);`);
 
         // If email was changed from a previous email address, migrate linked orders and inquiries
         if (previousEmail && previousEmail.trim().toLowerCase() !== cleanEmail) {
@@ -431,15 +763,16 @@ router.post('/customer-sync', async (req, res) => {
         }
 
         await pool.query(`
-          INSERT INTO users (id, email, first_name, last_name, phone, role, addresses, cart)
-          VALUES ($1, $2, $3, $4, $5, 'customer', $6, $7)
+          INSERT INTO users (id, email, first_name, last_name, phone, role, addresses, cart, password_hash)
+          VALUES ($1, $2, $3, $4, $5, 'customer', $6, $7, $8)
           ON CONFLICT (email) DO UPDATE SET
             first_name = CASE WHEN EXCLUDED.first_name != '' THEN EXCLUDED.first_name ELSE users.first_name END,
             last_name = CASE WHEN EXCLUDED.last_name != '' THEN EXCLUDED.last_name ELSE users.last_name END,
             phone = CASE WHEN EXCLUDED.phone != '' THEN EXCLUDED.phone ELSE users.phone END,
             addresses = CASE WHEN jsonb_array_length(EXCLUDED.addresses) > 0 THEN EXCLUDED.addresses ELSE users.addresses END,
-            cart = CASE WHEN EXCLUDED.cart != '[]' THEN EXCLUDED.cart ELSE users.cart END
-        `, [userId, cleanEmail, cleanFirst, cleanLast, cleanPhone, JSON.stringify(safeAddresses), JSON.stringify(safeCart)]);
+            cart = CASE WHEN EXCLUDED.cart != '[]' THEN EXCLUDED.cart ELSE users.cart END,
+            password_hash = CASE WHEN EXCLUDED.password_hash IS NOT NULL THEN EXCLUDED.password_hash ELSE users.password_hash END
+        `, [userId, cleanEmail, cleanFirst, cleanLast, cleanPhone, JSON.stringify(safeAddresses), JSON.stringify(safeCart), passwordHash]);
       } catch (dbErr) {
         console.warn('Could not upsert customer to cloud db:', dbErr.message);
       }
@@ -461,9 +794,14 @@ router.post('/customer-sync', async (req, res) => {
         phone: cleanPhone || localUsers[idx].phone || '',
         addresses: safeAddresses.length > 0 ? safeAddresses : (localUsers[idx].addresses || []),
         cart: safeCart.length > 0 ? safeCart : (localUsers[idx].cart || []),
+        password_hash: passwordHash || localUsers[idx].password_hash || undefined,
       };
+      delete localUsers[idx].password; // strip any plain password
     } else {
-      localUsers.push(userObj);
+      localUsers.push({
+        ...userObj,
+        password_hash: passwordHash || undefined,
+      });
     }
     writeJsonFile('users.json', localUsers);
 
