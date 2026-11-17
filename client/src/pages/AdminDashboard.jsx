@@ -526,9 +526,9 @@ export default function AdminDashboard() {
     };
     reader.readAsDataURL(file);
 
-    // 2. Stream to Backend Cloud Media Endpoint
+    // 2. Stream to Backend Cloud Media Endpoint (Cloudflare R2)
     setIsUploadingImage(true);
-    setUploadMessage('Streaming image to Cloudinary CDN...');
+    setUploadMessage('Compressing and uploading to Cloudflare R2...');
 
     try {
       const token = localStorage.getItem('penny_admin_token');
@@ -550,14 +550,19 @@ export default function AdminDashboard() {
           ...prev,
           imageUrl: data.url
         }));
-        setUploadMessage(data.isFallback ? 'Image saved locally (Cloudinary credentials pending in .env).' : 'Image uploaded to Cloudinary CDN successfully.');
+        setUploadMessage(data.message || 'Image uploaded to Cloudflare R2 successfully.');
       } else {
-        console.warn('Backend upload returned error, retained local preview:', data.message);
-        setUploadMessage('Retained high-quality local image preview.');
+        console.warn('Backend upload returned notice:', data.message);
+        setUploadMessage(data.message || 'Cloudflare R2 upload pending. Please check R2 keys in .env.');
+        showAlertDialog({
+          title: 'Cloudflare R2 Storage',
+          message: data.message || 'Could not upload to Cloudflare R2. Please check your R2 environment variables in server/.env.',
+          type: 'warning',
+        });
       }
     } catch (err) {
-      console.warn('Could not connect to media upload endpoint, retained local preview:', err);
-      setUploadMessage('Retained local image preview.');
+      console.warn('Could not connect to media upload endpoint:', err);
+      setUploadMessage('Could not connect to media upload service.');
     } finally {
       setIsUploadingImage(false);
     }
@@ -3110,8 +3115,8 @@ export default function AdminDashboard() {
                   <div className="mt-3 p-3 bg-neutral-100 border border-neutral-300 flex items-center gap-3 animate-pulse rounded-xs">
                     <Loader2 className="w-4 h-4 animate-spin text-brand-charcoal shrink-0" />
                     <div className="text-left text-xs">
-                      <p className="font-bold text-brand-charcoal">Streaming to Cloudinary CDN...</p>
-                      <p className="text-[10px] text-neutral-500">{uploadMessage || 'Optimizing format and generating high-performance WebP delivery URLs...'}</p>
+                      <p className="font-bold text-brand-charcoal">Uploading to Cloudflare R2...</p>
+                      <p className="text-[10px] text-neutral-500">{uploadMessage || 'Compressing with sharp and saving to Cloudflare R2...'}</p>
                     </div>
                   </div>
                 )}
@@ -3130,9 +3135,9 @@ export default function AdminDashboard() {
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
                             <CheckCircle2 className="w-3 h-3" /> Image Ready
                           </span>
-                          {productForm.imageUrl.includes('cloudinary.com') && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 text-[9px] font-bold uppercase rounded-xs">
-                              <Cloud className="w-2.5 h-2.5" /> Cloudinary CDN
+                          {(productForm.imageUrl.includes('r2.dev') || productForm.imageUrl.includes('r2.cloudflarestorage.com')) && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 text-[9px] font-bold uppercase rounded-xs">
+                              <Cloud className="w-2.5 h-2.5" /> Cloudflare R2
                             </span>
                           )}
                         </div>
