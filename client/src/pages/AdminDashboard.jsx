@@ -41,6 +41,7 @@ import { printOrderReceipt } from '../utils/printReceipt';
 import { generateOrderReceiptEmailHtml, generateInquiryReplyEmailHtml } from '../utils/emailPreviewGenerator';
 import FormattedMessage from '../components/common/FormattedMessage';
 import { useDialog } from '../context/DialogContext';
+import ProductFormModal from '../components/admin/ProductFormModal';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -100,10 +101,6 @@ export default function AdminDashboard() {
   const [selectedSubcategoryFilter, setSelectedSubcategoryFilter] = useState('all');
   const [newCategorySubcategories, setNewCategorySubcategories] = useState('');
   const [subInputs, setSubInputs] = useState({});
-  const [isAddingCustomSub, setIsAddingCustomSub] = useState(false);
-  const [customSubcategoryInput, setCustomSubcategoryInput] = useState('');
-  const [isAddingCustomSubtype, setIsAddingCustomSubtype] = useState(false);
-  const [customSubtypeInput, setCustomSubtypeInput] = useState('');
   const [categoryFeedback, setCategoryFeedback] = useState('');
 
   // Category & Subcategory Editing Modal State
@@ -278,26 +275,6 @@ export default function AdminDashboard() {
   // Modal State for Adding/Editing Product
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [uploadMessage, setUploadMessage] = useState('');
-  const fileInputRef = useRef(null);
-
-  const [productForm, setProductForm] = useState({
-    name: '',
-    category: 'tops',
-    subcategory: '',
-    price: '',
-    description: '',
-    material: '',
-    fit: '',
-    featured: false,
-    inStock: true,
-    isArchived: false,
-    colors: ['Black', 'White'],
-    availableSizes: ['S', 'M', 'L', 'XL'],
-    imageUrl: ''
-  });
 
   // Category Form State
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -418,267 +395,74 @@ export default function AdminDashboard() {
   // Open Add Product Modal
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
-    const firstCat = categoryList[0];
-    const firstSub = firstCat?.subcategories?.[0];
-    const firstSubName = typeof firstSub === 'string' ? firstSub : firstSub?.name || '';
-    const firstSubtypes = typeof firstSub === 'object' && Array.isArray(firstSub?.subtypes) ? firstSub.subtypes : [];
-
-    setProductForm({
-      name: '',
-      category: firstCat?.id || 'tops',
-      subcategory: firstSubName,
-      subtype: firstSubtypes[0] || '',
-      price: '',
-      description: '',
-      material: '',
-      fit: '',
-      care: '',
-      shipping: '',
-      featured: false,
-      inStock: true,
-      isArchived: false,
-      colors: ['Black', 'White'],
-      availableSizes: ['S', 'M', 'L', 'XL'],
-      imageUrl: ''
-    });
-    setIsAddingCustomSub(false);
-    setCustomSubcategoryInput('');
-    setIsAddingCustomSubtype(false);
-    setCustomSubtypeInput('');
     setIsProductModalOpen(true);
   };
 
   // Duplicate / Clone Existing Product (1-Click Product Addition)
   const handleDuplicateProduct = (product) => {
-    setEditingProduct(null); // Save will create a new product instead of updating
-    setProductForm({
+    setEditingProduct({
+      ...product,
+      id: null,
       name: `Copy of ${product.name}`,
-      category: product.category,
-      subcategory: product.subcategory || '',
-      subtype: product.subtype || '',
-      price: product.price,
-      description: product.description || '',
-      material: product.material || '',
-      fit: product.fit || '',
-      care: product.care || '',
-      shipping: product.shipping || '',
-      featured: !!product.featured,
-      inStock: product.inStock !== false,
+      featured: false,
       isArchived: false,
-      colors: product.colors?.length ? [...product.colors] : ['Black'],
-      availableSizes: product.availableSizes?.length ? [...product.availableSizes] : ['S', 'M', 'L', 'XL'],
-      imageUrl: product.images?.primary || ''
     });
-    setIsAddingCustomSub(false);
-    setCustomSubcategoryInput('');
-    setIsAddingCustomSubtype(false);
-    setCustomSubtypeInput('');
     setIsProductModalOpen(true);
   };
 
   // Open Edit Product Modal
   const handleOpenEditProduct = (product) => {
     setEditingProduct(product);
-    setProductForm({
-      name: product.name,
-      category: product.category,
-      subcategory: product.subcategory || '',
-      subtype: product.subtype || '',
-      price: product.price,
-      description: product.description || '',
-      material: product.material || '',
-      fit: product.fit || '',
-      care: product.care || '',
-      shipping: product.shipping || '',
-      featured: !!product.featured,
-      inStock: product.inStock !== false,
-      isArchived: !!product.isArchived,
-      colors: product.colors?.length ? [...product.colors] : ['Black'],
-      availableSizes: product.availableSizes?.length ? [...product.availableSizes] : ['M', 'L'],
-      imageUrl: product.images?.primary || ''
-    });
-    setIsAddingCustomSub(false);
-    setCustomSubcategoryInput('');
-    setIsAddingCustomSubtype(false);
-    setCustomSubtypeInput('');
     setIsProductModalOpen(true);
   };
 
-  // Handle Image File Selection (streams directly to Cloudinary via Express API with fallback)
-  const processImageFile = async (file) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      showAlertDialog({
-        title: 'Unsupported File Format',
-        message: 'Please upload an image file (PNG, JPG, or WEBP).',
-        type: 'warning',
-      });
-      return;
-    }
-
-    // 1. Immediate local thumbnail preview for instant UX responsiveness
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setProductForm(prev => ({
-        ...prev,
-        imageUrl: e.target.result
-      }));
-    };
-    reader.readAsDataURL(file);
-
-    // 2. Stream to Backend Cloud Media Endpoint (Cloudflare R2)
-    setIsUploadingImage(true);
-    setUploadMessage('Compressing and uploading to Cloudflare R2...');
-
-    try {
-      const token = localStorage.getItem('penny_admin_token');
-      const formData = new FormData();
-      formData.append('image', file);
-
-      const response = await fetch('/api/admin/media/upload', {
-        method: 'POST',
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success && data.url) {
-        setProductForm(prev => ({
-          ...prev,
-          imageUrl: data.url
-        }));
-        setUploadMessage(data.message || 'Image uploaded to Cloudflare R2 successfully.');
-      } else {
-        console.warn('Backend upload returned notice:', data.message);
-        setUploadMessage(data.message || 'Cloudflare R2 upload pending. Please check R2 keys in .env.');
-        showAlertDialog({
-          title: 'Cloudflare R2 Storage',
-          message: data.message || 'Could not upload to Cloudflare R2. Please check your R2 environment variables in server/.env.',
-          type: 'warning',
-        });
-      }
-    } catch (err) {
-      console.warn('Could not connect to media upload endpoint:', err);
-      setUploadMessage('Could not connect to media upload service.');
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
-
-  const handleFileInputChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processImageFile(file);
-    }
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      processImageFile(file);
-    }
-  };
-
   // Save Product (Add or Edit) with Context Sync
-  const handleSaveProduct = async (e) => {
-    e.preventDefault();
-    if (!productForm.name || !productForm.price) {
-      showAlertDialog({
-        title: 'Missing Details',
-        message: 'Please provide both the piece name and retail price before saving.',
-        type: 'warning',
-      });
-      return;
-    }
-
-    const finalSubcategory = isAddingCustomSub && customSubcategoryInput.trim()
-      ? customSubcategoryInput.trim()
-      : (productForm.subcategory || '');
-
-    const finalSubtype = isAddingCustomSubtype && customSubtypeInput.trim()
-      ? customSubtypeInput.trim()
-      : (productForm.subtype || '');
-
-    if (isAddingCustomSub && customSubcategoryInput.trim()) {
-      const cleanSub = customSubcategoryInput.trim();
-      const initialStyles = isAddingCustomSubtype && customSubtypeInput.trim() ? [customSubtypeInput.trim()] : [];
-      addSubcategory(productForm.category, cleanSub, initialStyles);
-    } else if (isAddingCustomSubtype && customSubtypeInput.trim()) {
-      const newStyle = customSubtypeInput.trim();
-      const catObj = categoryList.find(c => c.id === productForm.category || c.slug === productForm.category);
-      if (catObj) {
-        const subObj = (catObj.subcategories || []).find(s => (typeof s === 'string' ? s : s?.name) === finalSubcategory);
-        const subName = typeof subObj === 'string' ? subObj : subObj?.name || finalSubcategory;
-        const currentSubtypes = typeof subObj === 'object' && Array.isArray(subObj?.subtypes) ? subObj.subtypes : [];
-        if (!currentSubtypes.some(st => st.toLowerCase() === newStyle.toLowerCase())) {
-          updateSubcategory(catObj.id, subName, {
-            name: subName,
-            subtypes: [...currentSubtypes, newStyle]
-          });
-        }
-      }
-    }
-
+  const handleSaveProduct = async (formData) => {
     try {
-      if (editingProduct) {
+      if (editingProduct && editingProduct.id) {
         await updateProduct({
           ...editingProduct,
-          name: productForm.name,
-          category: productForm.category,
-          subcategory: finalSubcategory,
-          subtype: finalSubtype,
-          price: Number(productForm.price),
-          description: productForm.description,
-          material: productForm.material,
-          fit: productForm.fit,
-          care: productForm.care || 'Machine wash cold inside out. Hang dry.',
-          shipping: productForm.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
-          featured: productForm.featured,
-          inStock: productForm.inStock,
-          isArchived: !!productForm.isArchived,
-          colors: productForm.colors,
-          availableSizes: productForm.availableSizes,
+          name: formData.name,
+          category: formData.category,
+          subcategory: formData.subcategory,
+          subtype: formData.subtype,
+          price: Number(formData.price),
+          description: formData.description,
+          material: formData.material,
+          fit: formData.fit,
+          care: formData.care || 'Machine wash cold inside out. Hang dry.',
+          shipping: formData.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+          featured: formData.featured,
+          inStock: formData.inStock,
+          isArchived: !!formData.isArchived,
+          colors: formData.colors,
+          availableSizes: formData.availableSizes,
           images: {
             ...editingProduct.images,
-            primary: productForm.imageUrl || editingProduct.images?.primary || '/images/products/linen-set-1.jpg'
+            primary: formData.imageUrl || editingProduct.images?.primary || '/images/products/linen-set-1.jpg'
           }
         });
       } else {
         const newId = `p-${Date.now().toString().slice(-4)}`;
         const newProduct = {
           id: newId,
-          name: productForm.name,
-          category: productForm.category,
-          subcategory: finalSubcategory || 'New Arrival',
-          subtype: finalSubtype,
-          price: Number(productForm.price),
-          description: productForm.description || 'Premium menswear essential.',
-          material: productForm.material || '100% Cotton',
-          fit: productForm.fit || 'Relaxed fit.',
-          care: productForm.care || 'Machine wash cold inside out. Hang dry.',
-          shipping: productForm.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
-          featured: productForm.featured,
-          inStock: productForm.inStock,
-          isArchived: !!productForm.isArchived,
-          colors: productForm.colors,
-          availableSizes: productForm.availableSizes,
+          name: formData.name,
+          category: formData.category,
+          subcategory: formData.subcategory || 'New Arrival',
+          subtype: formData.subtype,
+          price: Number(formData.price),
+          description: formData.description || 'Premium menswear essential.',
+          material: formData.material || '100% Cotton',
+          fit: formData.fit || 'Relaxed fit.',
+          care: formData.care || 'Machine wash cold inside out. Hang dry.',
+          shipping: formData.shipping || 'Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.',
+          featured: formData.featured,
+          inStock: formData.inStock,
+          isArchived: !!formData.isArchived,
+          colors: formData.colors,
+          availableSizes: formData.availableSizes,
           images: {
-            primary: productForm.imageUrl || '/images/products/linen-set-1.jpg',
+            primary: formData.imageUrl || '/images/products/linen-set-1.jpg',
             gallery: ['/images/products/linen-set-2.jpg']
           }
         };
@@ -686,9 +470,11 @@ export default function AdminDashboard() {
       }
 
       setIsProductModalOpen(false);
+      setEditingProduct(null);
       setProductFeedback('Product piece saved successfully to catalogue.');
       setTimeout(() => setProductFeedback(''), 4000);
     } catch (err) {
+      console.error('Error saving product piece:', err);
       showAlertDialog({
         title: 'Save Failed',
         message: err.message || 'Could not save product to cloud database. Please verify your admin connection and sign in again if needed.',
@@ -2708,554 +2494,21 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ADD / EDIT PRODUCT MODAL */}
-      {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-neutral-200 shadow-2xl p-6 md:p-8">
-            <div className="flex justify-between items-center border-b border-neutral-200 pb-4 mb-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-charcoal">
-                {editingProduct ? 'Edit Product Details' : 'Add New Product to Catalogue'}
-              </h2>
-              <button 
-                onClick={() => setIsProductModalOpen(false)}
-                className="text-xs uppercase font-bold text-neutral-400 hover:text-black"
-              >
-                Cancel
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveProduct} className="space-y-4 text-xs font-sans">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                  Product Title *
-                </label>
-                <input
-                  type="text"
-                  value={productForm.name}
-                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                  placeholder="e.g. Heavyweight Boxy T-Shirt"
-                  className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    Category *
-                  </label>
-                  <select
-                    value={productForm.category}
-                    onChange={(e) => {
-                      const newCatId = e.target.value;
-                      const catObj = categoryList.find(c => c.id === newCatId || c.slug === newCatId);
-                      const firstSub = catObj?.subcategories?.[0];
-                      const firstSubName = typeof firstSub === 'string' ? firstSub : firstSub?.name || '';
-                      setProductForm({ 
-                        ...productForm, 
-                        category: newCatId,
-                        subcategory: firstSubName,
-                        subtype: ''
-                      });
-                      setIsAddingCustomSub(false);
-                      setCustomSubcategoryInput('');
-                    }}
-                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white"
-                  >
-                    {categoryList.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    Price (₦) *
-                  </label>
-                  <input
-                    type="number"
-                    value={productForm.price}
-                    onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                    placeholder="e.g. 25000"
-                    className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Subcategory & Subtype (Tier 3) Selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                    Subcategory *
-                  </label>
-                  {!isAddingCustomSub ? (
-                    <div className="flex gap-2">
-                      <select
-                        value={typeof productForm.subcategory === 'string' ? productForm.subcategory : productForm.subcategory?.name || ''}
-                        onChange={(e) => {
-                          if (e.target.value === '__NEW_SUB__') {
-                            setIsAddingCustomSub(true);
-                            setCustomSubcategoryInput('');
-                          } else {
-                            const newSub = e.target.value;
-                            const catObj = categoryList.find(c => c.id === productForm.category || c.slug === productForm.category);
-                            const subObj = (catObj?.subcategories || []).find(s => (typeof s === 'string' ? s : s?.name) === newSub);
-                            const availableSubtypes = typeof subObj === 'object' && Array.isArray(subObj?.subtypes) ? subObj.subtypes : [];
-
-                            setProductForm(prev => ({ 
-                              ...prev, 
-                              subcategory: newSub,
-                              subtype: availableSubtypes[0] || ''
-                            }));
-                          }
-                        }}
-                        className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white text-xs"
-                      >
-                        <option value="">(None / General)</option>
-                        {categoryList
-                          .find(c => c.id === productForm.category || c.slug === productForm.category)
-                          ?.subcategories?.map((sub) => {
-                            const subName = typeof sub === 'string' ? sub : sub?.name;
-                            return <option key={subName} value={subName}>{subName}</option>;
-                          })}
-                        <option value="__NEW_SUB__">+ Add New Subcategory...</option>
-                      </select>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={customSubcategoryInput}
-                        onChange={(e) => setCustomSubcategoryInput(e.target.value)}
-                        placeholder="Type new subcategory name..."
-                        className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal text-xs"
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsAddingCustomSub(false);
-                          setCustomSubcategoryInput('');
-                        }}
-                        className="px-3 py-2 border border-neutral-300 text-neutral-600 text-xs uppercase font-bold hover:bg-neutral-100"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Subtype / Style Category */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500">
-                      Style / Sub-Category (Tier 3)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAddingCustomSubtype(!isAddingCustomSubtype);
-                        setCustomSubtypeInput('');
-                      }}
-                      className="text-[10px] text-brand-charcoal underline hover:text-black font-semibold cursor-pointer"
-                    >
-                      {isAddingCustomSubtype ? 'Select from list' : '+ New Style'}
-                    </button>
-                  </div>
-                  {(() => {
-                    const catObj = categoryList.find(c => c.id === productForm.category || c.slug === productForm.category);
-                    const subObj = (catObj?.subcategories || []).find(s => (typeof s === 'string' ? s : s?.name) === productForm.subcategory);
-                    const availableSubtypes = typeof subObj === 'object' && Array.isArray(subObj?.subtypes) ? subObj.subtypes : [];
-
-                    if (isAddingCustomSubtype || (availableSubtypes.length === 0 && !productForm.subtype)) {
-                      return (
-                        <div className="space-y-1">
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={isAddingCustomSubtype ? customSubtypeInput : productForm.subtype}
-                              onChange={(e) => {
-                                if (isAddingCustomSubtype) {
-                                  setCustomSubtypeInput(e.target.value);
-                                  setProductForm({ ...productForm, subtype: e.target.value });
-                                } else {
-                                  setProductForm({ ...productForm, subtype: e.target.value });
-                                }
-                              }}
-                              placeholder="Type style (e.g. Collared Quarter-Zip, Cuffed)..."
-                              className="w-full border border-neutral-300 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white text-xs"
-                            />
-                            {isAddingCustomSubtype && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsAddingCustomSubtype(false);
-                                  setCustomSubtypeInput('');
-                                }}
-                                className="px-3 py-2 border border-neutral-300 text-neutral-600 text-xs uppercase font-bold hover:bg-neutral-100 cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-neutral-400">
-                            New styles are saved and automatically added to this subcategory's options.
-                          </p>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div className="space-y-1">
-                        <select
-                          value={productForm.subtype}
-                          onChange={(e) => {
-                            if (e.target.value === '__NEW_STYLE__') {
-                              setIsAddingCustomSubtype(true);
-                              setCustomSubtypeInput('');
-                              setProductForm({ ...productForm, subtype: '' });
-                            } else {
-                              setProductForm({ ...productForm, subtype: e.target.value });
-                            }
-                          }}
-                          className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal bg-white text-xs"
-                        >
-                          <option value="">(None / General)</option>
-                          {availableSubtypes.map((st) => (
-                            <option key={st} value={st}>{st}</option>
-                          ))}
-                          <option value="__NEW_STYLE__">+ Add New Style...</option>
-                        </select>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* SIZES & COLORS CONFIGURATION */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Sizes Picker */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1.5">
-                    Available Sizes ({productForm.availableSizes?.length || 0} selected)
-                  </label>
-                  <div className="space-y-2 bg-neutral-50/70 p-3 border border-neutral-200 rounded-xs">
-                    <div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Tops & Sets</span>
-                      <div className="flex flex-wrap gap-1">
-                        {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(sz => {
-                          const isSelected = productForm.availableSizes?.includes(sz);
-                          return (
-                            <button
-                              type="button"
-                              key={sz}
-                              onClick={() => {
-                                const curr = productForm.availableSizes || [];
-                                const updated = isSelected ? curr.filter(s => s !== sz) : [...curr, sz];
-                                setProductForm({ ...productForm, availableSizes: updated });
-                              }}
-                              className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
-                                isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
-                              }`}
-                            >
-                              {isSelected ? '✓ ' : ''}{sz}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Waist / Pants</span>
-                      <div className="flex flex-wrap gap-1">
-                        {['28', '30', '32', '34', '36', '38', '40', 'One Size'].map(sz => {
-                          const isSelected = productForm.availableSizes?.includes(sz);
-                          return (
-                            <button
-                              type="button"
-                              key={sz}
-                              onClick={() => {
-                                const curr = productForm.availableSizes || [];
-                                const updated = isSelected ? curr.filter(s => s !== sz) : [...curr, sz];
-                                setProductForm({ ...productForm, availableSizes: updated });
-                              }}
-                              className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
-                                isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
-                              }`}
-                            >
-                              {isSelected ? '✓ ' : ''}{sz}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Colors Picker */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1.5">
-                    Available Colors ({productForm.colors?.length || 0} selected)
-                  </label>
-                  <div className="space-y-2 bg-neutral-50/70 p-3 border border-neutral-200 rounded-xs">
-                    <div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Core Neutrals</span>
-                      <div className="flex flex-wrap gap-1">
-                        {['Black', 'White', 'Cream', 'Beige', 'Ash/Grey', 'Charcoal', 'Taupe', 'Sand'].map(c => {
-                          const isSelected = productForm.colors?.includes(c);
-                          return (
-                            <button
-                              type="button"
-                              key={c}
-                              onClick={() => {
-                                const curr = productForm.colors || [];
-                                const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
-                                setProductForm({ ...productForm, colors: updated });
-                              }}
-                              className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
-                                isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
-                              }`}
-                            >
-                              {isSelected ? '✓ ' : ''}{c}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Earth Tones</span>
-                      <div className="flex flex-wrap gap-1">
-                        {['Olive', 'Forest Green', 'Camel', 'Coffee Brown', 'Khaki'].map(c => {
-                          const isSelected = productForm.colors?.includes(c);
-                          return (
-                            <button
-                              type="button"
-                              key={c}
-                              onClick={() => {
-                                const curr = productForm.colors || [];
-                                const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
-                                setProductForm({ ...productForm, colors: updated });
-                              }}
-                              className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
-                                isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
-                              }`}
-                            >
-                              {isSelected ? '✓ ' : ''}{c}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Seasonal Accents</span>
-                      <div className="flex flex-wrap gap-1">
-                        {['Burgundy', 'Burnt Orange', 'Baby Pink', 'Sky Blue', 'Striped Sky Blue', 'Navy'].map(c => {
-                          const isSelected = productForm.colors?.includes(c);
-                          return (
-                            <button
-                              type="button"
-                              key={c}
-                              onClick={() => {
-                                const curr = productForm.colors || [];
-                                const updated = isSelected ? curr.filter(col => col !== c) : [...curr, c];
-                                setProductForm({ ...productForm, colors: updated });
-                              }}
-                              className={`text-[10px] px-2 py-0.5 rounded-xs border transition-colors cursor-pointer ${
-                                isSelected ? 'bg-brand-charcoal text-white font-bold border-brand-charcoal' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300'
-                              }`}
-                            >
-                              {isSelected ? '✓ ' : ''}{c}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Interactive Image Dropzone & Preview */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-                  Product Imagery (Live Upload & Preview)
-                </label>
-                
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileInputChange} 
-                  accept="image/png, image/jpeg, image/webp" 
-                  className="hidden" 
-                />
-
-                {/* Dropzone Area */}
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed p-4 text-center cursor-pointer transition-colors rounded-xs ${
-                    isDragging 
-                      ? 'border-brand-charcoal bg-neutral-100' 
-                      : 'border-neutral-200 hover:border-neutral-400 bg-neutral-50/50'
-                  }`}
-                >
-                  <Upload className="w-5 h-5 mx-auto text-neutral-400 mb-1.5" />
-                  <p className="text-xs font-bold text-brand-charcoal">
-                    Click to browse or drag and drop image file here
-                  </p>
-                  <p className="text-[10px] text-neutral-400 mt-0.5">
-                    Supports PNG, JPG, or WEBP. Uploaded images reflect across the homepage essentials & shop catalogue.
-                  </p>
-                </div>
-
-                {/* Upload in Progress Indicator */}
-                {isUploadingImage && (
-                  <div className="mt-3 p-3 bg-neutral-100 border border-neutral-300 flex items-center gap-3 animate-pulse rounded-xs">
-                    <Loader2 className="w-4 h-4 animate-spin text-brand-charcoal shrink-0" />
-                    <div className="text-left text-xs">
-                      <p className="font-bold text-brand-charcoal">Uploading to Cloudflare R2...</p>
-                      <p className="text-[10px] text-neutral-500">{uploadMessage || 'Compressing with sharp and saving to Cloudflare R2...'}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Thumbnail Preview Card */}
-                {productForm.imageUrl && !isUploadingImage && (
-                  <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 flex items-center justify-between gap-4 rounded-xs">
-                    <div className="flex items-center gap-3">
-                      <img 
-                        src={productForm.imageUrl} 
-                        alt="Preview" 
-                        className="w-14 h-16 object-cover bg-white border border-neutral-200 rounded-xs shrink-0" 
-                      />
-                      <div className="text-left overflow-hidden">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
-                            <CheckCircle2 className="w-3 h-3" /> Image Ready
-                          </span>
-                          {(productForm.imageUrl.includes('r2.dev') || productForm.imageUrl.includes('r2.cloudflarestorage.com')) && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 text-[9px] font-bold uppercase rounded-xs">
-                              <Cloud className="w-2.5 h-2.5" /> Cloudflare R2
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-neutral-600 font-mono truncate max-w-xs mt-0.5" title={productForm.imageUrl}>
-                          {productForm.imageUrl.startsWith('data:') ? 'Local High-Res Image Preview' : productForm.imageUrl}
-                        </p>
-                        {uploadMessage && (
-                          <p className="text-[10px] text-neutral-400 mt-0.5">{uploadMessage}</p>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setProductForm(prev => ({ ...prev, imageUrl: '' }));
-                        setUploadMessage('');
-                      }}
-                      className="text-neutral-400 hover:text-red-600 p-1.5 rounded-xs transition-colors cursor-pointer"
-                      title="Clear image"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Manual Path Fallback */}
-                <div className="mt-2">
-                  <span className="text-[10px] text-neutral-400 uppercase font-medium">Or enter image URL / public path manually:</span>
-                  <input
-                    type="text"
-                    value={productForm.imageUrl}
-                    onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })}
-                    placeholder="e.g. /images/products/linen-set-1.jpg"
-                    className="w-full mt-1 border border-neutral-200 p-2 focus:outline-none focus:border-brand-charcoal text-[11px]"
-                  />
-                </div>
-              </div>
-
-              {/* Toggles */}
-              <div className="pt-2 space-y-3 border-t border-neutral-100">
-                <div className="flex flex-wrap gap-6">
-                  {(() => {
-                    const isFormFeaturedDisabled = !productForm.featured && featuredCount >= 4 && (!editingProduct || !editingProduct.featured);
-                    return (
-                      <label 
-                        className={`flex items-center gap-2 ${isFormFeaturedDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-                        title={isFormFeaturedDisabled ? 'Maximum of 4 featured products reached. Unfeature another piece first.' : ''}
-                      >
-                        <input
-                          type="checkbox"
-                          disabled={isFormFeaturedDisabled}
-                          checked={productForm.featured}
-                          onChange={(e) => setProductForm({ ...productForm, featured: e.target.checked })}
-                          className="accent-black"
-                        />
-                        <span className="font-bold uppercase tracking-wider text-[11px] text-brand-charcoal">
-                          Feature in Homepage Essentials {isFormFeaturedDisabled ? '(Limit 4 Reached)' : ''}
-                        </span>
-                      </label>
-                    );
-                  })()}
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={productForm.inStock}
-                      onChange={(e) => setProductForm({ ...productForm, inStock: e.target.checked })}
-                      className="accent-black"
-                    />
-                    <span className="font-bold uppercase tracking-wider text-[11px] text-brand-charcoal">
-                      Mark As In Stock
-                    </span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!!productForm.isArchived}
-                      onChange={(e) => setProductForm({ ...productForm, isArchived: e.target.checked })}
-                      className="accent-amber-600"
-                    />
-                    <span className="font-bold uppercase tracking-wider text-[11px] text-amber-900 flex items-center gap-1.5">
-                      <Archive className="w-3.5 h-3.5 text-amber-700" />
-                      Archive Product (Hide from storefront)
-                    </span>
-                  </label>
-                </div>
-
-                {productForm.isArchived && (
-                  <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xs flex items-center gap-2">
-                    <Archive className="w-4 h-4 text-amber-700 shrink-0" />
-                    <span>
-                      This product is marked as <strong>Archived</strong>. It will be hidden from the live website and customer search, but will stay safely preserved here in admin for easy one-click retrieval anytime.
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-4 flex justify-end gap-3 border-t border-neutral-200">
-                <button
-                  type="button"
-                  onClick={() => setIsProductModalOpen(false)}
-                  className="px-5 py-2.5 border border-neutral-200 text-xs font-bold uppercase tracking-wider hover:bg-neutral-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black"
-                >
-                  Save Product
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* ADD / EDIT PRODUCT MODAL (Isolated for 0ms Instant Input Performance) */}
+      <ProductFormModal
+        isOpen={isProductModalOpen}
+        onClose={() => {
+          setIsProductModalOpen(false);
+          setEditingProduct(null);
+        }}
+        editingProduct={editingProduct}
+        categoryList={categoryList}
+        featuredCount={featuredCount}
+        onSave={handleSaveProduct}
+        addSubcategory={addSubcategory}
+        updateSubcategory={updateSubcategory}
+        showAlertDialog={showAlertDialog}
+      />
 
       {/* ORDER DETAILS INSPECTION DRAWER / MODAL */}
       {selectedOrder && (

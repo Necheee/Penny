@@ -164,13 +164,19 @@ export default function ProductModal({ productId, closeModal }) {
   }, [currentProductId, getContextProductById]);
 
 
+  const isCareCategory = 
+    product?.category === 'care-accessories' || 
+    product?.category === 'care' || 
+    product?.category?.toLowerCase().includes('care') || 
+    product?.category?.toLowerCase().includes('accessories');
+
   useEffect(() => {
     if (product) {
       const primary = product.images?.primary || (typeof product.images === 'string' ? product.images : '/images/products/linen-set-1.jpg');
       setActiveImage(primary);
       const cols = Array.isArray(product.colors) ? product.colors : [];
       setSelectedColor(cols[0] || '');
-      setSelectedSize('');
+      setSelectedSize(isCareCategory ? 'One Size' : '');
       setSizeError(false);
       setQuantity(1);
       setActiveCustomColor('');
@@ -178,7 +184,7 @@ export default function ProductModal({ productId, closeModal }) {
       setCustomColorSuccess(false);
       setCustomColorError('');
     }
-  }, [product]);
+  }, [product, isCareCategory]);
 
   // Compute up to 4 similar items from the active catalogue, prioritizing same category
   const similarProducts = (products || [])
@@ -658,51 +664,65 @@ export default function ProductModal({ productId, closeModal }) {
           </div>
 
           {/* Size Selection */}
-          <div className="mb-8">
-            <div className="flex justify-between items-end mb-3">
-              <span className="text-xs font-bold tracking-[0.15em] uppercase text-brand-charcoal">Size</span>
-              <button 
-                type="button"
-                onClick={() => setIsSizeGuideOpen(true)}
-                className="text-[10px] font-bold tracking-[0.1em] uppercase text-brand-taupe underline underline-offset-4 hover:text-brand-charcoal transition-colors cursor-pointer"
-              >
-                Size Guide
-              </button>
+          {!isCareCategory ? (
+            <div className="mb-8">
+              <div className="flex justify-between items-end mb-3">
+                <span className="text-xs font-bold tracking-[0.15em] uppercase text-brand-charcoal">Size</span>
+                <button 
+                  type="button"
+                  onClick={() => setIsSizeGuideOpen(true)}
+                  className="text-[10px] font-bold tracking-[0.1em] uppercase text-brand-taupe underline underline-offset-4 hover:text-brand-charcoal transition-colors cursor-pointer"
+                >
+                  Size Guide
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {globalSizes.map(size => {
+                  const isAvailable = (Array.isArray(product.availableSizes) ? product.availableSizes : []).includes(size);
+                  return (
+                    <button
+                      key={size}
+                      disabled={!isAvailable}
+                      onClick={() => {
+                        setSelectedSize(size);
+                        setSizeError(false);
+                      }}
+                      aria-label={`Select size ${size}`}
+                      aria-pressed={selectedSize === size}
+                      className={`py-2 text-xs font-bold tracking-wider transition-all border cursor-pointer
+                        ${!isAvailable ? 'border-brand-charcoal/10 text-brand-charcoal/20 !cursor-not-allowed line-through' : ''}
+                        ${isAvailable && selectedSize !== size ? 'border-brand-charcoal/20 text-brand-charcoal hover:border-brand-charcoal' : ''}
+                        ${isAvailable && selectedSize === size ? 'border-brand-charcoal bg-brand-charcoal text-white' : ''}
+                      `}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+              {sizeError && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-[11px] text-amber-900 tracking-wide font-sans mt-2 font-medium"
+                >
+                  Please select a size to proceed.
+                </motion.p>
+              )}
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {globalSizes.map(size => {
-                const isAvailable = (Array.isArray(product.availableSizes) ? product.availableSizes : []).includes(size);
-                return (
-                  <button
-                    key={size}
-                    disabled={!isAvailable}
-                    onClick={() => {
-                      setSelectedSize(size);
-                      setSizeError(false);
-                    }}
-                    aria-label={`Select size ${size}`}
-                    aria-pressed={selectedSize === size}
-                    className={`py-2 text-xs font-bold tracking-wider transition-all border cursor-pointer
-                      ${!isAvailable ? 'border-brand-charcoal/10 text-brand-charcoal/20 !cursor-not-allowed line-through' : ''}
-                      ${isAvailable && selectedSize !== size ? 'border-brand-charcoal/20 text-brand-charcoal hover:border-brand-charcoal' : ''}
-                      ${isAvailable && selectedSize === size ? 'border-brand-charcoal bg-brand-charcoal text-white' : ''}
-                    `}
-                  >
-                    {size}
-                  </button>
-                );
-              })}
+          ) : (
+            <div className="mb-8">
+              <div className="flex justify-between items-end mb-2">
+                <span className="text-xs font-bold tracking-[0.15em] uppercase text-brand-charcoal">Sizing</span>
+              </div>
+              <div className="inline-flex items-center px-3 py-1.5 bg-neutral-100 border border-neutral-200 text-brand-charcoal text-xs font-bold uppercase tracking-wider rounded-xs">
+                One Size / Standard
+              </div>
+              <p className="text-[11px] text-neutral-500 mt-1.5 font-sans">
+                Care & accessory essentials do not require sizing selection.
+              </p>
             </div>
-            {sizeError && (
-              <motion.p
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-[11px] text-amber-900 tracking-wide font-sans mt-2 font-medium"
-              >
-                Please select a size to proceed.
-              </motion.p>
-            )}
-          </div>
+          )}
 
           {/* Action Buttons: Add to Bag & Buy Now */}
           <div className="flex flex-col gap-3 mb-6 mt-auto pt-6 border-t border-brand-charcoal/15">
@@ -820,12 +840,14 @@ export default function ProductModal({ productId, closeModal }) {
         </div>
       )}
 
-      {/* Size Guide Modal */}
-      <SizeGuideModal 
-        isOpen={isSizeGuideOpen} 
-        onClose={() => setIsSizeGuideOpen(false)} 
-        initialCategory={product.category}
-      />
+      {/* Size Guide Modal (only for apparel) */}
+      {!isCareCategory && (
+        <SizeGuideModal 
+          isOpen={isSizeGuideOpen} 
+          onClose={() => setIsSizeGuideOpen(false)} 
+          initialCategory={product.category}
+        />
+      )}
     </motion.div>
     </div>
   );
