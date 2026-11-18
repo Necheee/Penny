@@ -15,6 +15,14 @@ import {
 
 const ProductContext = createContext();
 
+const getAdminAuthHeaders = () => {
+  const token = localStorage.getItem('penny_admin_token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 // Helper to guarantee product data integrity across the entire application
 const normalizeProduct = (p) => {
   if (!p) return p;
@@ -368,7 +376,7 @@ export function ProductProvider({ children }) {
     try {
       await fetch('/api/categories', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify(catWithSubs)
       });
     } catch (err) {
@@ -381,7 +389,8 @@ export function ProductProvider({ children }) {
 
     try {
       await fetch(`/api/categories/${encodeURIComponent(catId)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
       });
     } catch (err) {
       console.warn("Backend category delete note:", err);
@@ -409,7 +418,7 @@ export function ProductProvider({ children }) {
     try {
       await fetch(`/api/categories/${encodeURIComponent(categoryId)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify(updatedData),
       });
     } catch (err) {
@@ -456,7 +465,7 @@ export function ProductProvider({ children }) {
     try {
       await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories/${encodeURIComponent(typeof oldSubName === 'string' ? oldSubName : oldSubName?.name || '')}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           newName: targetNewName,
           subtypes: targetSubtypes,
@@ -507,7 +516,7 @@ export function ProductProvider({ children }) {
     try {
       await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({ subcategory: cleanSub, subtypes: cleanSubtypes })
       });
     } catch (err) {
@@ -535,7 +544,8 @@ export function ProductProvider({ children }) {
 
     try {
       await fetch(`/api/categories/${encodeURIComponent(categoryId)}/subcategories/${encodeURIComponent(rawSubName)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
       });
     } catch (err) {
       console.warn("Backend subcategory delete sync note:", err);

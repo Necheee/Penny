@@ -93,7 +93,7 @@ router.get('/', async (req, res) => {
  * POST /api/categories
  * Add a new category (Persists to local storage & cloud DB)
  */
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { name, slug, subcategories: rawSubs } = req.body;
 
@@ -175,7 +175,7 @@ router.post('/', async (req, res) => {
  * PUT /api/categories/:id
  * Update an existing category (name, slug, displayOrder, subcategories)
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, slug, displayOrder, subcategories: rawSubs } = req.body;
@@ -246,7 +246,7 @@ router.put('/:id', async (req, res) => {
  * POST /api/categories/:id/subcategories
  * Add a subcategory to an existing category
  */
-router.post('/:id/subcategories', async (req, res) => {
+router.post('/:id/subcategories', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const subcategoryName = (req.body.subcategory || req.body.name || '').trim();
@@ -320,7 +320,7 @@ router.post('/:id/subcategories', async (req, res) => {
  * PUT /api/categories/:id/subcategories/:subName
  * Update a subcategory name or its subtypes
  */
-router.put('/:id/subcategories/:subName', async (req, res) => {
+router.put('/:id/subcategories/:subName', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id, subName } = req.params;
     const { newName, subtypes } = req.body;
@@ -388,7 +388,7 @@ router.put('/:id/subcategories/:subName', async (req, res) => {
  * DELETE /api/categories/:id/subcategories/:subName
  * Remove a subcategory from an existing category
  */
-router.delete('/:id/subcategories/:subName', async (req, res) => {
+router.delete('/:id/subcategories/:subName', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id, subName } = req.params;
     const targetSub = decodeURIComponent(subName).trim().toLowerCase();
@@ -439,7 +439,7 @@ router.delete('/:id/subcategories/:subName', async (req, res) => {
  * DELETE /api/categories/:id
  * Remove a category permanently
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const index = categories.findIndex(c => c.id === id || c.slug === id);
@@ -488,7 +488,7 @@ router.get('/presets/all', (req, res) => {
  * POST /api/categories/presets/all
  * Save updated garment presets
  */
-router.post('/presets/all', (req, res) => {
+router.post('/presets/all', requireAuth, requireAdmin, (req, res) => {
   const updatedPresets = req.body || {};
   writeJsonFile('presets.json', updatedPresets);
   return res.status(200).json({
