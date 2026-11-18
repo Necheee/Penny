@@ -28,6 +28,7 @@ export default function ProductFormModal({
     isArchived: false,
     colors: ['Black', 'White'],
     availableSizes: ['S', 'M', 'L', 'XL'],
+    variants: [],
     imageUrl: '',
   });
 
@@ -62,6 +63,7 @@ export default function ProductFormModal({
         isArchived: !!editingProduct.isArchived,
         colors: Array.isArray(editingProduct.colors) ? editingProduct.colors : ['Black', 'White'],
         availableSizes: Array.isArray(editingProduct.availableSizes) ? editingProduct.availableSizes : ['S', 'M', 'L', 'XL'],
+        variants: Array.isArray(editingProduct.variants) ? editingProduct.variants : [],
         imageUrl: editingProduct.images?.primary || (typeof editingProduct.images === 'string' ? editingProduct.images : ''),
       });
     } else {
@@ -86,6 +88,7 @@ export default function ProductFormModal({
         isArchived: false,
         colors: ['Black', 'White'],
         availableSizes: firstCat?.id === 'care-accessories' ? ['One Size'] : ['S', 'M', 'L', 'XL'],
+        variants: [],
         imageUrl: '',
       });
     }
@@ -199,6 +202,21 @@ export default function ProductFormModal({
     const finalSubtype = isAddingCustomSubtype && customSubtypeInput.trim()
       ? customSubtypeInput.trim()
       : (formData.subtype || '');
+    const variants = (formData.availableSizes || []).flatMap(size =>
+      (formData.colors || []).map(color => {
+        const existing = (formData.variants || []).find(
+          variant => variant.size === size && (variant.colorName || variant.color) === color
+        );
+        return {
+          ...(existing?.id ? { id: existing.id } : {}),
+          size,
+          colorName: color,
+          colorHex: existing?.colorHex || null,
+          stockQuantity: Math.max(0, Number(existing?.stockQuantity ?? 10)),
+          sku: existing?.sku || null,
+        };
+      })
+    );
 
     if (isAddingCustomSub && customSubcategoryInput.trim()) {
       const cleanSub = customSubcategoryInput.trim();
@@ -224,6 +242,7 @@ export default function ProductFormModal({
       ...formData,
       subcategory: finalSubcategory,
       subtype: finalSubtype,
+      variants,
     });
   };
 

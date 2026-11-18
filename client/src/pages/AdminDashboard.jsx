@@ -437,6 +437,7 @@ export default function AdminDashboard() {
           isArchived: !!formData.isArchived,
           colors: formData.colors,
           availableSizes: formData.availableSizes,
+          variants: formData.variants,
           images: {
             ...editingProduct.images,
             primary: formData.imageUrl || editingProduct.images?.primary || '/images/products/linen-set-1.jpg'
@@ -461,6 +462,7 @@ export default function AdminDashboard() {
           isArchived: !!formData.isArchived,
           colors: formData.colors,
           availableSizes: formData.availableSizes,
+          variants: formData.variants,
           images: {
             primary: formData.imageUrl || '/images/products/linen-set-1.jpg',
             gallery: ['/images/products/linen-set-2.jpg']

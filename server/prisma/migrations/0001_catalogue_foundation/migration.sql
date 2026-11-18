@@ -55,6 +55,61 @@ CREATE TABLE IF NOT EXISTS "product_variants" (
   CONSTRAINT "product_variants_pkey" PRIMARY KEY ("id")
 );
 
+INSERT INTO "product_variants" (
+  "id", "product_id", "size", "color_name", "stock_quantity"
+)
+SELECT
+  md5(p."id" || '|' || sizes.value || '|' || colors.value),
+  p."id",
+  sizes.value,
+  colors.value,
+  10
+FROM "products" p
+CROSS JOIN LATERAL jsonb_array_elements_text(
+  CASE WHEN jsonb_typeof(p."available_sizes") = 'array'
+    THEN p."available_sizes"
+    ELSE '[]'::jsonb
+  END
+) AS sizes(value)
+CROSS JOIN LATERAL jsonb_array_elements_text(
+  CASE WHEN jsonb_typeof(p."colors") = 'array'
+    THEN p."colors"
+    ELSE '[]'::jsonb
+  END
+) AS colors(value)
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "product_images" (
+  "id", "url", "is_primary", "product_id"
+)
+SELECT
+  md5(p."id" || '|primary|' || (p."images"->>'primary')),
+  p."images"->>'primary',
+  true,
+  p."id"
+FROM "products" p
+WHERE jsonb_typeof(p."images") = 'object'
+  AND COALESCE(p."images"->>'primary', '') <> ''
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "product_images" (
+  "id", "url", "is_primary", "product_id"
+)
+SELECT
+  md5(p."id" || '|gallery|' || gallery.value || '|' || gallery.ordinality),
+  gallery.value,
+  false,
+  p."id"
+FROM "products" p
+CROSS JOIN LATERAL jsonb_array_elements_text(
+  CASE WHEN jsonb_typeof(p."images"->'gallery') = 'array'
+    THEN p."images"->'gallery'
+    ELSE '[]'::jsonb
+  END
+) WITH ORDINALITY AS gallery(value, ordinality)
+WHERE gallery.value <> ''
+ON CONFLICT ("id") DO NOTHING;
+
 CREATE UNIQUE INDEX IF NOT EXISTS "product_variants_sku_key"
   ON "product_variants" ("sku");
 

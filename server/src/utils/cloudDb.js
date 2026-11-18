@@ -123,6 +123,28 @@ export async function initCloudDatabase() {
       );
       ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE';
 
+      CREATE TABLE IF NOT EXISTS product_images (
+        id VARCHAR(100) PRIMARY KEY,
+        url TEXT NOT NULL,
+        public_id VARCHAR(255),
+        is_primary BOOLEAN DEFAULT false,
+        product_id VARCHAR(100) NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS product_variants (
+        id VARCHAR(100) PRIMARY KEY,
+        product_id VARCHAR(100) NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        size VARCHAR(50) NOT NULL,
+        color_name VARCHAR(100) NOT NULL,
+        color_hex VARCHAR(20),
+        stock_quantity INTEGER NOT NULL DEFAULT 10 CHECK (stock_quantity >= 0),
+        sku VARCHAR(255) UNIQUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (product_id, size, color_name)
+      );
+
       CREATE TABLE IF NOT EXISTS announcements (
         id INTEGER PRIMARY KEY DEFAULT 1,
         messages JSONB DEFAULT '[]'::jsonb,

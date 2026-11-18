@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import { initialProducts, initialCategories } from '../data/initialCatalogue.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
@@ -8,6 +9,100 @@ import { deleteR2Object } from '../utils/r2.js';
 const router = express.Router();
 
 const hasDatabase = () => Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'));
+
+async function syncProductRelations(pool, productId, { images, variants }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    if (Array.isArray(variants)) {
+      await client.query('DELETE FROM product_variants WHERE product_id = $1', [productId]);
+      for (const variant of variants) {
+        await client.query(`
+          INSERT INTO product_variants (
+            id, product_id, size, color_name, color_hex, stock_quantity, sku
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [
+          variant.id || crypto.randomUUID(),
+          productId,
+          String(variant.size || 'One Size'),
+          String(variant.colorName || variant.color || 'Standard'),
+          variant.colorHex || null,
+          Math.max(0, Number(variant.stockQuantity ?? 0)),
+          variant.sku || null,
+        ]);
+      }
+    }
+
+    if (images && typeof images === 'object') {
+      await client.query('DELETE FROM product_images WHERE product_id = $1', [productId]);
+      const imageUrls = [
+        { url: images.primary, isPrimary: true },
+        ...(Array.isArray(images.gallery)
+          ? images.gallery.map(url => ({ url, isPrimary: false }))
+          : []),
+      ].filter(image => typeof image.url === 'string' && image.url.trim());
+
+      for (const image of imageUrls) {
+        await client.query(`
+          INSERT INTO product_images (id, url, is_primary, product_id)
+          VALUES ($1, $2, $3, $4)
+        `, [crypto.randomUUID(), image.url.trim(), image.isPrimary, productId]);
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function loadProductRelations(pool, productRows) {
+  if (!productRows.length) return new Map();
+
+  const productIds = productRows.map(row => row.id);
+  let variantResult;
+  let imageResult;
+  try {
+    [variantResult, imageResult] = await Promise.all([
+      pool.query(`
+        SELECT id, product_id, size, color_name, color_hex, stock_quantity, sku
+        FROM product_variants
+        WHERE product_id = ANY($1::text[])
+        ORDER BY size, color_name
+      `, [productIds]),
+      pool.query(`
+        SELECT id, product_id, url, public_id, is_primary
+        FROM product_images
+        WHERE product_id = ANY($1::text[])
+        ORDER BY is_primary DESC, created_at ASC
+      `, [productIds]),
+    ]);
+  } catch (error) {
+    console.warn('[PRODUCTS API] Relational catalogue tables unavailable; using legacy product fields:', error.message);
+    return new Map(productIds.map(id => [id, { variants: [], images: [] }]));
+  }
+
+  const relations = new Map();
+  for (const id of productIds) {
+    const variants = variantResult.rows
+      .filter(row => row.product_id === id)
+      .map(row => ({
+        id: row.id,
+        size: row.size,
+        colorName: row.color_name,
+        colorHex: row.color_hex,
+        stockQuantity: Number(row.stock_quantity),
+        sku: row.sku,
+      }));
+    const images = imageResult.rows.filter(row => row.product_id === id);
+    relations.set(id, { variants, images });
+  }
+  return relations;
+}
 
 // Active Persistent Storage for Products with fallback to initial catalogue
 let storedProducts = readJsonFile('products.json', initialProducts) || initialProducts;
@@ -30,7 +125,7 @@ let products = storedProducts.map(p => ({
 writeJsonFile('products.json', products);
 
 // Helper to convert a PostgreSQL row into a standardized product object
-export function formatProductRow(row) {
+export function formatProductRow(row, relations = {}) {
   if (!row) return null;
   let images = row.images;
   if (typeof images === 'string') {
@@ -58,7 +153,12 @@ export function formatProductRow(row) {
     fit: row.fit || 'Relaxed fit',
     care: row.care || 'Machine wash cold.',
     shipping: row.shipping || 'Free delivery on orders above ₦200,000.',
-    images: images || { primary: '', gallery: [] },
+    images: relations.images?.length
+      ? {
+          primary: relations.images.find(image => image.is_primary)?.url || relations.images[0].url,
+          gallery: relations.images.filter(image => !image.is_primary).map(image => image.url),
+        }
+      : (images || { primary: '', gallery: [] }),
     colors: Array.isArray(colors) ? colors : [],
     availableSizes: Array.isArray(availableSizes) ? availableSizes : [],
     featured: !!row.featured,
@@ -67,6 +167,7 @@ export function formatProductRow(row) {
       ? row.status
       : (row.is_archived ? 'ARCHIVED' : 'ACTIVE'),
     isArchived: row.status === 'ARCHIVED' || !!row.is_archived,
+    variants: relations.variants || [],
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || new Date().toISOString(),
   };
@@ -90,7 +191,8 @@ router.get('/', async (req, res) => {
         const pool = getPool();
         const dbRes = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
         if (dbRes.rows && dbRes.rows.length > 0) {
-          result = dbRes.rows.map(formatProductRow);
+          const relations = await loadProductRelations(pool, dbRes.rows);
+          result = dbRes.rows.map(row => formatProductRow(row, relations.get(row.id)));
           // Keep local cache in sync
           products = [...result];
           writeJsonFile('products.json', products);
@@ -161,7 +263,8 @@ router.get('/:id', async (req, res) => {
           [id]
         );
         if (dbRes.rows.length > 0) {
-          product = formatProductRow(dbRes.rows[0]);
+          const relations = await loadProductRelations(pool, dbRes.rows);
+          product = formatProductRow(dbRes.rows[0], relations.get(dbRes.rows[0].id));
         }
       } catch (dbErr) {
         console.warn('[PRODUCTS API] Single product DB lookup fallback:', dbErr.message);
@@ -215,6 +318,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       images,
       colors,
       availableSizes,
+      variants,
       featured,
       inStock,
       isArchived,
@@ -341,7 +445,12 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
         ]);
 
         if (dbRes.rows.length > 0) {
-          const persisted = formatProductRow(dbRes.rows[0]);
+          await syncProductRelations(pool, newProduct.id, {
+            images: newProduct.images,
+            variants,
+          });
+          const relations = await loadProductRelations(pool, dbRes.rows);
+          const persisted = formatProductRow(dbRes.rows[0], relations.get(newProduct.id));
           products.unshift(persisted);
           writeJsonFile('products.json', products);
           return res.status(201).json({
@@ -496,7 +605,14 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
         ]);
 
         if (dbRes.rows.length > 0) {
-          const persisted = formatProductRow(dbRes.rows[0]);
+          if (Array.isArray(body.variants) || body.images !== undefined) {
+            await syncProductRelations(pool, id, {
+              images: body.images,
+              variants: body.variants,
+            });
+          }
+          const relations = await loadProductRelations(pool, dbRes.rows);
+          const persisted = formatProductRow(dbRes.rows[0], relations.get(id));
           const idx = products.findIndex(p => p.id === id);
           if (idx !== -1) products[idx] = persisted;
           else products.unshift(persisted);
@@ -600,6 +716,7 @@ router.patch('/:id/archive', requireAuth, requireAdmin, async (req, res) => {
     if (idx !== -1) {
       products[idx] = {
         ...products[idx],
+        status: nextArchived ? 'ARCHIVED' : 'ACTIVE',
         isArchived: nextArchived,
         updatedAt: new Date().toISOString(),
       };
