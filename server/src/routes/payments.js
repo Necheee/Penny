@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import { randomUUID } from 'node:crypto';
 import { sendOrderConfirmationEmail } from '../utils/receiptEmail.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
@@ -362,7 +363,9 @@ router.post('/verify', async (req, res) => {
       paidAt: paymentDetails.paidAt,
       createdAt: new Date().toISOString(),
       items: Array.isArray(orderData?.cartItems) ? orderData.cartItems.map(item => ({
-        id: item.id,
+        id: item.productId || item.id,
+        productId: item.productId || item.id,
+        variantId: item.variantId || null,
         name: item.name,
         size: item.selectedSize || item.size || 'M',
         color: item.selectedColor || item.color || 'Standard',
@@ -372,18 +375,72 @@ router.post('/verify', async (req, res) => {
       })) : [],
     };
 
-    // 1. Persist directly to Neon Cloud PostgreSQL Database
-    try {
-      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-        const pool = getPool();
-        await pool.query(`
+    // PostgreSQL order creation and stock deduction must be one transaction.
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      const pool = getPool();
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [newOrder.reference]);
+
+        const existing = await client.query(
+          'SELECT * FROM orders WHERE id = $1 OR reference = $2 ORDER BY created_at DESC LIMIT 1 FOR UPDATE',
+          [newOrder.id, newOrder.reference],
+        );
+        if (existing.rows.length > 0) {
+          await client.query('COMMIT');
+          const existingOrder = mapDbOrder(existing.rows[0]);
+          return res.status(200).json({
+            success: true,
+            message: 'Order was already registered.',
+            order: existingOrder,
+          });
+        }
+
+        for (const item of newOrder.items) {
+          const quantity = Number.isInteger(item.quantity) && item.quantity > 0 ? item.quantity : 0;
+          if (!item.productId || !item.size || !item.color || quantity === 0) {
+            throw Object.assign(new Error('Each order item must identify a product, size, color, and positive quantity.'), {
+              statusCode: 400,
+            });
+          }
+
+          const variantResult = await client.query(
+            `SELECT id, stock_quantity
+             FROM product_variants
+             WHERE product_id = $1 AND size = $2 AND color_name = $3
+             FOR UPDATE`,
+            [item.productId, item.size, item.color],
+          );
+          if (variantResult.rows.length === 0) {
+            throw Object.assign(new Error(`The selected variant for ${item.name || 'a product'} is no longer available.`), {
+              statusCode: 409,
+            });
+          }
+
+          const variant = variantResult.rows[0];
+          if (Number(variant.stock_quantity) < quantity) {
+            throw Object.assign(new Error(`Insufficient stock for ${item.name || 'a product'} (${item.size}, ${item.color}).`), {
+              statusCode: 409,
+            });
+          }
+
+          await client.query(
+            'UPDATE product_variants SET stock_quantity = stock_quantity - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            [quantity, variant.id],
+          );
+          await client.query(
+            `INSERT INTO inventory_adjustments
+              (id, variant_id, product_id, quantity_delta, reason, reference, actor_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [randomUUID(), variant.id, item.productId, -quantity, 'ORDER_PLACEMENT', newOrder.id, newOrder.userId],
+          );
+          item.variantId = variant.id;
+        }
+
+        await client.query(`
           INSERT INTO orders (id, reference, customer, email, phone, state, city, address, shipping_method, payment_method, transfer_account_name, payment_confirmed, items_count, subtotal, delivery_fee, total, status, items, paid_at, created_at, user_id)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-          ON CONFLICT (id) DO UPDATE SET
-            status = EXCLUDED.status,
-            payment_confirmed = EXCLUDED.payment_confirmed,
-            paid_at = EXCLUDED.paid_at,
-            user_id = COALESCE(EXCLUDED.user_id, orders.user_id)
         `, [
           newOrder.id, newOrder.reference, newOrder.customer, newOrder.email, newOrder.phone,
           newOrder.state, newOrder.city, newOrder.address, newOrder.shippingMethod, newOrder.paymentMethod,
@@ -391,10 +448,21 @@ router.post('/verify', async (req, res) => {
           newOrder.subtotal, newOrder.deliveryFee, newOrder.total, newOrder.status,
           JSON.stringify(newOrder.items), newOrder.paidAt, newOrder.createdAt, newOrder.userId
         ]);
-        console.log(`[ORDERS] Order #${newOrder.id} successfully saved to Neon PostgreSQL Cloud DB!`);
+        await client.query('COMMIT');
+        console.log(`[ORDERS] Order #${newOrder.id} and inventory successfully saved to PostgreSQL.`);
+      } catch (dbErr) {
+        await client.query('ROLLBACK');
+        if (dbErr.statusCode) {
+          return res.status(dbErr.statusCode).json({ success: false, message: dbErr.message });
+        }
+        console.error('[ORDERS] Transaction failed; order and inventory were rolled back:', dbErr.message);
+        return res.status(503).json({
+          success: false,
+          message: 'Order could not be completed because inventory is temporarily unavailable.',
+        });
+      } finally {
+        client.release();
       }
-    } catch (dbErr) {
-      console.warn('[ORDERS] Neon PostgreSQL insert warning, stored in local cache:', dbErr.message);
     }
 
     // 2. Persist to local JSON file & memory store

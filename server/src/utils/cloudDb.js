@@ -55,7 +55,6 @@ export async function initCloudDatabase() {
         addresses JSONB DEFAULT '[]'::jsonb,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
-
       CREATE TABLE IF NOT EXISTS orders (
         id VARCHAR(100) PRIMARY KEY,
         reference VARCHAR(100),
@@ -78,6 +77,7 @@ export async function initCloudDatabase() {
         paid_at TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_id VARCHAR(100);
 
       CREATE TABLE IF NOT EXISTS bank_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
@@ -144,6 +144,19 @@ export async function initCloudDatabase() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (product_id, size, color_name)
       );
+
+      CREATE TABLE IF NOT EXISTS inventory_adjustments (
+        id VARCHAR(100) PRIMARY KEY,
+        variant_id VARCHAR(100) NOT NULL REFERENCES product_variants(id) ON DELETE CASCADE,
+        product_id VARCHAR(100) NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        quantity_delta INTEGER NOT NULL CHECK (quantity_delta <> 0),
+        reason VARCHAR(100) NOT NULL,
+        reference VARCHAR(255),
+        actor_id VARCHAR(100),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS inventory_adjustments_variant_created_idx
+        ON inventory_adjustments (variant_id, created_at);
 
       CREATE TABLE IF NOT EXISTS announcements (
         id INTEGER PRIMARY KEY DEFAULT 1,

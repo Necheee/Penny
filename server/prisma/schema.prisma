@@ -61,6 +61,7 @@ model Product {
   legacySizes  Json?          @map("available_sizes")
   images       ProductImage[]
   variants     ProductVariant[]
+  inventoryAdjustments InventoryAdjustment[]
   orderItems   OrderItem[]
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
@@ -86,6 +87,7 @@ model ProductVariant {
   id            String   @id @default(uuid())
   productId     String   @map("product_id")
   product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventoryAdjustments InventoryAdjustment[]
   size          String   // "XS", "S", "M", "L", "XL", "XXL"
   colorName     String   @map("color_name") // e.g. "Charcoal", "Cream", "Olive"
   colorHex      String?  @map("color_hex") // e.g. "#36454f"
@@ -142,4 +144,20 @@ model OrderItem {
   quantity  Int      @default(1)
   unitPrice Float
   imageUrl  String?
+}
+
+model InventoryAdjustment {
+  id            String         @id @default(uuid())
+  variantId     String         @map("variant_id")
+  variant       ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  productId     String         @map("product_id")
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityDelta Int            @map("quantity_delta")
+  reason        String
+  reference     String?
+  actorId       String?        @map("actor_id")
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  @@index([variantId, createdAt])
+  @@map("inventory_adjustments")
 }

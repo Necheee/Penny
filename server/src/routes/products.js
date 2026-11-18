@@ -650,6 +650,77 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
+ * PATCH /api/products/:id/variants/:variantId/inventory
+ * Applies an auditable admin stock adjustment to a product variant.
+ */
+router.patch('/:id/variants/:variantId/inventory', requireAuth, requireAdmin, async (req, res) => {
+  const { id, variantId } = req.params;
+  const quantityDelta = Number(req.body?.quantityDelta);
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+
+  if (!Number.isInteger(quantityDelta) || quantityDelta === 0 || !reason) {
+    return res.status(400).json({
+      success: false,
+      message: 'A non-zero integer quantityDelta and adjustment reason are required.',
+    });
+  }
+
+  if (!hasDatabase()) {
+    return res.status(503).json({
+      success: false,
+      message: 'Inventory adjustments require the PostgreSQL database.',
+    });
+  }
+
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const variantResult = await client.query(
+      'SELECT id, product_id, stock_quantity FROM product_variants WHERE id = $1 AND product_id = $2 FOR UPDATE',
+      [variantId, id],
+    );
+    if (variantResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Product variant not found.' });
+    }
+
+    const variant = variantResult.rows[0];
+    const nextStock = Number(variant.stock_quantity) + quantityDelta;
+    if (nextStock < 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'Inventory cannot be reduced below zero.' });
+    }
+
+    await client.query(
+      'UPDATE product_variants SET stock_quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [nextStock, variantId],
+    );
+    await client.query(
+      `INSERT INTO inventory_adjustments
+        (id, variant_id, product_id, quantity_delta, reason, reference, actor_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [crypto.randomUUID(), variantId, id, quantityDelta, reason, req.body?.reference || null, req.user?.id || null],
+    );
+    await client.query('COMMIT');
+
+    return res.status(200).json({
+      success: true,
+      variant: { id: variantId, productId: id, stockQuantity: nextStock },
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('[PRODUCTS API] Inventory adjustment failed:', error.message);
+    return res.status(503).json({
+      success: false,
+      message: 'Inventory adjustment could not be completed.',
+    });
+  } finally {
+    client.release();
+  }
+});
+
+/**
  * PATCH /api/products/:id/archive
  * Toggle or set product archived state (Admin only)
  */
