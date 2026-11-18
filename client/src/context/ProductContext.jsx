@@ -41,7 +41,10 @@ const normalizeProduct = (p) => {
     ...p,
     category: cat,
     subcategory: typeof sub === 'string' ? sub : String(sub || ''),
-    isArchived: !!p.isArchived,
+    status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(p.status)
+      ? p.status
+      : (p.isArchived ? 'ARCHIVED' : 'ACTIVE'),
+    isArchived: p.status === 'ARCHIVED' || !!p.isArchived,
     availableSizes: Array.isArray(p.availableSizes) && p.availableSizes.length > 0 ? p.availableSizes : ['XS', 'S', 'M', 'L', 'XL'],
     colors: Array.isArray(p.colors) && p.colors.length > 0 ? p.colors : ['Black', 'White', 'Charcoal'],
     images: {
@@ -69,7 +72,7 @@ export function ProductProvider({ children }) {
   });
 
   // Active products for live customer storefront browsing
-  const products = allProducts.filter(p => !p.isArchived);
+  const products = allProducts.filter(p => p.status === 'ACTIVE' && !p.isArchived);
 
   // Archived products saved in admin for easy retrieval
   const archivedProducts = allProducts.filter(p => !!p.isArchived);
@@ -273,7 +276,7 @@ export function ProductProvider({ children }) {
     setAllProducts((prev) =>
       prev.map((p) =>
         p.id === productId
-          ? { ...p, isArchived: true, archivedAt: new Date().toISOString() }
+          ? { ...p, status: 'ARCHIVED', isArchived: true, archivedAt: new Date().toISOString() }
           : p
       )
     );
@@ -287,7 +290,7 @@ export function ProductProvider({ children }) {
     setAllProducts((prev) =>
       prev.map((p) =>
         p.id === productId
-          ? { ...p, isArchived: false, archivedAt: null }
+          ? { ...p, status: 'ACTIVE', isArchived: false, archivedAt: null }
           : p
       )
     );
@@ -305,6 +308,7 @@ export function ProductProvider({ children }) {
           nextStatus = !p.isArchived;
           return {
             ...p,
+            status: nextStatus ? 'ARCHIVED' : 'ACTIVE',
             isArchived: nextStatus,
             archivedAt: nextStatus ? new Date().toISOString() : null,
           };

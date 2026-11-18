@@ -22,7 +22,10 @@ initialProducts.forEach(ip => {
 
 let products = storedProducts.map(p => ({
   ...p,
-  isArchived: !!p.isArchived,
+  status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(p.status)
+    ? p.status
+    : (p.isArchived ? 'ARCHIVED' : 'ACTIVE'),
+  isArchived: p.status === 'ARCHIVED' || !!p.isArchived,
 }));
 writeJsonFile('products.json', products);
 
@@ -60,7 +63,10 @@ export function formatProductRow(row) {
     availableSizes: Array.isArray(availableSizes) ? availableSizes : [],
     featured: !!row.featured,
     inStock: row.in_stock !== false,
-    isArchived: !!row.is_archived,
+    status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(row.status)
+      ? row.status
+      : (row.is_archived ? 'ARCHIVED' : 'ACTIVE'),
+    isArchived: row.status === 'ARCHIVED' || !!row.is_archived,
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || new Date().toISOString(),
   };
@@ -101,9 +107,9 @@ router.get('/', async (req, res) => {
     const { category, featured, search, includeArchived, archivedOnly } = req.query;
 
     if (archivedOnly === 'true') {
-      result = result.filter(p => !!p.isArchived);
+      result = result.filter(p => p.status === 'ARCHIVED' || !!p.isArchived);
     } else if (includeArchived !== 'true') {
-      result = result.filter(p => !p.isArchived);
+      result = result.filter(p => p.status === 'ACTIVE' && !p.isArchived);
     }
 
     if (category && category !== 'all') {
@@ -212,6 +218,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       featured,
       inStock,
       isArchived,
+      status,
       subcategory,
       subtype
     } = req.body;
@@ -270,7 +277,10 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       availableSizes: Array.isArray(availableSizes) ? availableSizes : ['S', 'M', 'L', 'XL'],
       featured: !!featured,
       inStock: inStock !== false,
-      isArchived: !!isArchived,
+      status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(status)
+        ? status
+        : (isArchived ? 'ARCHIVED' : 'ACTIVE'),
+      isArchived: status !== undefined ? status === 'ARCHIVED' : !!isArchived,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -282,11 +292,11 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
           INSERT INTO products (
             id, slug, name, category, subcategory, subtype, price,
             description, material, fit, care, shipping, images,
-            colors, available_sizes, featured, in_stock, is_archived, created_at, updated_at
+            colors, available_sizes, featured, in_stock, is_archived, status, created_at, updated_at
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7,
             $8, $9, $10, $11, $12, $13,
-            $14, $15, $16, $17, $18, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            $14, $15, $16, $17, $18, $19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
           ) ON CONFLICT (id) DO UPDATE SET
             name = EXCLUDED.name,
             slug = EXCLUDED.slug,
@@ -305,6 +315,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
             featured = EXCLUDED.featured,
             in_stock = EXCLUDED.in_stock,
             is_archived = EXCLUDED.is_archived,
+            status = EXCLUDED.status,
             updated_at = CURRENT_TIMESTAMP
           RETURNING *;
         `, [
@@ -325,7 +336,8 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
           JSON.stringify(newProduct.availableSizes),
           newProduct.featured,
           newProduct.inStock,
-          newProduct.isArchived
+          newProduct.isArchived,
+          newProduct.status
         ]);
 
         if (dbRes.rows.length > 0) {
@@ -422,7 +434,14 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
         ? (typeof body.subcategory === 'string' ? body.subcategory : body.subcategory?.name || '')
         : existing.subcategory,
       subtype: body.subtype !== undefined ? body.subtype : existing.subtype,
-      isArchived: body.isArchived !== undefined ? !!body.isArchived : existing.isArchived,
+      isArchived: body.status !== undefined
+        ? body.status === 'ARCHIVED'
+        : (body.isArchived !== undefined ? !!body.isArchived : existing.isArchived),
+      status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(body.status)
+        ? body.status
+        : (body.isArchived === true
+          ? 'ARCHIVED'
+          : (body.isArchived === false ? 'ACTIVE' : (existing.status || 'ACTIVE'))),
       featured: body.featured !== undefined ? !!body.featured : existing.featured,
       inStock: body.inStock !== undefined ? !!body.inStock : existing.inStock,
       updatedAt: new Date().toISOString(),
@@ -450,6 +469,7 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
             featured = $16,
             in_stock = $17,
             is_archived = $18,
+            status = $19,
             updated_at = CURRENT_TIMESTAMP
           WHERE id = $1
           RETURNING *;
@@ -471,7 +491,8 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
           JSON.stringify(updated.availableSizes),
           updated.featured,
           updated.inStock,
-          updated.isArchived
+          updated.isArchived,
+          updated.status
         ]);
 
         if (dbRes.rows.length > 0) {
@@ -550,10 +571,11 @@ router.patch('/:id/archive', requireAuth, requireAdmin, async (req, res) => {
         const dbRes = await pool.query(`
           UPDATE products SET
             is_archived = $2,
+            status = $3,
             updated_at = CURRENT_TIMESTAMP
           WHERE id = $1
           RETURNING *;
-        `, [id, nextArchived]);
+        `, [id, nextArchived, nextArchived ? 'ARCHIVED' : 'ACTIVE']);
 
         if (dbRes.rows.length > 0) {
           const persisted = formatProductRow(dbRes.rows[0]);

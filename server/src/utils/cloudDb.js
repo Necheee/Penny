@@ -117,9 +117,11 @@ export async function initCloudDatabase() {
         featured BOOLEAN DEFAULT false,
         in_stock BOOLEAN DEFAULT true,
         is_archived BOOLEAN DEFAULT false,
+        status VARCHAR(20) DEFAULT 'ACTIVE',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE';
 
       CREATE TABLE IF NOT EXISTS announcements (
         id INTEGER PRIMARY KEY DEFAULT 1,
