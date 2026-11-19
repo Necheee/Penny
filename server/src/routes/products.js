@@ -98,6 +98,8 @@ async function loadProductRelations(pool, productRows) {
 // Helper to convert a PostgreSQL row into a standardized product object
 export function formatProductRow(row, relations = {}) {
   if (!row) return null;
+  const hasRelationalImages = Array.isArray(relations.images);
+  const hasRelationalVariants = Array.isArray(relations.variants);
   let images = row.images;
   if (typeof images === 'string') {
     try { images = JSON.parse(images); } catch { images = { primary: '', gallery: [] }; }
@@ -110,6 +112,23 @@ export function formatProductRow(row, relations = {}) {
   if (typeof availableSizes === 'string') {
     try { availableSizes = JSON.parse(availableSizes); } catch { availableSizes = []; }
   }
+  const relationalVariants = hasRelationalVariants ? relations.variants : [];
+  const relationalColors = [...new Set(
+    relationalVariants.map(variant => variant.colorName).filter(Boolean),
+  )];
+  const relationalSizes = [...new Set(
+    relationalVariants.map(variant => variant.size).filter(Boolean),
+  )];
+  const relationalImages = hasRelationalImages
+    ? {
+        primary: relations.images.find(image => image.is_primary)?.url
+          || relations.images[0]?.url
+          || '',
+        gallery: relations.images
+          .filter(image => !image.is_primary)
+          .map(image => image.url),
+      }
+    : null;
 
   return {
     id: row.id,
@@ -124,21 +143,20 @@ export function formatProductRow(row, relations = {}) {
     fit: row.fit || 'Relaxed fit',
     care: row.care || 'Machine wash cold.',
     shipping: row.shipping || 'Free delivery on orders above ₦200,000.',
-    images: relations.images?.length
-      ? {
-          primary: relations.images.find(image => image.is_primary)?.url || relations.images[0].url,
-          gallery: relations.images.filter(image => !image.is_primary).map(image => image.url),
-        }
-      : (images || { primary: '', gallery: [] }),
-    colors: Array.isArray(colors) ? colors : [],
-    availableSizes: Array.isArray(availableSizes) ? availableSizes : [],
+    images: relationalImages || (images || { primary: '', gallery: [] }),
+    colors: hasRelationalVariants ? relationalColors : (Array.isArray(colors) ? colors : []),
+    availableSizes: hasRelationalVariants
+      ? relationalSizes
+      : (Array.isArray(availableSizes) ? availableSizes : []),
     featured: !!row.featured,
-    inStock: row.in_stock !== false,
+    inStock: hasRelationalVariants
+      ? relationalVariants.some(variant => variant.stockQuantity > 0)
+      : row.in_stock !== false,
     status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(row.status)
       ? row.status
       : (row.is_archived ? 'ARCHIVED' : 'ACTIVE'),
     isArchived: row.status === 'ARCHIVED' || !!row.is_archived,
-    variants: relations.variants || [],
+    variants: relationalVariants,
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || new Date().toISOString(),
   };

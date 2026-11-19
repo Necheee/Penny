@@ -34,8 +34,20 @@ const normalizeProduct = (p) => {
   if (cat === 'sets' || cat === 'two-piece-sets') {
     cat = 'the-linen-shop';
   }
-  const primaryImg = p.images?.primary || (typeof p.images === 'string' ? p.images : (p.image || '/images/products/linen-set-1.jpg'));
-  const galleryImgs = Array.isArray(p.images?.gallery) ? p.images.gallery : [];
+  const hasRelationalImages = p.images && typeof p.images === 'object' && !Array.isArray(p.images);
+  const primaryImg = hasRelationalImages
+    ? (p.images.primary || '')
+    : (typeof p.images === 'string' ? p.images : (p.image || '/images/products/linen-set-1.jpg'));
+  const galleryImgs = hasRelationalImages && Array.isArray(p.images.gallery)
+    ? p.images.gallery
+    : [];
+  const hasRelationalVariants = Array.isArray(p.variants);
+  const variantColors = hasRelationalVariants
+    ? [...new Set(p.variants.map(variant => variant.colorName).filter(Boolean))]
+    : [];
+  const variantSizes = hasRelationalVariants
+    ? [...new Set(p.variants.map(variant => variant.size).filter(Boolean))]
+    : [];
 
   return {
     ...p,
@@ -45,14 +57,20 @@ const normalizeProduct = (p) => {
       ? p.status
       : (p.isArchived ? 'ARCHIVED' : 'ACTIVE'),
     isArchived: p.status === 'ARCHIVED' || !!p.isArchived,
-    availableSizes: Array.isArray(p.availableSizes) && p.availableSizes.length > 0 ? p.availableSizes : ['XS', 'S', 'M', 'L', 'XL'],
-    colors: Array.isArray(p.colors) && p.colors.length > 0 ? p.colors : ['Black', 'White', 'Charcoal'],
+    availableSizes: hasRelationalVariants
+      ? variantSizes
+      : (Array.isArray(p.availableSizes) && p.availableSizes.length > 0 ? p.availableSizes : ['XS', 'S', 'M', 'L', 'XL']),
+    colors: hasRelationalVariants
+      ? variantColors
+      : (Array.isArray(p.colors) && p.colors.length > 0 ? p.colors : ['Black', 'White', 'Charcoal']),
     images: {
       primary: primaryImg,
       gallery: galleryImgs
     },
     price: Number(p.price) || 0,
-    inStock: p.inStock !== undefined ? !!p.inStock : true,
+    inStock: hasRelationalVariants
+      ? p.variants.some(variant => Number(variant.stockQuantity) > 0)
+      : (p.inStock !== undefined ? !!p.inStock : true),
   };
 };
 

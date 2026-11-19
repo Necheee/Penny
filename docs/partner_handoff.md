@@ -151,12 +151,14 @@ The next implementation step is to make the relational variant and image tables
 authoritative in the API and frontend while preserving the existing response
 shape during the transition.
 
-### 4. Complete catalogue model usage
+### 4. Complete catalogue model usage — **Complete**
 
-Product routes still expose legacy JSON fields (`colors`, `available_sizes`,
-`images`, `is_archived`) alongside the new relational variant/image tables.
-Update read/write normalization and admin forms so variants and images are the
-authoritative values.
+Product API responses now derive images, colors, sizes, and stock from the
+relational `product_images` and `product_variants` tables. The frontend
+normalization layer follows those relational values, including empty relational
+arrays, instead of inventing defaults. Legacy JSON columns remain as
+compatibility mirrors for the existing response shape and older records, but
+are no longer authoritative for relational catalogue data.
 
 ## Full remaining implementation roadmap
 
@@ -314,7 +316,7 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 2. Make PostgreSQL the only backend catalogue source of truth. **Complete.**
 3. Choose Prisma or `pg` as the single active catalogue data layer. **Complete:
    retain `pg`; Prisma is the schema contract and migration tool.**
-4. Make relational variants/images/status authoritative in the API and frontend.
+4. Make relational variants/images/status authoritative in the API and frontend. **Complete.**
 5. Verify and harden inventory adjustment, reservation, cancellation, and
    concurrency behavior.
 6. Convert active currency calculations and payment totals to Decimal-safe values.
@@ -332,7 +334,7 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 4. Verify admin login → category save → product/variant save → storefront read. **Complete.**
 5. Begin the order schema work; relational order snapshot migration, write path, relational reads, and legacy JSON cleanup are **Complete**.
 6. Repair or remove the missing `prisma/seed.js` script. **Complete.**
-7. Make relational variants and images authoritative in the API and frontend.
+7. Make relational variants and images authoritative in the API and frontend. **Complete.**
 
 ## Validation notes
 
