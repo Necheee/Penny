@@ -337,6 +337,35 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 - [client/src/pages/Checkout.jsx](../client/src/pages/Checkout.jsx)
 - [client/src/pages/AdminDashboard.jsx](../client/src/pages/AdminDashboard.jsx)
 
+## Partner/local setup
+
+Before a partner pulls the latest work, commit and push the current source and
+documentation changes. Uncommitted worktree changes are not included in a
+`git pull`.
+
+After pulling the repository, install dependencies from both package manifests
+and verify the client build:
+
+```bash
+git pull
+npm ci --prefix client
+npm ci --prefix server
+npm run build
+```
+
+The dependency changes are tracked in the repository, including the server
+package lockfile. Do not copy or commit the existing `server/.env`. Each local
+machine needs its own `server/.env` containing the required database, auth,
+Paystack, Cloudflare R2, and email settings.
+
+The shared database is already migrated. Do not run migrations against it
+unless a new migration is intentionally being deployed. Once dependencies and
+environment variables are configured, start local development with:
+
+```bash
+npm run dev
+```
+
 ## Original recommended implementation order, updated
 
 1. Reconcile `_prisma_migrations` bookkeeping safely. **Complete.**
