@@ -1,6 +1,6 @@
 # PENNY Partner Handoff
 
-Updated: 2026-11-18
+Updated: 2026-11-19
 
 ## Current repository state
 
@@ -43,10 +43,11 @@ Verified live data after migration:
 
 The migration was applied directly with `psql`, not through Prisma CLI.
 
-The live database does **not** currently have a `_prisma_migrations` table. Do not
-run `prisma migrate deploy` blindly: it may try to reapply the already-applied
-migration. Reconcile Prisma migration bookkeeping before adopting Prisma CLI
-deployment as the normal process.
+The live database now has `_prisma_migrations` with
+`0001_catalogue_foundation` recorded as applied. This was reconciled with
+Prisma 7's `prisma migrate resolve --applied` command after verifying the
+migration had already been applied. Future deployments may use Prisma CLI, but
+should still verify migration status before applying changes.
 
 Prisma tooling is now runnable from Linux. Node.js `v26.13.1` is installed and
 `npm run prisma:validate` succeeds. Prisma Client generation also succeeds.
@@ -62,12 +63,10 @@ Active catalogue routes still use handwritten `pg` queries and legacy fields:
 - [server/src/routes/categories.js](../server/src/routes/categories.js)
 - [server/src/utils/cloudDb.js](../server/src/utils/cloudDb.js)
 
-The backend still has operational JSON/in-memory catalogue fallbacks:
-
-- `products.js` loads and writes `server/src/data/storage/products.json`.
-- `categories.js` loads and writes `server/src/data/storage/categories.json`.
-- `cloudDb.js` seeds PostgreSQL from JSON files when tables are empty.
-- Product and category route errors can fall back to cached in-memory data.
+Product catalogue routes no longer use operational JSON/in-memory fallbacks, and
+database initialization no longer seeds products or categories from JSON files.
+Category routes still retain legacy local persistence and fallback behavior and
+must be migrated separately.
 
 Prisma models are defined in
 [server/prisma/schema.prisma](../server/prisma/schema.prisma), but application
@@ -94,10 +93,11 @@ from `DATABASE_URL` there and is no longer declared in the Prisma schema.
 
 ## What remains
 
-### 1. Make PostgreSQL the only catalogue source of truth
+### 1. Make PostgreSQL the only catalogue source of truth — **Partial**
 
-Remove backend operational JSON/in-memory fallbacks and make database errors
-explicit. Keep any frontend cache read-only and non-authoritative.
+Product routes now make database errors explicit and no longer read/write the
+catalogue JSON cache. Complete the same conversion for category routes. Keep
+any frontend cache read-only and non-authoritative.
 
 Primary files:
 
@@ -109,11 +109,10 @@ Primary files:
 Use small, reviewable changes. Preserve the existing API response shape until
 the frontend migration is intentionally handled.
 
-### 2. Resolve Prisma migration bookkeeping
+### 2. Resolve Prisma migration bookkeeping — **Complete**
 
-Determine the correct safe way to mark the already-applied migration as applied
-for Prisma without rerunning its SQL. Do not manually invent Prisma metadata
-without checking the Prisma version/schema expected by the installed package.
+The already-applied migration was safely recorded with Prisma 7's
+`prisma migrate resolve --applied` command without rerunning its SQL.
 
 ### 3. Decide whether Prisma becomes the active data layer
 
@@ -264,11 +263,10 @@ Add tests for behavior introduced by the catalogue migration and remaining work:
 - database failure behavior without JSON fallback;
 - admin authorization on all mutation routes.
 
-### 14. Repair or remove the broken seed script
+### 14. Repair or remove the broken seed script — **Complete**
 
-`package.json` exposes `npm run seed`, but the referenced
-`server/prisma/seed.js` file does not exist. Add a real seed implementation or
-remove/rename the script so the documented command cannot fail.
+The broken `npm run seed` script was removed because catalogue initialization is
+now database-only and no `server/prisma/seed.js` implementation exists.
 
 ## Relevant frontend areas
 
@@ -280,7 +278,7 @@ remove/rename the script so the documented command cannot fail.
 
 ## Original recommended implementation order, updated
 
-1. Reconcile `_prisma_migrations` bookkeeping safely.
+1. Reconcile `_prisma_migrations` bookkeeping safely. **Complete.**
 2. Make PostgreSQL the only backend catalogue source of truth.
 3. Choose Prisma or `pg` as the single active catalogue data layer.
 4. Make relational variants/images/status authoritative in the API and frontend.
@@ -291,16 +289,16 @@ remove/rename the script so the documented command cannot fail.
 8. Remove operational frontend localStorage catalogue/order fallbacks.
 9. Complete admin-to-storefront-to-checkout end-to-end verification.
 10. Add focused regression and integration coverage.
-11. Repair or remove the broken seed script.
+11. Repair or remove the broken seed script. **Complete.**
 
 ## Recommended next session
 
 1. Reconcile `_prisma_migrations` safely.
 2. Add focused tests or a controlled smoke test for the migrated catalogue.
-3. Remove product/category backend JSON and in-memory operational fallbacks.
+3. Remove the remaining category backend JSON and in-memory operational fallbacks.
 4. Verify admin login → category save → product/variant save → storefront read.
 5. Only then begin the order schema and frontend `localStorage` work.
-6. Repair or remove the missing `prisma/seed.js` script.
+6. Repair or remove the missing `prisma/seed.js` script. **Complete.**
 
 ## Validation notes
 

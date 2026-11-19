@@ -1,8 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import { initialProducts, initialCategories } from '../data/initialCatalogue.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
-import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
 import { deleteR2Object } from '../utils/r2.js';
 
@@ -64,27 +62,20 @@ async function loadProductRelations(pool, productRows) {
   if (!productRows.length) return new Map();
 
   const productIds = productRows.map(row => row.id);
-  let variantResult;
-  let imageResult;
-  try {
-    [variantResult, imageResult] = await Promise.all([
-      pool.query(`
-        SELECT id, product_id, size, color_name, color_hex, stock_quantity, sku
-        FROM product_variants
-        WHERE product_id = ANY($1::text[])
-        ORDER BY size, color_name
-      `, [productIds]),
-      pool.query(`
-        SELECT id, product_id, url, public_id, is_primary
-        FROM product_images
-        WHERE product_id = ANY($1::text[])
-        ORDER BY is_primary DESC, created_at ASC
-      `, [productIds]),
-    ]);
-  } catch (error) {
-    console.warn('[PRODUCTS API] Relational catalogue tables unavailable; using legacy product fields:', error.message);
-    return new Map(productIds.map(id => [id, { variants: [], images: [] }]));
-  }
+  const [variantResult, imageResult] = await Promise.all([
+    pool.query(`
+      SELECT id, product_id, size, color_name, color_hex, stock_quantity, sku
+      FROM product_variants
+      WHERE product_id = ANY($1::text[])
+      ORDER BY size, color_name
+    `, [productIds]),
+    pool.query(`
+      SELECT id, product_id, url, public_id, is_primary
+      FROM product_images
+      WHERE product_id = ANY($1::text[])
+      ORDER BY is_primary DESC, created_at ASC
+    `, [productIds]),
+  ]);
 
   const relations = new Map();
   for (const id of productIds) {
@@ -103,26 +94,6 @@ async function loadProductRelations(pool, productRows) {
   }
   return relations;
 }
-
-// Active Persistent Storage for Products with fallback to initial catalogue
-let storedProducts = readJsonFile('products.json', initialProducts) || initialProducts;
-
-// Ensure all initial catalogue products are preserved
-const storedIds = new Set(storedProducts.map(p => p.id));
-initialProducts.forEach(ip => {
-  if (!storedIds.has(ip.id)) {
-    storedProducts.push(ip);
-  }
-});
-
-let products = storedProducts.map(p => ({
-  ...p,
-  status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(p.status)
-    ? p.status
-    : (p.isArchived ? 'ARCHIVED' : 'ACTIVE'),
-  isArchived: p.status === 'ARCHIVED' || !!p.isArchived,
-}));
-writeJsonFile('products.json', products);
 
 // Helper to convert a PostgreSQL row into a standardized product object
 export function formatProductRow(row, relations = {}) {
@@ -184,27 +155,17 @@ export function formatProductRow(row, relations = {}) {
  */
 router.get('/', async (req, res) => {
   try {
-    let result = [];
-
-    if (hasDatabase()) {
-      try {
-        const pool = getPool();
-        const dbRes = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
-        if (dbRes.rows && dbRes.rows.length > 0) {
-          const relations = await loadProductRelations(pool, dbRes.rows);
-          result = dbRes.rows.map(row => formatProductRow(row, relations.get(row.id)));
-          // Keep local cache in sync
-          products = [...result];
-          writeJsonFile('products.json', products);
-        }
-      } catch (dbErr) {
-        console.warn('[PRODUCTS API] Neon DB read error, using local fallback:', dbErr.message);
-      }
+    if (!hasDatabase()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Products catalogue requires the PostgreSQL database.',
+      });
     }
 
-    if (result.length === 0) {
-      result = [...products];
-    }
+    const pool = getPool();
+    const dbRes = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
+    const relations = await loadProductRelations(pool, dbRes.rows);
+    let result = dbRes.rows.map(row => formatProductRow(row, relations.get(row.id)));
 
     const { category, featured, search, includeArchived, archivedOnly } = req.query;
 
@@ -253,26 +214,22 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    let product = null;
-
-    if (hasDatabase()) {
-      try {
-        const pool = getPool();
-        const dbRes = await pool.query(
-          'SELECT * FROM products WHERE id = $1 OR slug = $1 LIMIT 1',
-          [id]
-        );
-        if (dbRes.rows.length > 0) {
-          const relations = await loadProductRelations(pool, dbRes.rows);
-          product = formatProductRow(dbRes.rows[0], relations.get(dbRes.rows[0].id));
-        }
-      } catch (dbErr) {
-        console.warn('[PRODUCTS API] Single product DB lookup fallback:', dbErr.message);
-      }
+    if (!hasDatabase()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Products catalogue requires the PostgreSQL database.',
+      });
     }
 
-    if (!product) {
-      product = products.find(p => p.id === id || p.slug === id);
+    const pool = getPool();
+    const dbRes = await pool.query(
+      'SELECT * FROM products WHERE id = $1 OR slug = $1 LIMIT 1',
+      [id]
+    );
+    let product = null;
+    if (dbRes.rows.length > 0) {
+      const relations = await loadProductRelations(pool, dbRes.rows);
+      product = formatProductRow(dbRes.rows[0], relations.get(dbRes.rows[0].id));
     }
 
     if (!product) {
@@ -305,6 +262,13 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!hasDatabase()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Product changes require the PostgreSQL database.',
+      });
+    }
+
     const {
       id,
       name,
@@ -337,17 +301,11 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
     // Enforce maximum 4 featured products rule
     if (featured === true) {
       let activeFeaturedCount = 0;
-      if (hasDatabase()) {
-        try {
-          const pool = getPool();
-          const countRes = await pool.query(
-            "SELECT count(*) FROM products WHERE featured = true AND is_archived = false"
-          );
-          activeFeaturedCount = parseInt(countRes.rows[0]?.count || 0, 10);
-        } catch {}
-      } else {
-        activeFeaturedCount = products.filter(p => p.featured && !p.isArchived).length;
-      }
+      const pool = getPool();
+      const countRes = await pool.query(
+        "SELECT count(*) FROM products WHERE featured = true AND is_archived = false"
+      );
+      activeFeaturedCount = parseInt(countRes.rows[0]?.count || 0, 10);
 
       if (activeFeaturedCount >= 4) {
         return res.status(400).json({
@@ -389,7 +347,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       updatedAt: new Date().toISOString(),
     };
 
-    if (hasDatabase()) {
+    {
       try {
         const pool = getPool();
         const dbRes = await pool.query(`
@@ -451,8 +409,6 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
           });
           const relations = await loadProductRelations(pool, dbRes.rows);
           const persisted = formatProductRow(dbRes.rows[0], relations.get(newProduct.id));
-          products.unshift(persisted);
-          writeJsonFile('products.json', products);
           return res.status(201).json({
             success: true,
             message: 'Product created and saved to cloud database.',
@@ -461,17 +417,12 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
         }
       } catch (dbErr) {
         console.error('[PRODUCTS API] DB insert error:', dbErr.message);
+        return res.status(503).json({
+          success: false,
+          message: 'Product could not be saved to the database.',
+        });
       }
     }
-
-    products.unshift(newProduct);
-    writeJsonFile('products.json', products);
-
-    return res.status(201).json({
-      success: true,
-      message: 'Product created successfully.',
-      data: newProduct,
-    });
   } catch (error) {
     console.error('Error creating product:', error);
     return res.status(500).json({
@@ -487,21 +438,21 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
  */
 router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!hasDatabase()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Product changes require the PostgreSQL database.',
+      });
+    }
+
     const { id } = req.params;
     const body = req.body;
 
-    let existing = products.find(p => p.id === id);
-
-    if (hasDatabase()) {
-      try {
-        const pool = getPool();
-        const checkRes = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
-        if (checkRes.rows.length > 0) {
-          existing = formatProductRow(checkRes.rows[0]);
-        }
-      } catch (e) {
-        console.warn('[PRODUCTS API] DB lookup error during update:', e.message);
-      }
+    const pool = getPool();
+    const checkRes = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    let existing = null;
+    if (checkRes.rows.length > 0) {
+      existing = formatProductRow(checkRes.rows[0]);
     }
 
     if (!existing) {
@@ -514,18 +465,11 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
     // Enforce maximum 4 featured products rule when updating
     if (body.featured === true && !existing.featured) {
       let activeFeaturedCount = 0;
-      if (hasDatabase()) {
-        try {
-          const pool = getPool();
-          const countRes = await pool.query(
-            "SELECT count(*) FROM products WHERE featured = true AND is_archived = false AND id != $1",
-            [id]
-          );
-          activeFeaturedCount = parseInt(countRes.rows[0]?.count || 0, 10);
-        } catch {}
-      } else {
-        activeFeaturedCount = products.filter(p => p.featured && !p.isArchived && p.id !== id).length;
-      }
+      const countRes = await pool.query(
+        "SELECT count(*) FROM products WHERE featured = true AND is_archived = false AND id != $1",
+        [id]
+      );
+      activeFeaturedCount = parseInt(countRes.rows[0]?.count || 0, 10);
 
       if (activeFeaturedCount >= 4) {
         return res.status(400).json({
@@ -556,7 +500,7 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
       updatedAt: new Date().toISOString(),
     };
 
-    if (hasDatabase()) {
+    {
       try {
         const pool = getPool();
         const dbRes = await pool.query(`
@@ -613,11 +557,6 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
           }
           const relations = await loadProductRelations(pool, dbRes.rows);
           const persisted = formatProductRow(dbRes.rows[0], relations.get(id));
-          const idx = products.findIndex(p => p.id === id);
-          if (idx !== -1) products[idx] = persisted;
-          else products.unshift(persisted);
-          writeJsonFile('products.json', products);
-
           return res.status(200).json({
             success: true,
             message: 'Product updated and persisted to database.',
@@ -626,20 +565,12 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
         }
       } catch (dbErr) {
         console.error('[PRODUCTS API] DB update error:', dbErr.message);
+        return res.status(503).json({
+          success: false,
+          message: 'Product could not be updated in the database.',
+        });
       }
     }
-
-    const index = products.findIndex(p => p.id === id);
-    if (index !== -1) {
-      products[index] = updated;
-    }
-    writeJsonFile('products.json', products);
-
-    return res.status(200).json({
-      success: true,
-      message: 'Product updated successfully.',
-      data: updated,
-    });
   } catch (error) {
     console.error('Error updating product:', error);
     return res.status(500).json({
@@ -726,19 +657,19 @@ router.patch('/:id/variants/:variantId/inventory', requireAuth, requireAdmin, as
  */
 router.patch('/:id/archive', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { id } = req.params;
-    let existing = products.find(p => p.id === id);
+    if (!hasDatabase()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Product changes require the PostgreSQL database.',
+      });
+    }
 
-    if (hasDatabase()) {
-      try {
-        const pool = getPool();
-        const checkRes = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
-        if (checkRes.rows.length > 0) {
-          existing = formatProductRow(checkRes.rows[0]);
-        }
-      } catch (e) {
-        console.warn('[PRODUCTS API] DB lookup error:', e.message);
-      }
+    const { id } = req.params;
+    const pool = getPool();
+    const checkRes = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    let existing = null;
+    if (checkRes.rows.length > 0) {
+      existing = formatProductRow(checkRes.rows[0]);
     }
 
     if (!existing) {
@@ -752,7 +683,7 @@ router.patch('/:id/archive', requireAuth, requireAdmin, async (req, res) => {
       ? !!req.body.isArchived
       : !existing.isArchived;
 
-    if (hasDatabase()) {
+    {
       try {
         const pool = getPool();
         const dbRes = await pool.query(`
@@ -766,10 +697,6 @@ router.patch('/:id/archive', requireAuth, requireAdmin, async (req, res) => {
 
         if (dbRes.rows.length > 0) {
           const persisted = formatProductRow(dbRes.rows[0]);
-          const idx = products.findIndex(p => p.id === id);
-          if (idx !== -1) products[idx] = persisted;
-          writeJsonFile('products.json', products);
-
           return res.status(200).json({
             success: true,
             message: nextArchived
@@ -780,31 +707,12 @@ router.patch('/:id/archive', requireAuth, requireAdmin, async (req, res) => {
         }
       } catch (dbErr) {
         console.error('[PRODUCTS API] DB archive update error:', dbErr.message);
+        return res.status(503).json({
+          success: false,
+          message: 'Product archive status could not be saved to the database.',
+        });
       }
     }
-
-    const idx = products.findIndex(p => p.id === id);
-    if (idx !== -1) {
-      products[idx] = {
-        ...products[idx],
-        status: nextArchived ? 'ARCHIVED' : 'ACTIVE',
-        isArchived: nextArchived,
-        updatedAt: new Date().toISOString(),
-      };
-      writeJsonFile('products.json', products);
-      return res.status(200).json({
-        success: true,
-        message: nextArchived
-          ? 'Product archived successfully.'
-          : 'Product unarchived and restored to storefront.',
-        data: products[idx],
-      });
-    }
-
-    return res.status(404).json({
-      success: false,
-      message: `Product with ID '${id}' not found.`,
-    });
   } catch (error) {
     console.error('Error toggling archive status:', error);
     return res.status(500).json({
@@ -820,26 +728,28 @@ router.patch('/:id/archive', requireAuth, requireAdmin, async (req, res) => {
  */
 router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!hasDatabase()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Product changes require the PostgreSQL database.',
+      });
+    }
+
     const { id } = req.params;
     let removed = null;
 
-    if (hasDatabase()) {
-      try {
-        const pool = getPool();
-        const dbRes = await pool.query('DELETE FROM products WHERE id = $1 RETURNING *', [id]);
-        if (dbRes.rows.length > 0) {
-          removed = formatProductRow(dbRes.rows[0]);
-        }
-      } catch (dbErr) {
-        console.error('[PRODUCTS API] DB delete error:', dbErr.message);
+    try {
+      const pool = getPool();
+      const dbRes = await pool.query('DELETE FROM products WHERE id = $1 RETURNING *', [id]);
+      if (dbRes.rows.length > 0) {
+        removed = formatProductRow(dbRes.rows[0]);
       }
-    }
-
-    const index = products.findIndex(p => p.id === id);
-    if (index !== -1) {
-      const spliced = products.splice(index, 1)[0];
-      if (!removed) removed = spliced;
-      writeJsonFile('products.json', products);
+    } catch (dbErr) {
+      console.error('[PRODUCTS API] DB delete error:', dbErr.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Product could not be removed from the database.',
+      });
     }
 
     if (!removed) {
