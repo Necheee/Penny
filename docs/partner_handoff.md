@@ -62,6 +62,16 @@ Prisma tooling is now runnable from Linux. Node.js `v26.13.1` is installed and
 The database schema now contains the relational catalogue structures, but the
 application has not yet been converted to Prisma or made database-only.
 
+### Architecture guardrails
+
+- `pg` is the single runtime persistence layer.
+- Prisma is used strictly for the `server/prisma/schema.prisma` contract and
+  migrations, with migrations using `DIRECT_URL`.
+- Never instantiate `PrismaClient` in routes or other runtime application code.
+- All `pg` SQL must use PostgreSQL `snake_case` table and column names matching
+  the Prisma `@map` directives, including `unit_price`, `product_id`, and
+  `image_url`.
+
 Active catalogue routes still use handwritten `pg` queries and legacy fields:
 
 - [server/src/routes/products.js](../server/src/routes/products.js)
@@ -122,15 +132,24 @@ the frontend migration is intentionally handled.
 The already-applied migration was safely recorded with Prisma 7's
 `prisma migrate resolve --applied` command without rerunning its SQL.
 
-### 3. Decide whether Prisma becomes the active data layer
+### 3. Decide whether Prisma becomes the active data layer — **Complete**
 
 The schema and live database are currently relational, but the application uses
-`pg`. Either:
+`pg`. The project explicitly retains `pg` as the active application data layer.
+Prisma is retained as a schema contract and migration/deployment tool only:
 
-- adopt Prisma consistently for catalogue reads/writes; or
-- explicitly retain `pg` and treat Prisma as a schema contract only.
+- catalogue routes and transactional checkout logic use the shared `pg` pool;
+- `server/prisma/schema.prisma` defines and validates the relational contract;
+- Prisma CLI is used for client generation and migration status/deployment;
+- application routes do not instantiate `PrismaClient`.
 
-Do not maintain two competing persistence implementations indefinitely.
+This avoids maintaining two competing runtime persistence implementations. Any
+future move to Prisma must be an intentional, repository-wide migration rather
+than a route-by-route hybrid.
+
+The next implementation step is to make the relational variant and image tables
+authoritative in the API and frontend while preserving the existing response
+shape during the transition.
 
 ### 4. Complete catalogue model usage
 
@@ -229,17 +248,13 @@ dashboard. Catalogue cache cleanup remains outstanding.
 Network/database failures should surface explicitly instead of creating
 success-shaped local orders or catalogue records.
 
-### 10. Adopt one active persistence layer — **Not complete**
+### 10. Adopt one active persistence layer — **Complete**
 
-The live database now contains the relational catalogue structures, but active
-routes still use handwritten `pg` queries and legacy JSON fields. Decide and
-execute one coherent direction:
-
-1. adopt Prisma consistently for catalogue reads/writes and transactions; or
-2. explicitly retain `pg` while treating Prisma as a schema contract only.
-
-Do not leave Prisma models, handwritten SQL, JSON storage, and in-memory state as
-competing sources of truth.
+The project explicitly retains handwritten `pg` queries and transactions as the
+active persistence layer. Prisma models remain the schema contract and
+migration/deployment tooling; they are not a second runtime persistence path.
+The remaining catalogue work is to remove legacy JSON fields from the active
+normalization and write paths, not to introduce Prisma into those routes.
 
 ### 11. Complete database migration/deployment hygiene — **Not complete**
 
@@ -296,8 +311,9 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 ## Original recommended implementation order, updated
 
 1. Reconcile `_prisma_migrations` bookkeeping safely. **Complete.**
-2. Make PostgreSQL the only backend catalogue source of truth.
-3. Choose Prisma or `pg` as the single active catalogue data layer.
+2. Make PostgreSQL the only backend catalogue source of truth. **Complete.**
+3. Choose Prisma or `pg` as the single active catalogue data layer. **Complete:
+   retain `pg`; Prisma is the schema contract and migration tool.**
 4. Make relational variants/images/status authoritative in the API and frontend.
 5. Verify and harden inventory adjustment, reservation, cancellation, and
    concurrency behavior.
@@ -316,6 +332,7 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 4. Verify admin login → category save → product/variant save → storefront read. **Complete.**
 5. Begin the order schema work; relational order snapshot migration, write path, relational reads, and legacy JSON cleanup are **Complete**.
 6. Repair or remove the missing `prisma/seed.js` script. **Complete.**
+7. Make relational variants and images authoritative in the API and frontend.
 
 ## Validation notes
 
