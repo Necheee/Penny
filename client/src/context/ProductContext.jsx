@@ -42,11 +42,17 @@ const normalizeProduct = (p) => {
     ? p.images.gallery
     : [];
   const hasRelationalVariants = Array.isArray(p.variants);
+  const variants = hasRelationalVariants
+    ? p.variants.map(variant => ({
+        ...variant,
+        stockQuantity: Number(variant.stockQuantity ?? 0),
+      }))
+    : [];
   const variantColors = hasRelationalVariants
-    ? [...new Set(p.variants.map(variant => variant.colorName).filter(Boolean))]
+    ? [...new Set(variants.map(variant => variant.colorName).filter(Boolean))]
     : [];
   const variantSizes = hasRelationalVariants
-    ? [...new Set(p.variants.map(variant => variant.size).filter(Boolean))]
+    ? [...new Set(variants.map(variant => variant.size).filter(Boolean))]
     : [];
 
   return {
@@ -67,9 +73,16 @@ const normalizeProduct = (p) => {
       primary: primaryImg,
       gallery: galleryImgs
     },
+    primaryImage: primaryImg,
+    galleryImages: galleryImgs,
+    variants,
+    availableVariants: variants,
     price: p.price ?? '0.00',
+    isAvailable: hasRelationalVariants
+      ? variants.some(variant => variant.stockQuantity > 0)
+      : (p.inStock !== undefined ? !!p.inStock : true),
     inStock: hasRelationalVariants
-      ? p.variants.some(variant => Number(variant.stockQuantity) > 0)
+      ? variants.some(variant => variant.stockQuantity > 0)
       : (p.inStock !== undefined ? !!p.inStock : true),
   };
 };

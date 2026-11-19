@@ -92,8 +92,8 @@ export function CartProvider({ children }) {
   const closeCart = () => setIsCartOpen(false);
 
   // Add item to cart
-  const addToCart = (product, size, color, quantity = 1) => {
-    const cartId = `${product.id}-${color}-${size}`;
+  const addToCart = (product, size, color, quantity = 1, variantId = null) => {
+    const cartId = `${product.id}-${variantId || `${color}-${size}`}`;
     
     setCartItems(prev => {
       const existing = prev.find(item => item.cartId === cartId);
@@ -108,9 +108,10 @@ export function CartProvider({ children }) {
         updated = [...prev, {
           cartId,
           productId: product.id,
+          variantId,
           name: product.name,
           price: product.price,
-          image: product.images.primary,
+          image: product.images?.primary || product.image || '',
           size,
           color,
           quantity

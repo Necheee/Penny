@@ -33,13 +33,11 @@ export default function ProductCard({ product }) {
 
   const handleBuyNow = (e) => {
     e.stopPropagation(); // prevent modal from opening
-    const defaultSize = (product.availableSizes && product.availableSizes.length > 0)
-      ? product.availableSizes[0]
-      : 'M';
-    const defaultColor = (product.colors && product.colors.length > 0)
-      ? product.colors[0]
-      : 'Standard';
-    addToCart(product, defaultSize, defaultColor, 1);
+    const defaultVariant = (product.variants || []).find(variant => Number(variant.stockQuantity) > 0)
+      || (product.variants || [])[0];
+    const defaultSize = defaultVariant?.size || product.availableSizes?.[0] || 'M';
+    const defaultColor = defaultVariant?.colorName || product.colors?.[0] || 'Standard';
+    addToCart(product, defaultSize, defaultColor, 1, defaultVariant?.id || null);
     navigate('/checkout');
   };
 
@@ -54,7 +52,7 @@ export default function ProductCard({ product }) {
     >
       <div className="relative aspect-[4/5] mb-4 bg-[#f4f4f0] overflow-hidden">
         <img 
-          src={product.images?.primary || '/images/products/linen-set-1.jpg'} 
+          src={product.primaryImage || '/images/products/linen-set-1.jpg'}
           alt={product.name} 
           loading="lazy"
           onError={(e) => {

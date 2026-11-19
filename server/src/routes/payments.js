@@ -36,6 +36,7 @@ export function mapDbOrder(row) {
     items: items.map(item => ({
       id: item.id,
       productId: item.product_id || null,
+      ...(item.variant_id ? { variantId: item.variant_id } : {}),
       name: item.name,
       size: item.size,
       color: item.color,
@@ -63,6 +64,7 @@ const relationalOrderSelect = `
         json_build_object(
           'id', oi.id,
           'product_id', oi.product_id,
+          'variant_id', oi.variant_id,
           'name', oi.name,
           'size', oi.size,
           'color', oi.color,
@@ -456,11 +458,14 @@ router.post('/verify', async (req, res) => {
           const quantity = item.quantity;
 
           const variantResult = await client.query(
-            `SELECT id, stock_quantity
+            `SELECT id, product_id, size, color_name, stock_quantity
              FROM product_variants
-             WHERE product_id = $1 AND size = $2 AND color_name = $3
+             WHERE id = COALESCE($1, id)
+               AND product_id = $2
+               AND size = $3
+               AND color_name = $4
              FOR UPDATE`,
-            [item.productId, item.size, item.color],
+            [item.variantId || null, item.productId, item.size, item.color],
           );
           if (variantResult.rows.length === 0) {
             throw Object.assign(new Error(`The selected variant for ${item.name || 'a product'} is no longer available.`), {
@@ -469,6 +474,11 @@ router.post('/verify', async (req, res) => {
           }
 
           const variant = variantResult.rows[0];
+          if (item.variantId && item.variantId !== variant.id) {
+            throw Object.assign(new Error(`The selected variant for ${item.name || 'a product'} is no longer available.`), {
+              statusCode: 409,
+            });
+          }
           if (Number(variant.stock_quantity) < quantity) {
             throw Object.assign(new Error(`Insufficient stock for ${item.name || 'a product'} (${item.size}, ${item.color}).`), {
               statusCode: 409,
@@ -486,6 +496,8 @@ router.post('/verify', async (req, res) => {
             [randomUUID(), variant.id, item.productId, -quantity, 'ORDER_PLACEMENT', newOrder.id, newOrder.userId],
           );
           item.variantId = variant.id;
+          item.size = variant.size;
+          item.color = variant.color_name;
         }
 
         await client.query(`

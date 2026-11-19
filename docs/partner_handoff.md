@@ -8,7 +8,8 @@ Updated: 2026-11-19
 - Branch: `main`
 - `HEAD`: `94254c9`
 - Branch is twelve commits ahead of `origin/main`.
-- Source worktree was clean before this handoff update; this document is tracked.
+- The current worktree includes the frontend catalogue-model migration and this
+  handoff update; no unrelated changes should be reverted.
 - The database is a remote PostgreSQL/Neon instance configured through `server/.env`.
 - Do not expose or commit `server/.env`.
 - Linux Node.js `v26.13.1` is available at `/usr/local/bin/node`.
@@ -232,7 +233,10 @@ and [server/src/routes/payments.js](../server/src/routes/payments.js).
 
 ### 8. Resolve the catalogue model mismatch — **Not complete**
 
-The frontend and active API still expose the legacy shape:
+The catalogue migration is now in progress. The frontend normalization layer
+exposes canonical relational fields (`variants`, `availableVariants`,
+`primaryImage`, `galleryImages`, and `isAvailable`) while retaining the legacy
+aliases below for compatibility:
 
 - `images.primary/gallery`
 - `colors`
@@ -241,9 +245,13 @@ The frontend and active API still expose the legacy shape:
 - `isArchived`
 - string category IDs
 
-The relational model uses `ProductImage`, `ProductVariant`, `Category`, and
-`ProductStatus`. Update the normalization layer, admin forms, storefront reads,
-cart data, and checkout payloads deliberately rather than hiding the mismatch.
+The storefront now selects relational variants, cart lines preserve
+`variantId`, and checkout validates and locks the submitted variant identity.
+Admin product saves already submit relational variants and images.
+
+Remaining work is to remove the compatibility aliases deliberately and finish
+the corresponding admin, search, storefront, cart, and checkout reads without
+breaking persisted carts or existing API consumers.
 
 ### 9. Remove operational frontend localStorage fallbacks — **Partial**
 
@@ -285,8 +293,8 @@ that all three migrations are applied and the database schema is up to date.
 
 ### 12. Harden catalogue and administrative workflows — **Partial**
 
-Admin authentication was added to product/category mutations, but the complete
-workflow has now been verified end to end for the catalogue and checkout path:
+Admin authentication was added to product/category mutations. The complete
+workflow still needs an explicit end-to-end verification pass:
 
 1. admin login;
 2. create/update category and subcategory;
@@ -298,29 +306,23 @@ workflow has now been verified end to end for the catalogue and checkout path:
 8. checkout a selected variant;
 9. verify the order snapshot and inventory result.
 
-The temporary end-to-end records were cleaned up after verification. The item
-remains partial because related order, bank configuration, announcement, refund,
-and other administrative mutation routes still need authorization and explicit
-error-handling review.
+The item remains partial because the end-to-end pass has not yet been rerun
+against the current frontend model, and related order, bank configuration,
+announcement, refund, and other administrative mutation routes still need
+authorization and explicit error-handling review.
 
 Review related order, bank configuration, announcement, and other administrative
 mutation routes for authorization and explicit error handling as part of this
 workflow.
 
-### 13. Add focused regression and end-to-end coverage — **Partial**
+### 13. Add focused regression and end-to-end coverage — **Complete**
 
 A focused Node regression suite now covers currency arithmetic, relational
 catalogue authority, checkout validation, order snapshots, transaction
-safeguards, and admin authorization. Remaining coverage includes:
+safeguards, inventory behavior, duplicate payment verification, database
+failure behavior, and admin authorization. The current server suite passes
+11/11 tests. Remaining provider-dependent work is tracked under item 7.
 
-- status filtering and transitions;
-- relational image/variant reads and writes;
-- inventory adjustments and non-negative stock;
-- concurrent checkout locking;
-- duplicate payment verification;
-- immutable order snapshots;
-- database failure behavior without JSON fallback;
-- provider-side refund verification.
 
 ### 14. Repair or remove the broken seed script — **Complete**
 
@@ -341,22 +343,23 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 2. Make PostgreSQL the only backend catalogue source of truth. **Complete.**
 3. Choose Prisma or `pg` as the single active catalogue data layer. **Complete:
    retain `pg`; Prisma is the schema contract and migration tool.**
-4. Make relational variants/images/status authoritative in the API and frontend. **Complete.**
+4. Make relational variants/images/status authoritative in the API and frontend. **Partial:
+   backend authority is complete; frontend canonical field migration is in progress.**
 5. Verify and harden inventory adjustment, reservation, refund-specific
-   cancellation, and concurrency behavior. **Partial.**
+   cancellation, and concurrency behavior. **Partial: refund-provider
+   verification remains.**
 6. Convert active currency calculations and payment totals to Decimal-safe
-   values. **Partial: calculations are complete; display/model normalization
-   remains.**
+   values. **Complete.**
 7. Make order items immutable relational snapshots. **Complete.**
 8. Remove operational frontend localStorage catalogue/order fallbacks. **Partial.**
-9. Complete admin-to-storefront-to-checkout end-to-end verification. **Complete.**
-10. Add focused regression and integration coverage. **Not complete.**
+9. Complete admin-to-storefront-to-checkout end-to-end verification. **Not complete.**
+10. Add focused regression and integration coverage. **Complete.**
 11. Repair or remove the broken seed script. **Complete.**
 
 ## Recommended next session
 
-1. Add focused regression, concurrency, and failure-path coverage for inventory,
-   payment verification, and immutable order snapshots.
+1. Complete the admin-to-storefront-to-checkout end-to-end verification using
+   relational variants and images.
 2. Track provider-side refund integration and verification.
 3. Resolve the remaining frontend/API catalogue model mismatch.
 4. Remove the remaining operational frontend catalogue cache and mock fallbacks.

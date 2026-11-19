@@ -173,7 +173,7 @@ export default function ProductModal({ productId, closeModal }) {
 
   useEffect(() => {
     if (product) {
-      const primary = product.images?.primary || (typeof product.images === 'string' ? product.images : '/images/products/linen-set-1.jpg');
+      const primary = product.primaryImage || '/images/products/linen-set-1.jpg';
       setActiveImage(primary);
       const cols = Array.isArray(product.colors) ? product.colors : [];
       setSelectedColor(cols[0] || '');
@@ -221,9 +221,12 @@ export default function ProductModal({ productId, closeModal }) {
     );
   }
 
-  const primaryImg = product.images?.primary || (typeof product.images === 'string' ? product.images : '/images/products/linen-set-1.jpg');
-  const galleryImgs = Array.isArray(product.images?.gallery) ? product.images.gallery : [];
+  const primaryImg = product.primaryImage || '/images/products/linen-set-1.jpg';
+  const galleryImgs = Array.isArray(product.galleryImages) ? product.galleryImages : [];
   const allImages = [primaryImg, ...galleryImgs].filter(Boolean);
+  const selectedVariant = (product.variants || []).find(
+    variant => variant.size === selectedSize && variant.colorName === selectedColor,
+  );
 
   const handleQuantity = (type) => {
     if (type === 'inc') setQuantity(prev => prev + 1);
@@ -238,7 +241,7 @@ export default function ProductModal({ productId, closeModal }) {
     setSizeError(false);
     setIsAdding(true);
     setTimeout(() => {
-      addToCart(product, selectedSize, selectedColor, quantity);
+      addToCart(product, selectedSize, selectedColor, quantity, selectedVariant?.id || null);
       setIsAdding(false);
       closeModal();
       openCart();
@@ -253,7 +256,7 @@ export default function ProductModal({ productId, closeModal }) {
     }
     setSizeError(false);
     const colorToUse = activeCustomColor ? `${activeCustomColor} (Custom Color)` : selectedColor;
-    addToCart(product, selectedSize, colorToUse, quantity);
+    addToCart(product, selectedSize, colorToUse, quantity, selectedVariant?.id || null);
     closeModal();
     navigate('/checkout');
   };
@@ -679,7 +682,9 @@ export default function ProductModal({ productId, closeModal }) {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {globalSizes.map(size => {
-                  const isAvailable = (Array.isArray(product.availableSizes) ? product.availableSizes : []).includes(size);
+                  const isAvailable = (product.variants || []).some(
+                    variant => variant.size === size && Number(variant.stockQuantity) > 0,
+                  );
                   return (
                     <button
                       key={size}
