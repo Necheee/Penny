@@ -114,11 +114,6 @@ export default function Account() {
     }
   }, [user?.firstName, user?.lastName, user?.email, user?.phone]);
 
-  // If not logged in, redirect
-  if (!user) {
-    return <Navigate to="/account/login" replace />;
-  }
-
   const handleLogout = () => {
     logout();
     navigate('/');
@@ -485,6 +480,11 @@ export default function Account() {
       window.removeEventListener('penny_inquiry_updated', handleInquirySync);
     };
   }, [user?.email, user?.id]);
+
+  // If not logged in, redirect after all hooks have been declared.
+  if (!user) {
+    return <Navigate to="/account/login" replace />;
+  }
 
   const repliedInquiriesCount = userInquiries.filter(i => i.status === 'replied').length;
 
