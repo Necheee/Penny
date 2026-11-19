@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { formatMoney, multiplyMoney } from './money.js';
 
 let transporter = null;
 
@@ -63,7 +64,7 @@ export const generateOrderReceiptHtml = (order) => {
         <span style="font-size: 11px; color: #767471;">Size: ${item.size} • Color: ${item.color} • Qty: ${item.quantity}</span>
       </td>
       <td style="padding: 12px 0; text-align: right; font-size: 13px; color: #232220; font-family: monospace;">
-        ₦ ${(Number(item.price) * Number(item.quantity)).toLocaleString()}
+        ₦ ${formatMoney(multiplyMoney(item.price || 0, item.quantity || 1))}
       </td>
     </tr>
   `).join('');
@@ -124,15 +125,15 @@ export const generateOrderReceiptHtml = (order) => {
         <div style="border-top: 1px solid #e8e7e4; padding-top: 16px; margin-bottom: 32px;">
           <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; color: #555350;">
             <span>Subtotal:</span>
-            <span>₦ ${(Number(order.subtotal) || 0).toLocaleString()}</span>
+            <span>₦ ${formatMoney(order.subtotal || 0)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: #555350;">
             <span>Delivery Fee:</span>
-            <span>₦ ${(Number(order.deliveryFee) || 0).toLocaleString()}</span>
+            <span>₦ ${formatMoney(order.deliveryFee || 0)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; color: #232220; padding-top: 8px; border-top: 1px dashed #d5d3ce;">
             <span>Total Paid:</span>
-            <span style="font-family: monospace;">₦ ${(Number(order.total) || 0).toLocaleString()}</span>
+            <span style="font-family: monospace;">₦ ${formatMoney(order.total || 0)}</span>
           </div>
         </div>
       </div>
@@ -172,7 +173,7 @@ export const sendOrderConfirmationEmail = async (order) => {
   console.log(`To: ${order.customer} <${order.email}>`);
   console.log(`Subject: Official Receipt & Confirmation for Order ${order.id} - PENNY`);
   console.log(`Payment Status: VERIFIED & CONFIRMED (Bank Transfer)`);
-  console.log(`Total Amount: ₦${(Number(order.total) || 0).toLocaleString()}`);
+  console.log(`Total Amount: ₦${formatMoney(order.total || 0)}`);
   if (previewUrl) {
     console.log(`Live Preview URL: ${previewUrl}`);
   }

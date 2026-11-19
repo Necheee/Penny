@@ -42,6 +42,7 @@ import { generateOrderReceiptEmailHtml, generateInquiryReplyEmailHtml } from '..
 import FormattedMessage from '../components/common/FormattedMessage';
 import { useDialog } from '../context/DialogContext';
 import ProductFormModal from '../components/admin/ProductFormModal';
+import { addMoney, formatMoney, multiplyMoney } from '../utils/money';
 
 const adminAuthHeaders = () => {
   const token = localStorage.getItem('penny_admin_token');
@@ -320,7 +321,7 @@ export default function AdminDashboard() {
   };
 
   // Calculate Metrics
-  const totalRevenue = orders.reduce((sum, ord) => sum + ord.total, 0);
+  const totalRevenue = orders.reduce((sum, ord) => addMoney(sum, ord.total || 0), '0.00');
   const activeCount = productList.filter(p => !p.isArchived).length;
   const archivedCount = productList.filter(p => !!p.isArchived).length;
   const featuredCount = productList.filter(p => p.featured && !p.isArchived).length;
@@ -874,7 +875,7 @@ export default function AdminDashboard() {
                 <TrendingUp className="w-4 h-4 text-emerald-600" />
               </div>
               <p className="text-2xl font-serif font-bold text-brand-charcoal">
-                ₦ {totalRevenue.toLocaleString()}
+                ₦ {formatMoney(totalRevenue)}
               </p>
               <span className="text-[11px] text-emerald-700 font-medium mt-1 inline-flex items-center">
                 +14.2% from last week
@@ -956,7 +957,7 @@ export default function AdminDashboard() {
                       <td className="py-3.5 font-bold font-mono">{ord.id}</td>
                       <td className="py-3.5">{ord.customer}</td>
                       <td className="py-3.5 text-neutral-600">{ord.state}</td>
-                      <td className="py-3.5 font-serif font-bold">₦ {ord.total.toLocaleString()}</td>
+                      <td className="py-3.5 font-serif font-bold">₦ {formatMoney(ord.total)}</td>
                       <td className="py-3.5">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                           ord.status === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
@@ -1163,7 +1164,7 @@ export default function AdminDashboard() {
                         )}
                       </td>
                       <td className="py-3 px-4 font-serif font-bold text-sm text-brand-charcoal">
-                        ₦ {p.price.toLocaleString()}
+                        ₦ {formatMoney(p.price)}
                       </td>
                       {/* Status Column */}
                       <td className="py-3 px-4 text-center">
@@ -1855,7 +1856,7 @@ export default function AdminDashboard() {
                       {ord.address}, {ord.state}
                     </td>
                     <td className="py-4 px-4 font-serif font-bold text-sm text-brand-charcoal">
-                      ₦ {ord.total.toLocaleString()}
+                      ₦ {formatMoney(ord.total)}
                     </td>
                     <td className="py-4 px-4">
                       {ord.paymentConfirmed ? (
@@ -2619,13 +2620,13 @@ export default function AdminDashboard() {
                               )}
                             </td>
                             <td className="py-2.5 px-3 text-right font-serif">
-                              ₦ {item.price.toLocaleString()}
+                              ₦ {formatMoney(item.price)}
                             </td>
                             <td className="py-2.5 px-3 text-center font-mono font-bold">
                               {item.quantity}
                             </td>
                             <td className="py-2.5 px-3 text-right font-serif font-bold text-brand-charcoal">
-                              ₦ {(item.price * item.quantity).toLocaleString()}
+                              ₦ {formatMoney(multiplyMoney(item.price, item.quantity))}
                             </td>
                           </tr>
                         ))
@@ -2645,17 +2646,17 @@ export default function AdminDashboard() {
               <div className="border-t border-neutral-200 pt-4 flex flex-col items-end space-y-1.5 text-xs">
                 <div className="flex justify-between w-64 text-neutral-500">
                   <span>Subtotal:</span>
-                  <span className="font-serif">₦ {(selectedOrder.subtotal || selectedOrder.total).toLocaleString()}</span>
+                  <span className="font-serif">₦ {formatMoney(selectedOrder.subtotal || selectedOrder.total)}</span>
                 </div>
                 <div className="flex justify-between w-64 text-neutral-500">
                   <span>Standard Delivery:</span>
                   <span className="font-serif">
-                    {selectedOrder.deliveryFee ? `₦ ${selectedOrder.deliveryFee.toLocaleString()}` : 'Free'}
+                    {selectedOrder.deliveryFee ? `₦ ${formatMoney(selectedOrder.deliveryFee)}` : 'Free'}
                   </span>
                 </div>
                 <div className="flex justify-between w-64 text-sm font-bold text-brand-charcoal pt-2 border-t border-neutral-200">
                   <span>Total Paid:</span>
-                  <span className="font-serif text-base">₦ {selectedOrder.total.toLocaleString()}</span>
+                  <span className="font-serif text-base">₦ {formatMoney(selectedOrder.total)}</span>
                 </div>
               </div>
 

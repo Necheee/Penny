@@ -1,3 +1,5 @@
+import { formatMoney, multiplyMoney } from './money';
+
 /**
  * Email HTML Template Generators for Admin Preview & Dispatch
  * Matches PENNY brand guidelines: Clean typography, logo, luxury formatting.
@@ -14,9 +16,9 @@ export function generateOrderReceiptEmailHtml(order) {
   const paymentColor = order.paymentConfirmed ? '#15803d' : '#b45309';
   const addressStr = [order.address, order.city, order.state].filter(Boolean).join(', ') || 'Standard Lagos Delivery';
   const items = Array.isArray(order.items) && order.items.length > 0 ? order.items : [];
-  const subtotal = Number(order.subtotal || order.total || 0);
-  const deliveryFee = Number(order.deliveryFee || 0);
-  const total = Number(order.total || (subtotal + deliveryFee));
+  const subtotal = order.subtotal || order.total || '0.00';
+  const deliveryFee = order.deliveryFee || '0.00';
+  const total = order.total || subtotal;
 
   const itemsRows = items.length > 0 ? items.map(item => `
     <tr style="border-bottom: 1px solid #f0f0f0;">
@@ -25,7 +27,7 @@ export function generateOrderReceiptEmailHtml(order) {
         <span style="font-size: 11px; color: #767471;">Size: ${item.size || '—'} • Color: ${item.color || 'Standard'}${item.color && item.color.includes('(Custom Color)') ? ' <span style="background: #fef3c7; color: #78350f; font-size: 9px; padding: 1px 4px; border-radius: 2px; text-transform: uppercase; font-weight: bold; border: 1px solid #fde68a;">Custom Color</span>' : ''} • Qty: ${item.quantity || 1}</span>
       </td>
       <td style="padding: 12px 0; text-align: right; font-size: 13px; color: #232220; font-family: monospace;">
-        ₦ ${(Number(item.price || 0) * Number(item.quantity || 1)).toLocaleString()}
+        ₦ ${formatMoney(multiplyMoney(item.price || 0, item.quantity || 1))}
       </td>
     </tr>
   `).join('') : `
@@ -35,7 +37,7 @@ export function generateOrderReceiptEmailHtml(order) {
         <span style="font-size: 11px; color: #767471;">${order.itemsCount || 1} item(s)</span>
       </td>
       <td style="padding: 12px 0; text-align: right; font-size: 13px; color: #232220; font-family: monospace;">
-        ₦ ${total.toLocaleString()}
+        ₦ ${formatMoney(total)}
       </td>
     </tr>
   `;
@@ -100,15 +102,15 @@ export function generateOrderReceiptEmailHtml(order) {
     <div style="border-top: 1px solid #e8e7e4; padding-top: 16px;">
       <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; color: #555350;">
         <span>Subtotal:</span>
-        <span>₦ ${subtotal.toLocaleString()}</span>
+        <span>₦ ${formatMoney(subtotal)}</span>
       </div>
       <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: #555350;">
         <span>Standard Delivery:</span>
-        <span>${deliveryFee > 0 ? `₦ ${deliveryFee.toLocaleString()}` : 'Free'}</span>
+        <span>${deliveryFee !== '0.00' ? `₦ ${formatMoney(deliveryFee)}` : 'Free'}</span>
       </div>
       <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; color: #232220; padding-top: 8px; border-top: 1px dashed #d5d3ce;">
         <span>Total Paid:</span>
-        <span style="font-family: monospace;">₦ ${total.toLocaleString()}</span>
+        <span style="font-family: monospace;">₦ ${formatMoney(total)}</span>
       </div>
     </div>
   </div>

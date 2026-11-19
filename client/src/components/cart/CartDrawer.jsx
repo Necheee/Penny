@@ -2,14 +2,20 @@ import { useCart } from '../../context/CartContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Minus, ArrowRight, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { formatMoney, multiplyMoney, toMinorUnits, fromMinorUnits } from '../../utils/money';
 
 export default function CartDrawer() {
   const { isCartOpen, closeCart, cartItems, updateQuantity, removeFromCart, cartSubtotal } = useCart();
   const navigate = useNavigate();
 
   const FREE_SHIPPING_THRESHOLD = 200000;
-  const amountToFreeShipping = FREE_SHIPPING_THRESHOLD - cartSubtotal;
-  const progressPercentage = Math.min((cartSubtotal / FREE_SHIPPING_THRESHOLD) * 100, 100);
+  const amountToFreeShipping = fromMinorUnits(
+    toMinorUnits(FREE_SHIPPING_THRESHOLD) - toMinorUnits(cartSubtotal),
+  );
+  const progressPercentage = Math.min(
+    Number(toMinorUnits(cartSubtotal) * 10000n / toMinorUnits(FREE_SHIPPING_THRESHOLD)) / 100,
+    100,
+  );
 
   const handleCheckout = () => {
     closeCart();
@@ -59,7 +65,7 @@ export default function CartDrawer() {
               <div className="bg-brand-beige/20 p-4 border-b border-brand-charcoal/5 text-center">
                 <p className="text-xs font-bold tracking-widest uppercase text-brand-charcoal mb-2">
                   {amountToFreeShipping > 0 
-                    ? `You are ₦${amountToFreeShipping.toLocaleString()} away from free shipping` 
+                    ? `You are ₦${formatMoney(amountToFreeShipping)} away from free shipping`
                     : 'You have unlocked free shipping!'}
                 </p>
                 <div className="w-full h-1 bg-brand-charcoal/10 rounded-full overflow-hidden">
@@ -116,7 +122,7 @@ export default function CartDrawer() {
                           </button>
                         </div>
                         <p className="text-sm font-serif text-brand-charcoal">
-                          ₦ {(item.price * item.quantity).toLocaleString()}
+                          ₦ {formatMoney(multiplyMoney(item.price, item.quantity))}
                         </p>
                       </div>
                     </div>
@@ -130,7 +136,7 @@ export default function CartDrawer() {
               <div className="border-t border-brand-charcoal/10 p-6 bg-white space-y-4">
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-bold tracking-widest uppercase text-brand-charcoal text-xs">Subtotal</span>
-                  <span className="font-serif text-lg text-brand-charcoal">₦ {cartSubtotal.toLocaleString()}</span>
+                  <span className="font-serif text-lg text-brand-charcoal">₦ {formatMoney(cartSubtotal)}</span>
                 </div>
                 <p className="text-xs text-brand-taupe text-center">Shipping & taxes calculated at checkout.</p>
                 <button 

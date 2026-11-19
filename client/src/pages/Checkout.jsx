@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock, User, Printer, MapPin, Phone, Mail, Edit3, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { printOrderReceipt } from '../utils/printReceipt';
-import { fromMinorUnits, toMinorUnits } from '../utils/money';
+import { fromMinorUnits, formatMoney, toMinorUnits, multiplyMoney } from '../utils/money';
 
 const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
@@ -102,10 +102,10 @@ const Checkout = () => {
   // Dynamic Shipping Calculation according to Location & Policy
   const isLagos = formData.state === 'Lagos';
   const FREE_SHIPPING_THRESHOLD = 200000;
-  const isFreeStandardEligible = cartSubtotal >= FREE_SHIPPING_THRESHOLD;
+  const isFreeStandardEligible = toMinorUnits(cartSubtotal) >= toMinorUnits(FREE_SHIPPING_THRESHOLD);
 
   let shippingCost = 0;
-  if (cartSubtotal > 0) {
+  if (toMinorUnits(cartSubtotal) > 0n) {
     if (isLagos) {
       if (formData.shippingMethod === 'express') {
         shippingCost = 5000; // Lagos Express (Same day)
@@ -262,7 +262,7 @@ const Checkout = () => {
         const handler = window.PaystackPop.setup({
           key: initData.publicKey,
           email: formData.email,
-          amount: toMinorUnits(grandTotal), // in kobo
+          amount: Number(toMinorUnits(grandTotal)), // Paystack requires a JSON-safe integer amount in kobo
           currency: 'NGN',
           ref: transactionRef,
           metadata: {
@@ -435,7 +435,7 @@ const Checkout = () => {
           </div>
           <div className="flex justify-between pt-1">
             <span className="text-brand-charcoal/60 uppercase tracking-wider font-bold">Total Amount</span>
-            <span className="font-bold text-sm">₦ {grandTotal.toLocaleString()}</span>
+            <span className="font-bold text-sm">₦ {formatMoney(grandTotal)}</span>
           </div>
         </div>
 
@@ -835,7 +835,7 @@ const Checkout = () => {
                 <p>{formData.firstName} {formData.lastName}</p>
                 <p>{formData.address}, {formData.city}, {formData.state}</p>
                 <p className="text-[11px] font-sans uppercase tracking-wider text-brand-charcoal font-medium pt-1">
-                  Method: {isLagos && formData.shippingMethod === 'express' ? 'Lagos Express (Same Day)' : isLagos ? 'Lagos Standard (1-2 Days)' : 'Nationwide Delivery (3-5 Days)'} — {shippingCost === 0 ? 'Free' : `₦${shippingCost.toLocaleString()}`}
+                  Method: {isLagos && formData.shippingMethod === 'express' ? 'Lagos Express (Same Day)' : isLagos ? 'Lagos Standard (1-2 Days)' : 'Nationwide Delivery (3-5 Days)'} — {shippingCost === 0 ? 'Free' : `₦${formatMoney(shippingCost)}`}
                 </p>
               </div>
             ) : null}
@@ -897,7 +897,7 @@ const Checkout = () => {
                           : 'Nationwide Courier (3-5 Days)'}
                         {' • '}
                         <span className="font-bold text-brand-charcoal">
-                          {shippingCost === 0 ? 'FREE' : `₦${shippingCost.toLocaleString()}`}
+                          {shippingCost === 0 ? 'FREE' : `₦${formatMoney(shippingCost)}`}
                         </span>
                       </p>
                     </div>
@@ -1042,7 +1042,7 @@ const Checkout = () => {
                       <div className="p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xs text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
                         <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                         <span>
-                          <strong>Instructions:</strong> Please transfer the exact order total of <strong>₦ {grandTotal.toLocaleString()}</strong>. In your bank app transfer narration/remark, enter your name or order reference. Once confirmed by store admin, your receipt and dispatch email will be sent automatically.
+                          <strong>Instructions:</strong> Please transfer the exact order total of <strong>₦ {formatMoney(grandTotal)}</strong>. In your bank app transfer narration/remark, enter your name or order reference. Once confirmed by store admin, your receipt and dispatch email will be sent automatically.
                         </span>
                       </div>
                     </div>
@@ -1069,7 +1069,7 @@ const Checkout = () => {
                       isProcessing ? 'opacity-70 cursor-wait' : 'hover:bg-black'
                     }`}
                   >
-                    {isProcessing ? 'Authorizing Payment...' : `Complete Order • ₦ ${grandTotal.toLocaleString()}`}
+                    {isProcessing ? 'Authorizing Payment...' : `Complete Order • ₦ ${formatMoney(grandTotal)}`}
                   </button>
                   <button
                     type="button"
@@ -1111,7 +1111,7 @@ const Checkout = () => {
                     <p className="text-brand-charcoal/60 mt-0.5">Qty: {item.quantity}</p>
                   </div>
                   <div className="font-serif text-brand-charcoal text-right shrink-0">
-                    ₦ {(item.price * item.quantity).toLocaleString()}
+                    ₦ {formatMoney(multiplyMoney(item.price, item.quantity))}
                   </div>
                 </div>
               ))}
@@ -1121,7 +1121,7 @@ const Checkout = () => {
             <div className="border-t border-brand-charcoal/10 pt-4 space-y-2.5 text-xs">
               <div className="flex justify-between text-brand-charcoal/70">
                 <span>Subtotal</span>
-                <span className="font-serif text-brand-charcoal">₦ {cartSubtotal.toLocaleString()}</span>
+                <span className="font-serif text-brand-charcoal">₦ {formatMoney(cartSubtotal)}</span>
               </div>
               <div className="flex justify-between text-brand-charcoal/70 items-center">
                 <span className="flex items-center">
@@ -1131,20 +1131,20 @@ const Checkout = () => {
                   {shippingCost === 0 ? (
                     <span className="font-sans text-[11px] font-bold text-green-700 tracking-wider uppercase">Free</span>
                   ) : (
-                    `₦ ${shippingCost.toLocaleString()}`
+                    `₦ ${formatMoney(shippingCost)}`
                   )}
                 </span>
               </div>
               <div className="border-t border-brand-charcoal/10 pt-3 flex justify-between font-bold text-sm text-brand-charcoal">
                 <span className="uppercase tracking-wider">Total</span>
-                <span className="font-serif text-base">₦ {grandTotal.toLocaleString()}</span>
+                <span className="font-serif text-base">₦ {formatMoney(grandTotal)}</span>
               </div>
             </div>
 
             {/* Free Shipping Tip */}
             {shippingCost > 0 && (
               <p className="text-[11px] text-brand-taupe mt-4 font-serif text-center bg-brand-offwhite p-2 border border-brand-charcoal/5">
-                Orders over ₦{FREE_SHIPPING_THRESHOLD.toLocaleString()} qualify for complimentary delivery.
+                Orders over ₦{formatMoney(FREE_SHIPPING_THRESHOLD)} qualify for complimentary delivery.
               </p>
             )}
           </div>

@@ -67,7 +67,7 @@ const normalizeProduct = (p) => {
       primary: primaryImg,
       gallery: galleryImgs
     },
-    price: Number(p.price) || 0,
+    price: p.price ?? '0.00',
     inStock: hasRelationalVariants
       ? p.variants.some(variant => Number(variant.stockQuantity) > 0)
       : (p.inStock !== undefined ? !!p.inStock : true),

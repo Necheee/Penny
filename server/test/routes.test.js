@@ -37,6 +37,28 @@ test('currency values use exact minor-unit arithmetic', () => {
   );
 });
 
+test('product and order models preserve fixed two-decimal currency strings', () => {
+  const product = formatProductRow({
+    id: 'p-price',
+    name: 'Price Test',
+    price: '45000.5',
+    status: 'ACTIVE',
+  }, { images: [], variants: [] });
+  const order = mapDbOrder({
+    id: 'PNY-price',
+    subtotal: '45000.5',
+    delivery_fee: '5000',
+    total: '50000.5',
+    order_items: [{ id: 'item-price', unit_price: '45000.5', quantity: 1 }],
+  });
+
+  assert.equal(product.price, '45000.50');
+  assert.equal(order.subtotal, '45000.50');
+  assert.equal(order.deliveryFee, '5000.00');
+  assert.equal(order.total, '50000.50');
+  assert.equal(order.items[0].price, '45000.50');
+});
+
 test('relational product data remains authoritative, including empty relations', () => {
   const product = formatProductRow({
     id: 'p-1',
@@ -115,11 +137,11 @@ test('database orders preserve relational immutable item snapshots', () => {
     name: 'Snapshot Product',
     size: 'M',
     color: 'Black',
-    price: 50,
+    price: '50.00',
     quantity: 2,
     image: 'snapshot.jpg',
   });
-  assert.equal(order.total, 105);
+  assert.equal(order.total, '105.00');
 });
 
 test('checkout transaction retains concurrency, rollback, and duplicate-payment safeguards', () => {

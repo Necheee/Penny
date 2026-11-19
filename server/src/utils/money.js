@@ -24,3 +24,15 @@ export function minorUnitsToDecimal(value) {
   const fraction = String(absolute % MINOR_UNITS_PER_MAJOR).padStart(2, '0');
   return `${sign}${whole}.${fraction}`;
 }
+
+export function formatMoney(value) {
+  const decimal = minorUnitsToDecimal(toMinorUnits(value));
+  const [whole, fraction] = decimal.split('.');
+  const sign = whole.startsWith('-') ? '-' : '';
+  const unsignedWhole = sign ? whole.slice(1) : whole;
+  return `${sign}${unsignedWhole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${fraction}`;
+}
+
+export function multiplyMoney(value, quantity) {
+  return minorUnitsToDecimal(toMinorUnits(value) * BigInt(quantity));
+}

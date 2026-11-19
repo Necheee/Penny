@@ -172,20 +172,23 @@ The following items from the original handoff remain in scope. The statuses belo
 reflect the work completed since that handoff; none of these future areas should
 be considered removed.
 
-### 5. Use Decimal-safe currency values — **Partial**
+### 5. Use Decimal-safe currency values — **Complete**
 
 Database storage and Prisma models now use `Decimal(12, 2)`/`NUMERIC(12, 2)` for
 order and item currency values. Checkout subtotals, totals, Paystack amounts,
-and PostgreSQL order writes now use integer minor-unit arithmetic and fixed
-two-decimal values. Remaining work is to remove repeated `Number(...)`
-conversions from non-calculation display and model-normalization paths:
+and PostgreSQL order writes use integer minor-unit arithmetic and fixed
+two-decimal values. Active product/order models and display paths now preserve
+fixed two-decimal strings and use BigInt minor-unit helpers for arithmetic.
 
 - `Product.price`
 - `Order.subtotal`
 - `Order.deliveryFee`
 - `Order.total`
 - `OrderItem.unitPrice`
-- payment and checkout total calculations **Complete**
+- payment and checkout total calculations
+
+The remaining numeric conversions are limited to external API boundaries and
+legacy seed/input compatibility, not currency arithmetic or display formatting.
 
 Use database Decimal/Numeric values and avoid floating-point arithmetic for payment
 amounts.
@@ -354,7 +357,7 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 
 1. Add focused regression, concurrency, and failure-path coverage for inventory,
    payment verification, and immutable order snapshots.
-2. Finish Decimal-safe display/model normalization for product and order prices.
+2. Track provider-side refund integration and verification.
 3. Resolve the remaining frontend/API catalogue model mismatch.
 4. Remove the remaining operational frontend catalogue cache and mock fallbacks.
 5. Review administrative mutation routes for authorization and explicit error
@@ -379,7 +382,7 @@ Use the following three milestones to keep remaining work bounded:
      adjustments, status transitions, and admin authorization.
 
 3. **Follow-up cleanup**
-   - Finish Decimal-safe display normalization.
+   - Track provider-side refund integration and verification.
    - Finish the relational frontend/API model migration.
    - Remove remaining catalogue cache and local fallback authority.
    - Review refund and administrative mutation behavior for authorization and

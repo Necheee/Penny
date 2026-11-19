@@ -1,3 +1,5 @@
+import { formatMoney, multiplyMoney, toMinorUnits } from './money';
+
 /**
  * Utility to generate and print a clean, luxury receipt for orders.
  * Works seamlessly across both Admin and Customer views without cutting off content or printing background UI.
@@ -19,9 +21,9 @@ export function printOrderReceipt(order) {
   const paymentMethodLabel = order.paymentMethod === 'bank_transfer' ? 'Direct Bank Transfer' : 'Card / Online Payment';
   const paymentStatus = order.paymentConfirmed ? 'PAID & VERIFIED' : (order.status === 'Awaiting Payment' ? 'AWAITING BANK TRANSFER' : 'CONFIRMED');
   const items = Array.isArray(order.items) && order.items.length > 0 ? order.items : [];
-  const subtotal = Number(order.subtotal || order.total || 0);
-  const deliveryFee = Number(order.deliveryFee || 0);
-  const grandTotal = Number(order.total || (subtotal + deliveryFee));
+  const subtotal = order.subtotal || order.total || '0.00';
+  const deliveryFee = order.deliveryFee || '0.00';
+  const grandTotal = order.total || subtotal;
 
   const itemsHtml = items.length > 0 ? items.map((item, idx) => `
     <tr>
@@ -36,10 +38,10 @@ export function printOrderReceipt(order) {
         ${item.quantity || 1}
       </td>
       <td style="padding: 10px 12px; border-bottom: 1px solid #eee; text-align: right; font-size: 13px;">
-        ₦ ${(Number(item.price) || 0).toLocaleString()}
+        ₦ ${formatMoney(item.price || 0)}
       </td>
       <td style="padding: 10px 12px; border-bottom: 1px solid #eee; text-align: right; font-size: 13px; font-weight: bold;">
-        ₦ ${(Number(item.price || 0) * Number(item.quantity || 1)).toLocaleString()}
+        ₦ ${formatMoney(multiplyMoney(item.price || 0, item.quantity || 1))}
       </td>
     </tr>
   `).join('') : `
@@ -284,15 +286,15 @@ export function printOrderReceipt(order) {
           <div class="totals-box">
             <div class="totals-row">
               <span>Subtotal:</span>
-              <span>₦ ${subtotal.toLocaleString()}</span>
+              <span>₦ ${formatMoney(subtotal)}</span>
             </div>
             <div class="totals-row">
               <span>Standard Delivery:</span>
-              <span>${deliveryFee > 0 ? `₦ ${deliveryFee.toLocaleString()}` : 'Complimentary'}</span>
+              <span>${toMinorUnits(deliveryFee) > 0n ? `₦ ${formatMoney(deliveryFee)}` : 'Complimentary'}</span>
             </div>
             <div class="totals-grand">
               <span>Total Paid:</span>
-              <span>₦ ${grandTotal.toLocaleString()}</span>
+              <span>₦ ${formatMoney(grandTotal)}</span>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { Search, X, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useProducts } from '../../context/ProductContext';
 import { useModal } from '../../context/ModalContext';
+import { formatMoney } from '../../utils/money';
 
 export default function SearchModal({ isOpen, onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -207,7 +208,7 @@ export default function SearchModal({ isOpen, onClose }) {
                           {product.name}
                         </h4>
                         <p className="text-xs font-serif text-brand-charcoal/80 mt-1">
-                          ₦ {product.price?.toLocaleString()}
+                          ₦ {formatMoney(product.price)}
                         </p>
                       </div>
                     </div>

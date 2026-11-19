@@ -18,6 +18,7 @@ const getColorHex = (colorName) => {
 
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
+import { formatMoney, multiplyMoney } from '../../utils/money';
 import { useProducts } from '../../context/ProductContext';
 import SizeGuideModal from './SizeGuideModal';
 
@@ -347,7 +348,7 @@ export default function ProductModal({ productId, closeModal }) {
                 </span>
               ) : null}
               <h1 className="text-2xl font-serif text-brand-charcoal mb-2">{product.name}</h1>
-              <p className="text-lg font-serif text-brand-charcoal/80">₦ {(Number(product.price) || 0).toLocaleString()}</p>
+              <p className="text-lg font-serif text-brand-charcoal/80">₦ {formatMoney(product.price)}</p>
             </div>
             <button 
               onClick={() => toggleWishlist(product)}
@@ -775,7 +776,7 @@ export default function ProductModal({ productId, closeModal }) {
                 product.isArchived || !product.inStock ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
-              <Zap className="w-4 h-4 text-amber-300" /> Buy Now - ₦{((Number(product.price) || 0) * quantity).toLocaleString()}
+              <Zap className="w-4 h-4 text-amber-300" /> Buy Now - ₦{formatMoney(multiplyMoney(product.price, quantity))}
             </button>
           </div>
         </div>
@@ -831,7 +832,7 @@ export default function ProductModal({ productId, closeModal }) {
                   )}
 
                   <p className="text-xs md:text-sm text-brand-charcoal/80 font-serif">
-                    ₦ {(Number(simProduct.price) || 0).toLocaleString()}
+                    ₦ {formatMoney(simProduct.price)}
                   </p>
                 </div>
               );

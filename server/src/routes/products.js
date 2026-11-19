@@ -3,10 +3,15 @@ import crypto from 'crypto';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { getPool } from '../utils/cloudDb.js';
 import { deleteR2Object } from '../utils/r2.js';
+import { minorUnitsToDecimal, toMinorUnits } from '../utils/money.js';
 
 const router = express.Router();
 
 const hasDatabase = () => Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'));
+
+function normalizePrice(value) {
+  return minorUnitsToDecimal(toMinorUnits(value));
+}
 
 async function syncProductRelations(pool, productId, { images, variants }) {
   const client = await pool.connect();
@@ -137,7 +142,7 @@ export function formatProductRow(row, relations = {}) {
     category: row.category,
     subcategory: row.subcategory || '',
     subtype: row.subtype || '',
-    price: Number(row.price) || 0,
+    price: normalizePrice(row.price ?? 0),
     description: row.description || '',
     material: row.material || '100% Cotton',
     fit: row.fit || 'Relaxed fit',
@@ -356,7 +361,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       category: category || 'tops',
       subcategory: typeof subcategory === 'string' ? subcategory : subcategory?.name || '',
       subtype: subtype || '',
-      price: Number(price) || 0,
+      price: normalizePrice(price),
       description: description || '',
       material: material || '100% Cotton',
       fit: fit || 'Relaxed fit',
@@ -513,7 +518,7 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
     const updated = {
       ...existing,
       ...body,
-      price: body.price !== undefined ? Number(body.price) : existing.price,
+      price: body.price !== undefined ? normalizePrice(body.price) : existing.price,
       subcategory: body.subcategory !== undefined
         ? (typeof body.subcategory === 'string' ? body.subcategory : body.subcategory?.name || '')
         : existing.subcategory,

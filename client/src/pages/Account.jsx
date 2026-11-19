@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { printOrderReceipt } from '../utils/printReceipt';
+import { formatMoney, multiplyMoney } from '../utils/money';
 import FormattedMessage from '../components/common/FormattedMessage';
 import { useDialog } from '../context/DialogContext';
 
@@ -1064,7 +1065,7 @@ export default function Account() {
 
                                     <div className="text-right shrink-0">
                                       <p className="font-serif font-bold text-xs text-brand-charcoal">
-                                        ₦ {Number((item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                                        ₦ {formatMoney(multiplyMoney(item.price || 0, item.quantity || 1))}
                                       </p>
                                     </div>
                                   </div>
@@ -1122,7 +1123,7 @@ export default function Account() {
                                     Order Total
                                   </span>
                                   <span className="font-serif font-bold text-base text-brand-charcoal">
-                                    ₦ {Number(ord.total || 0).toLocaleString()}
+                                    ₦ {formatMoney(ord.total || 0)}
                                   </span>
                                 </div>
                               </div>
@@ -1513,7 +1514,7 @@ export default function Account() {
                             {/* Ordered Items Preview */}
                             <div className="pt-2 flex flex-wrap items-center justify-between gap-4 text-xs">
                               <span className="text-neutral-500 font-serif">
-                                Package Contents: <strong>{ord.items?.length || ord.itemsCount || 1}</strong> piece(s) • Total Paid: <strong className="font-sans text-brand-charcoal">₦ {Number(ord.total || 0).toLocaleString()}</strong>
+                                Package Contents: <strong>{ord.items?.length || ord.itemsCount || 1}</strong> piece(s) • Total Paid: <strong className="font-sans text-brand-charcoal">                                ₦ {formatMoney(ord.total || 0)}</strong>
                               </span>
                               <Link
                                 to="/contact"

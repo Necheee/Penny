@@ -4,6 +4,7 @@ import { useModal } from '../../context/ModalContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { useCart } from '../../context/CartContext';
 import { Heart, Zap } from 'lucide-react';
+import { formatMoney } from '../../utils/money';
 
 // Helper to map color names to simple hex values for the swatches
 const getColorHex = (colorName) => {
@@ -85,7 +86,7 @@ export default function ProductCard({ product }) {
       )}
       
       <p className="text-sm text-brand-charcoal/70 mb-2 font-serif">
-        ₦ {product.price.toLocaleString()}
+        ₦ {formatMoney(product.price)}
       </p>
       
       {/* Visual Color Swatches & Buy Now Button */}

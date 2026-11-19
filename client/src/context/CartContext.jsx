@@ -159,7 +159,7 @@ export function CartProvider({ children }) {
   const cartSubtotal = useMemo(() => {
     const subtotalMinorUnits = cartItems.reduce(
       (total, item) => total + (toMinorUnits(item.price) * item.quantity),
-      0,
+      0n,
     );
     return fromMinorUnits(subtotalMinorUnits);
   }, [cartItems]);
