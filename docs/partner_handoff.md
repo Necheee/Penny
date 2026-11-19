@@ -63,10 +63,10 @@ Active catalogue routes still use handwritten `pg` queries and legacy fields:
 - [server/src/routes/categories.js](../server/src/routes/categories.js)
 - [server/src/utils/cloudDb.js](../server/src/utils/cloudDb.js)
 
-Product catalogue routes no longer use operational JSON/in-memory fallbacks, and
-database initialization no longer seeds products or categories from JSON files.
-Category routes still retain legacy local persistence and fallback behavior and
-must be migrated separately.
+Product and category catalogue routes no longer use operational JSON/in-memory
+fallbacks, and database initialization no longer seeds products or categories
+from JSON files. Other administrative content still uses its existing storage
+paths and is outside this catalogue-source change.
 
 Prisma models are defined in
 [server/prisma/schema.prisma](../server/prisma/schema.prisma), but application
@@ -93,11 +93,11 @@ from `DATABASE_URL` there and is no longer declared in the Prisma schema.
 
 ## What remains
 
-### 1. Make PostgreSQL the only catalogue source of truth — **Partial**
+### 1. Make PostgreSQL the only catalogue source of truth — **Complete**
 
-Product routes now make database errors explicit and no longer read/write the
-catalogue JSON cache. Complete the same conversion for category routes. Keep
-any frontend cache read-only and non-authoritative.
+Product and category routes now make database errors explicit and no longer
+read/write catalogue JSON caches. Keep any frontend cache read-only and
+non-authoritative.
 
 Primary files:
 
@@ -293,10 +293,10 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 
 ## Recommended next session
 
-1. Reconcile `_prisma_migrations` safely.
-2. Add focused tests or a controlled smoke test for the migrated catalogue.
-3. Remove the remaining category backend JSON and in-memory operational fallbacks.
-4. Verify admin login → category save → product/variant save → storefront read.
+1. Reconcile `_prisma_migrations` safely. **Complete.**
+2. Add focused tests or a controlled smoke test for the migrated catalogue. **Category GET smoke test complete.**
+3. Remove the remaining category backend JSON and in-memory operational fallbacks. **Complete.**
+4. Verify admin login → category save → product/variant save → storefront read. **Next.**
 5. Only then begin the order schema and frontend `localStorage` work.
 6. Repair or remove the missing `prisma/seed.js` script. **Complete.**
 

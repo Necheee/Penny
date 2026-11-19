@@ -1,29 +1,50 @@
 import express from 'express';
-import { initialCategories, initialSizeGuides } from '../data/initialCatalogue.js';
+import { initialSizeGuides } from '../data/initialCatalogue.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Active persistent storage for categories and size guides
-let categories = (readJsonFile('categories.json', initialCategories) || initialCategories)
-  .filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets');
 let sizeGuides = (readJsonFile('sizeGuides.json', initialSizeGuides) || initialSizeGuides)
   .filter(sg => sg.category !== 'sets' && sg.category !== 'tops' && sg.category !== 'bottoms');
 
-// Ensure initial categories always have their subcategories array
-categories = categories
-  .filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets')
-  .map(cat => {
-    const initial = initialCategories.find(ic => ic.id === cat.id || ic.slug === cat.slug);
-    return {
-      ...cat,
-      subcategories: Array.isArray(cat.subcategories) && cat.subcategories.length > 0
-        ? cat.subcategories
-        : (initial?.subcategories || [])
-    };
+const hasDatabase = () => Boolean(process.env.DATABASE_URL?.startsWith('postgres'));
+
+function requireDatabase(res) {
+  if (hasDatabase()) return true;
+  res.status(503).json({
+    success: false,
+    message: 'Category operations require the PostgreSQL database.',
   });
+  return false;
+}
+
+function formatCategoryRow(row) {
+  let subcategories = row.subcategories;
+  if (typeof subcategories === 'string') {
+    try { subcategories = JSON.parse(subcategories); } catch { subcategories = []; }
+  }
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug || row.id,
+    displayOrder: row.display_order || 1,
+    subcategories: Array.isArray(subcategories) ? subcategories : [],
+  };
+}
+
+async function findCategory(pool, id) {
+  const result = await pool.query(
+    "SELECT * FROM categories WHERE (id = $1 OR slug = $1) AND id != 'sets' AND slug != 'two-piece-sets' LIMIT 1",
+    [id],
+  );
+  return result.rows[0] ? formatCategoryRow(result.rows[0]) : null;
+}
+
+const getSubName = (subcategory) => (
+  typeof subcategory === 'string' ? subcategory : subcategory?.name || ''
+).trim();
 
 /**
  * GET /api/categories
@@ -31,70 +52,35 @@ categories = categories
  */
 router.get('/', async (req, res) => {
   try {
-    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-      const pool = getPool();
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS categories (
-          id VARCHAR(100) PRIMARY KEY,
-          name VARCHAR(100) NOT NULL,
-          slug VARCHAR(100),
-          display_order INTEGER DEFAULT 1,
-          subcategories JSONB DEFAULT '[]'::jsonb
-        );
-        ALTER TABLE categories ADD COLUMN IF NOT EXISTS subcategories JSONB DEFAULT '[]'::jsonb;
-        ALTER TABLE categories ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 1;
-      `);
-      // Delete obsolete categories (e.g. sets / two-piece-sets) permanently from database
-      await pool.query("DELETE FROM categories WHERE id = 'sets' OR slug = 'two-piece-sets'").catch(() => {});
+    if (!requireDatabase(res)) return;
+    const pool = getPool();
+    await pool.query("DELETE FROM categories WHERE id = 'sets' OR slug = 'two-piece-sets'");
+    const dbRes = await pool.query(
+      "SELECT * FROM categories WHERE id != 'sets' AND slug != 'two-piece-sets' ORDER BY display_order ASC",
+    );
+    const categories = dbRes.rows.map(formatCategoryRow);
 
-      const dbRes = await pool.query("SELECT * FROM categories WHERE id != 'sets' AND slug != 'two-piece-sets' ORDER BY display_order ASC");
-      if (dbRes.rows && dbRes.rows.length > 0) {
-        categories = dbRes.rows.map(r => {
-          let subs = [];
-          if (Array.isArray(r.subcategories)) {
-            subs = r.subcategories;
-          } else if (typeof r.subcategories === 'string') {
-            try { subs = JSON.parse(r.subcategories); } catch {}
-          }
-          return {
-            id: r.id,
-            name: r.name,
-            slug: r.slug || r.id,
-            displayOrder: r.display_order || 1,
-            subcategories: Array.isArray(subs) ? subs : [],
-          };
-        }).filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets').sort((a, b) => (a.displayOrder || 1) - (b.displayOrder || 1));
-        writeJsonFile('categories.json', categories);
-      } else {
-        // Table is empty! First-time seed initial categories into database
-        for (const ic of initialCategories.filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets')) {
-          await pool.query(`
-            INSERT INTO categories (id, name, slug, display_order, subcategories)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (id) DO NOTHING
-          `, [ic.id, ic.name, ic.slug, ic.displayOrder || 1, JSON.stringify(ic.subcategories || [])]).catch(() => {});
-        }
-        categories = initialCategories.filter(c => c.id !== 'sets' && c.slug !== 'two-piece-sets');
-        writeJsonFile('categories.json', categories);
-      }
-    }
+    return res.status(200).json({
+      success: true,
+      count: categories.length,
+      data: categories,
+    });
   } catch (err) {
-    // Fallback to cached file
+    console.error('[CATEGORIES] Database read failed:', err.message);
+    return res.status(503).json({
+      success: false,
+      message: 'Failed to retrieve categories from the database.',
+    });
   }
-
-  return res.status(200).json({
-    success: true,
-    count: categories.length,
-    data: categories,
-  });
 });
 
 /**
  * POST /api/categories
- * Add a new category (Persists to local storage & cloud DB)
+ * Add a new category.
  */
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!requireDatabase(res)) return;
     const { name, slug, subcategories: rawSubs } = req.body;
 
     if (!name || !name.trim()) {
@@ -107,9 +93,13 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
     const trimmedName = name.trim();
     const generatedSlug = slug?.trim() || trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const newId = generatedSlug;
+    const pool = getPool();
 
-    // Check if category already exists
-    if (categories.some(c => c.id === newId || c.slug === generatedSlug)) {
+    const duplicate = await pool.query(
+      'SELECT 1 FROM categories WHERE id = $1 OR slug = $1 LIMIT 1',
+      [generatedSlug],
+    );
+    if (duplicate.rows.length > 0) {
       return res.status(400).json({
         success: false,
         message: `Category with slug '${generatedSlug}' already exists.`,
@@ -123,39 +113,21 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       parsedSubs = rawSubs.split(',').map(s => s.trim()).filter(Boolean);
     }
 
-    const newCategory = {
-      id: newId,
-      name: trimmedName,
-      slug: generatedSlug,
-      displayOrder: categories.length + 1,
-      subcategories: parsedSubs,
-    };
-
-    categories.push(newCategory);
-    writeJsonFile('categories.json', categories);
-
-    try {
-      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-        const pool = getPool();
-        await pool.query(`
-          INSERT INTO categories (id, name, slug, display_order, subcategories)
-          VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            slug = EXCLUDED.slug,
-            display_order = EXCLUDED.display_order,
-            subcategories = EXCLUDED.subcategories;
-        `, [
-          newCategory.id,
-          newCategory.name,
-          newCategory.slug,
-          newCategory.displayOrder,
-          JSON.stringify(newCategory.subcategories)
-        ]);
-      }
-    } catch (e) {
-      console.warn('[CATEGORIES] DB category sync warning:', e.message);
-    }
+    const nextOrder = await pool.query(
+      'SELECT COALESCE(MAX(display_order), 0) + 1 AS next_order FROM categories',
+    );
+    const result = await pool.query(`
+      INSERT INTO categories (id, name, slug, display_order, subcategories)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [
+      newId,
+      trimmedName,
+      generatedSlug,
+      Number(nextOrder.rows[0].next_order),
+      JSON.stringify(parsedSubs),
+    ]);
+    const newCategory = formatCategoryRow(result.rows[0]);
 
     return res.status(201).json({
       success: true,
@@ -163,10 +135,10 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       data: newCategory,
     });
   } catch (error) {
-    console.error('Error creating category:', error);
-    return res.status(500).json({
+    console.error('[CATEGORIES] Database create failed:', error.message);
+    return res.status(503).json({
       success: false,
-      message: 'Failed to create category.',
+      message: 'Category could not be saved to the database.',
     });
   }
 });
@@ -177,10 +149,12 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
  */
 router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!requireDatabase(res)) return;
     const { id } = req.params;
     const { name, slug, displayOrder, subcategories: rawSubs } = req.body;
+    const pool = getPool();
 
-    const category = categories.find(c => c.id === id || c.slug === id);
+    const category = await findCategory(pool, id);
     if (!category) {
       return res.status(404).json({
         success: false,
@@ -206,38 +180,31 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
       }).filter(s => s.name);
     }
 
-    writeJsonFile('categories.json', categories);
-
-    try {
-      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-        const pool = getPool();
-        await pool.query(
-          `UPDATE categories 
-           SET name = $1, slug = $2, display_order = $3, subcategories = $4 
-           WHERE id = $5 OR slug = $5`,
-          [
-            category.name,
-            category.slug || category.id,
-            category.displayOrder || 1,
-            JSON.stringify(category.subcategories),
-            category.id
-          ]
-        );
-      }
-    } catch (e) {
-      console.warn('[CATEGORIES] DB category update warning:', e.message);
-    }
+    const result = await pool.query(
+      `UPDATE categories
+       SET name = $1, slug = $2, display_order = $3, subcategories = $4
+       WHERE id = $5
+       RETURNING *`,
+      [
+        category.name,
+        category.slug || category.id,
+        category.displayOrder || 1,
+        JSON.stringify(category.subcategories),
+        category.id,
+      ],
+    );
+    const updatedCategory = formatCategoryRow(result.rows[0]);
 
     return res.status(200).json({
       success: true,
-      message: `Category '${category.name}' updated successfully.`,
-      data: category,
+      message: `Category '${updatedCategory.name}' updated successfully.`,
+      data: updatedCategory,
     });
   } catch (error) {
-    console.error('Error updating category:', error);
-    return res.status(500).json({
+    console.error('[CATEGORIES] Database update failed:', error.message);
+    return res.status(503).json({
       success: false,
-      message: 'Failed to update category.',
+      message: 'Category could not be updated in the database.',
     });
   }
 });
@@ -248,6 +215,7 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
  */
 router.post('/:id/subcategories', requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!requireDatabase(res)) return;
     const { id } = req.params;
     const subcategoryName = (req.body.subcategory || req.body.name || '').trim();
     const rawSubtypes = req.body.subtypes || [];
@@ -259,7 +227,8 @@ router.post('/:id/subcategories', requireAuth, requireAdmin, async (req, res) =>
       });
     }
 
-    const category = categories.find(c => c.id === id || c.slug === id);
+    const pool = getPool();
+    const category = await findCategory(pool, id);
     if (!category) {
       return res.status(404).json({
         success: false,
@@ -270,8 +239,6 @@ router.post('/:id/subcategories', requireAuth, requireAdmin, async (req, res) =>
     if (!Array.isArray(category.subcategories)) {
       category.subcategories = [];
     }
-
-    const getSubName = (s) => (typeof s === 'string' ? s : s?.name || '').trim();
 
     // Check for duplicate (case-insensitive)
     const exists = category.subcategories.some(s => getSubName(s).toLowerCase() === subcategoryName.toLowerCase());
@@ -288,30 +255,22 @@ router.post('/:id/subcategories', requireAuth, requireAdmin, async (req, res) =>
     };
 
     category.subcategories.push(newSubObj);
-    writeJsonFile('categories.json', categories);
-
-    try {
-      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-        const pool = getPool();
-        await pool.query(
-          'UPDATE categories SET subcategories = $1 WHERE id = $2 OR slug = $2',
-          [JSON.stringify(category.subcategories), category.id]
-        );
-      }
-    } catch (e) {
-      console.warn('[CATEGORIES] DB subcategory add warning:', e.message);
-    }
+    const result = await pool.query(
+      'UPDATE categories SET subcategories = $1 WHERE id = $2 RETURNING *',
+      [JSON.stringify(category.subcategories), category.id],
+    );
+    const updatedCategory = formatCategoryRow(result.rows[0]);
 
     return res.status(200).json({
       success: true,
-      message: `Subcategory '${subcategoryName}' added to ${category.name}.`,
-      data: category,
+      message: `Subcategory '${subcategoryName}' added to ${updatedCategory.name}.`,
+      data: updatedCategory,
     });
   } catch (error) {
-    console.error('Error adding subcategory:', error);
-    return res.status(500).json({
+    console.error('[CATEGORIES] Database subcategory add failed:', error.message);
+    return res.status(503).json({
       success: false,
-      message: 'Failed to add subcategory.',
+      message: 'Subcategory could not be saved to the database.',
     });
   }
 });
@@ -322,12 +281,13 @@ router.post('/:id/subcategories', requireAuth, requireAdmin, async (req, res) =>
  */
 router.put('/:id/subcategories/:subName', requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!requireDatabase(res)) return;
     const { id, subName } = req.params;
     const { newName, subtypes } = req.body;
     const targetSub = decodeURIComponent(subName).trim().toLowerCase();
-    const getSubName = (s) => (typeof s === 'string' ? s : s?.name || '').trim();
+    const pool = getPool();
 
-    const category = categories.find(c => c.id === id || c.slug === id);
+    const category = await findCategory(pool, id);
     if (!category) {
       return res.status(404).json({
         success: false,
@@ -356,30 +316,22 @@ router.put('/:id/subcategories/:subName', requireAuth, requireAdmin, async (req,
     };
 
     category.subcategories[subIndex] = updatedSub;
-    writeJsonFile('categories.json', categories);
-
-    try {
-      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-        const pool = getPool();
-        await pool.query(
-          'UPDATE categories SET subcategories = $1 WHERE id = $2 OR slug = $2',
-          [JSON.stringify(category.subcategories), category.id]
-        );
-      }
-    } catch (e) {
-      console.warn('[CATEGORIES] DB subcategory update warning:', e.message);
-    }
+    const result = await pool.query(
+      'UPDATE categories SET subcategories = $1 WHERE id = $2 RETURNING *',
+      [JSON.stringify(category.subcategories), category.id],
+    );
+    const updatedCategory = formatCategoryRow(result.rows[0]);
 
     return res.status(200).json({
       success: true,
-      message: `Subcategory updated in ${category.name}.`,
-      data: category,
+      message: `Subcategory updated in ${updatedCategory.name}.`,
+      data: updatedCategory,
     });
   } catch (error) {
-    console.error('Error updating subcategory:', error);
-    return res.status(500).json({
+    console.error('[CATEGORIES] Database subcategory update failed:', error.message);
+    return res.status(503).json({
       success: false,
-      message: 'Failed to update subcategory.',
+      message: 'Subcategory could not be updated in the database.',
     });
   }
 });
@@ -390,11 +342,12 @@ router.put('/:id/subcategories/:subName', requireAuth, requireAdmin, async (req,
  */
 router.delete('/:id/subcategories/:subName', requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!requireDatabase(res)) return;
     const { id, subName } = req.params;
     const targetSub = decodeURIComponent(subName).trim().toLowerCase();
-    const getSubName = (s) => (typeof s === 'string' ? s : s?.name || '').trim();
+    const pool = getPool();
 
-    const category = categories.find(c => c.id === id || c.slug === id);
+    const category = await findCategory(pool, id);
     if (!category) {
       return res.status(404).json({
         success: false,
@@ -407,30 +360,22 @@ router.delete('/:id/subcategories/:subName', requireAuth, requireAdmin, async (r
     }
 
     category.subcategories = category.subcategories.filter(s => getSubName(s).toLowerCase() !== targetSub);
-    writeJsonFile('categories.json', categories);
-
-    try {
-      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-        const pool = getPool();
-        await pool.query(
-          'UPDATE categories SET subcategories = $1 WHERE id = $2 OR slug = $2',
-          [JSON.stringify(category.subcategories), category.id]
-        );
-      }
-    } catch (e) {
-      console.warn('[CATEGORIES] DB subcategory delete warning:', e.message);
-    }
+    const result = await pool.query(
+      'UPDATE categories SET subcategories = $1 WHERE id = $2 RETURNING *',
+      [JSON.stringify(category.subcategories), category.id],
+    );
+    const updatedCategory = formatCategoryRow(result.rows[0]);
 
     return res.status(200).json({
       success: true,
-      message: `Subcategory '${subName}' removed from ${category.name}.`,
-      data: category,
+      message: `Subcategory '${subName}' removed from ${updatedCategory.name}.`,
+      data: updatedCategory,
     });
   } catch (error) {
-    console.error('Error removing subcategory:', error);
-    return res.status(500).json({
+    console.error('[CATEGORIES] Database subcategory delete failed:', error.message);
+    return res.status(503).json({
       success: false,
-      message: 'Failed to delete subcategory.',
+      message: 'Subcategory could not be deleted from the database.',
     });
   }
 });
@@ -441,22 +386,20 @@ router.delete('/:id/subcategories/:subName', requireAuth, requireAdmin, async (r
  */
 router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!requireDatabase(res)) return;
     const { id } = req.params;
-    const index = categories.findIndex(c => c.id === id || c.slug === id);
-    const removed = index !== -1 ? categories.splice(index, 1)[0] : { id };
-    
-    // Always filter to ensure completely removed
-    categories = categories.filter(c => c.id !== id && c.slug !== id);
-    writeJsonFile('categories.json', categories);
-
-    try {
-      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-        const pool = getPool();
-        await pool.query('DELETE FROM categories WHERE id = $1 OR slug = $1', [id]);
-      }
-    } catch (e) {
-      console.warn('[CATEGORIES] DB category delete warning:', e.message);
+    const pool = getPool();
+    const result = await pool.query(
+      'DELETE FROM categories WHERE id = $1 OR slug = $1 RETURNING *',
+      [id],
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `Category '${id}' not found.`,
+      });
     }
+    const removed = formatCategoryRow(result.rows[0]);
 
     return res.status(200).json({
       success: true,
@@ -464,10 +407,10 @@ router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
       data: removed,
     });
   } catch (error) {
-    console.error('Error removing category:', error);
-    return res.status(500).json({
+    console.error('[CATEGORIES] Database delete failed:', error.message);
+    return res.status(503).json({
       success: false,
-      message: 'Failed to delete category.',
+      message: 'Category could not be deleted from the database.',
     });
   }
 });
