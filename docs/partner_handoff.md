@@ -26,6 +26,11 @@ Recent commits:
 The migration in [server/prisma/migrations/0001_catalogue_foundation/migration.sql](../server/prisma/migrations/0001_catalogue_foundation/migration.sql)
 was applied successfully on 2026-11-18 after a database backup was confirmed.
 
+The migration in [server/prisma/migrations/0002_relational_order_snapshots/migration.sql](../server/prisma/migrations/0002_relational_order_snapshots/migration.sql)
+was applied successfully with `prisma migrate deploy` on 2026-11-19.
+`prisma migrate status` reports that the database is up to date with both
+migrations.
+
 Verified live data after migration:
 
 - `products`: 38 rows
@@ -86,6 +91,9 @@ from `DATABASE_URL` there and is no longer declared in the Prisma schema.
 - Inventory adjustment records and an admin adjustment endpoint exist.
 - Checkout stock locking/decrement logic was added.
 - The catalogue migration has been applied and verified against live data.
+- The relational order snapshot migration has been applied and verified.
+- Existing orders were backfilled into `order_items`.
+- Order totals and item unit prices use `NUMERIC(12, 2)` in PostgreSQL.
 - Prisma 7 is configured for migration/deployment tooling with
   `server/prisma.config.ts`.
 - `npm run prisma:validate` passes.
@@ -137,10 +145,12 @@ The following items from the original handoff remain in scope. The statuses belo
 reflect the work completed since that handoff; none of these future areas should
 be considered removed.
 
-### 5. Use Decimal-safe currency values — **Not complete**
+### 5. Use Decimal-safe currency values — **Partial**
 
-Currency is still represented as floating-point values in the Prisma order models
-and is repeatedly converted with `Number(...)` in the API. Review and migrate:
+Database storage and Prisma models now use `Decimal(12, 2)`/`NUMERIC(12, 2)` for
+order and item currency values. Remaining work is to remove repeated
+`Number(...)` conversions and floating-point arithmetic from payment and checkout
+calculations:
 
 - `Product.price`
 - `Order.subtotal`
@@ -152,12 +162,14 @@ and is repeatedly converted with `Number(...)` in the API. Review and migrate:
 Use database Decimal/Numeric values and avoid floating-point arithmetic for payment
 amounts.
 
-### 6. Make order snapshots relational and immutable — **Partial, unsafe**
+### 6. Make order snapshots relational and immutable — **Complete**
 
-Orders still store item snapshots in the JSON `orders.items` column. The Prisma
-`OrderItem` model exists but is not used by the active payment/order routes.
+The active payment transaction now writes relational `order_items` alongside
+the order header. Existing orders were backfilled from `orders.items`. The legacy
+JSON column remains temporarily for backward-compatible reads during the
+application transition.
 
-Implement relational order items containing immutable purchase-time snapshots:
+Relational order items contain purchase-time snapshots:
 
 - product ID when available
 - product name
@@ -288,8 +300,8 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 4. Make relational variants/images/status authoritative in the API and frontend.
 5. Verify and harden inventory adjustment, reservation, cancellation, and
    concurrency behavior.
-6. Convert currency calculations and stored order amounts to Decimal-safe values.
-7. Make order items immutable relational snapshots.
+6. Convert active currency calculations and payment totals to Decimal-safe values.
+7. Make order items immutable relational snapshots. **Complete.**
 8. Remove operational frontend localStorage catalogue/order fallbacks.
 9. Complete admin-to-storefront-to-checkout end-to-end verification.
 10. Add focused regression and integration coverage.
@@ -301,7 +313,7 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 2. Add focused tests or a controlled smoke test for the migrated catalogue. **Category GET smoke test complete.**
 3. Remove the remaining category backend JSON and in-memory operational fallbacks. **Complete.**
 4. Verify admin login → category save → product/variant save → storefront read. **Complete.**
-5. Begin the order schema work; relational order snapshot migration and write path are **In progress**. Existing order reads and legacy JSON cleanup remain.
+5. Begin the order schema work; relational order snapshot migration and write path are **Complete**. Existing order reads and legacy JSON cleanup remain.
 6. Repair or remove the missing `prisma/seed.js` script. **Complete.**
 
 ## Validation notes
@@ -313,6 +325,13 @@ The following live checks were completed with `psql`:
 - Product/category/order counts were preserved.
 - Backfilled variant/image counts were verified.
 - Status, stock, image URL, and foreign-key checks passed.
+- Migration `0002_relational_order_snapshots` was applied successfully with
+  `prisma migrate deploy`.
+- `prisma migrate status` confirmed that both migrations are applied and the
+  database schema is up to date.
+- Live verification found 8 orders and 13 backfilled `order_items`.
+- Live `orders` totals were returned as `NUMERIC(12, 2)` values, including
+  `92000.00`, `5000.00`, and `97000.00` for the existing PNY-892140 order.
 
 Prisma 7 CLI checks completed in Linux:
 

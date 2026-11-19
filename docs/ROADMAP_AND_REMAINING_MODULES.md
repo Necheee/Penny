@@ -11,7 +11,7 @@ This document outlines the remaining architectural modules, features, and produc
 | **Storefront UI & Pages** | **Completed (~95%)** | Home, Shop, Product Details, Bag Drawer, Search, Size Guide, Auth pages, Info pages. |
 | **Checkout Flow** | **Completed (Simulated)** | Multi-step form, state-based delivery fees, Nigerian states selector, summary receipt. |
 | **Admin Dashboard** | **Completed (UI & Client Sync)** | Full UI, product CRUD, image uploader & preview, categories, size guide, order drawer, ProductContext & localStorage sync. |
-| **Backend & Database** | **Pending (Next Target)** | REST/GraphQL API, persistent database, session/JWT auth, cloud storage. |
+| **Backend & Database** | **Partially Implemented** | Neon/PostgreSQL persistence, catalogue and order migrations, JWT auth, inventory locking, and relational order snapshots are live. Remaining API and persistence consolidation work remains. |
 | **Payment Gateway** | **Pending** | Real Paystack/Flutterwave API keys, webhook listener, transaction verification. |
 | **Transactional Email** | **Pending** | Order receipts, tracking updates, and password resets sent to email inboxes. |
 | **Customer Portal** | **Partially Implemented** | Account layout exists; needs real order history and address book synchronization. |
@@ -101,8 +101,9 @@ The backend replaces mock in-memory data with a resilient, persistent server inf
    - `id`, `category_id`, `unit` (`cm` | `in`), `size`, `measurements_json`.
 8. **Orders Table:**
    - `id`, `order_reference`, `user_id`, `guest_email`, `total_amount`, `shipping_cost`, `grand_total`, `status`, `payment_status`, `payment_method`, `shipping_address_json`, `created_at`.
-9. **OrderItems Table:**
-   - `id`, `order_id`, `product_id`, `size`, `color`, `quantity`, `unit_price`.
+9. **OrderItems Table — Implemented:**
+   - `id`, `order_id`, `product_id`, `name`, `size`, `color`, `image_url`, `quantity`, `unit_price`.
+   - Existing orders were backfilled from the legacy JSON snapshot column.
 
 ### 3.3 Core API Endpoints
 - `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh-token`, `GET /api/auth/me`
