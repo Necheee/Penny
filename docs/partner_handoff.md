@@ -281,7 +281,7 @@ that all three migrations are applied and the database schema is up to date.
 ### 12. Harden catalogue and administrative workflows — **Partial**
 
 Admin authentication was added to product/category mutations, but the complete
-workflow still needs verification:
+workflow has now been verified end to end for the catalogue and checkout path:
 
 1. admin login;
 2. create/update category and subcategory;
@@ -293,13 +293,20 @@ workflow still needs verification:
 8. checkout a selected variant;
 9. verify the order snapshot and inventory result.
 
+The temporary end-to-end records were cleaned up after verification. The item
+remains partial because related order, bank configuration, announcement, refund,
+and other administrative mutation routes still need authorization and explicit
+error-handling review.
+
 Review related order, bank configuration, announcement, and other administrative
 mutation routes for authorization and explicit error handling as part of this
 workflow.
 
-### 13. Add focused regression and end-to-end coverage — **Not complete**
+### 13. Add focused regression and end-to-end coverage — **Partial**
 
-Add tests for behavior introduced by the catalogue migration and remaining work:
+A focused Node regression suite now covers currency arithmetic, relational
+catalogue authority, checkout validation, order snapshots, transaction
+safeguards, and admin authorization. Remaining coverage includes:
 
 - status filtering and transitions;
 - relational image/variant reads and writes;
@@ -337,7 +344,7 @@ now database-only and no `server/prisma/seed.js` implementation exists.
    remains.**
 7. Make order items immutable relational snapshots. **Complete.**
 8. Remove operational frontend localStorage catalogue/order fallbacks. **Partial.**
-9. Complete admin-to-storefront-to-checkout end-to-end verification. **Partial.**
+9. Complete admin-to-storefront-to-checkout end-to-end verification. **Complete.**
 10. Add focused regression and integration coverage. **Not complete.**
 11. Repair or remove the broken seed script. **Complete.**
 
@@ -348,8 +355,7 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 2. Finish Decimal-safe display/model normalization for product and order prices.
 3. Resolve the remaining frontend/API catalogue model mismatch.
 4. Remove the remaining operational frontend catalogue cache and mock fallbacks.
-5. Complete admin-to-storefront-to-checkout end-to-end verification.
-6. Review administrative mutation routes for authorization and explicit error
+5. Review administrative mutation routes for authorization and explicit error
    handling, including refund-specific inventory behavior.
 
 ## Practical completion scope
@@ -411,3 +417,7 @@ Prisma 7 CLI checks completed in Linux:
 The authenticated catalogue smoke test also passed against the configured
 database: admin login, category creation, product creation with a relational
 variant, public product/category reads, and cleanup of the temporary records.
+The full temporary admin-to-storefront-to-checkout workflow also passed against
+the configured database, including relational image persistence, inventory
+adjustment, selected-variant checkout, immutable order snapshot creation,
+cancellation, inventory restoration, and cleanup.
