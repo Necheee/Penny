@@ -301,7 +301,7 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 2. Add focused tests or a controlled smoke test for the migrated catalogue. **Category GET smoke test complete.**
 3. Remove the remaining category backend JSON and in-memory operational fallbacks. **Complete.**
 4. Verify admin login → category save → product/variant save → storefront read. **Complete.**
-5. Begin the order schema work; frontend order `localStorage` removal is **Complete**.
+5. Begin the order schema work; relational order snapshot migration and write path are **In progress**. Existing order reads and legacy JSON cleanup remain.
 6. Repair or remove the missing `prisma/seed.js` script. **Complete.**
 
 ## Validation notes

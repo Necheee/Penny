@@ -448,6 +448,24 @@ router.post('/verify', async (req, res) => {
           newOrder.subtotal, newOrder.deliveryFee, newOrder.total, newOrder.status,
           JSON.stringify(newOrder.items), newOrder.paidAt, newOrder.createdAt, newOrder.userId
         ]);
+        for (const item of newOrder.items) {
+          await client.query(
+            `INSERT INTO order_items
+              (id, order_id, product_id, name, size, color, image_url, quantity, unit_price)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [
+              randomUUID(),
+              newOrder.id,
+              item.productId,
+              item.name,
+              item.size,
+              item.color,
+              item.image,
+              item.quantity,
+              item.price,
+            ],
+          );
+        }
         await client.query('COMMIT');
         console.log(`[ORDERS] Order #${newOrder.id} and inventory successfully saved to PostgreSQL.`);
       } catch (dbErr) {
