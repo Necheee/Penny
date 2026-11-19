@@ -246,13 +246,18 @@ Frontend localStorage must become optional, read-only UI cache rather than an
 authoritative fallback:
 
 - catalogue cache initialization in `ProductContext.jsx`;
-- mock-product fallback in `client/src/services/api.js`;
+- mock-product fallback in `client/src/services/api.js` **removed**;
 - checkout order writes in `client/src/pages/Checkout.jsx`;
 - admin order initialization/persistence in `client/src/pages/AdminDashboard.jsx`.
 
 Order records are no longer read from or written to frontend `penny_orders`
 localStorage in checkout, account history, notifications, or the admin
 dashboard. Catalogue cache cleanup remains outstanding.
+
+Catalogue API requests now fail explicitly instead of returning mock products or
+categories. The existing catalogue cache may still render while the request is
+in flight, but it is replaced by the live response (including an empty response)
+and is never used as a success-shaped API fallback.
 
 Network/database failures should surface explicitly instead of creating
 success-shaped local orders or catalogue records.

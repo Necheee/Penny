@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { products as initialProducts, categories as initialCategories, sizes as initialSizes } from '../data/mockCatalogue';
+import { sizes as initialSizes } from '../data/mockCatalogue';
 import {
   getProducts,
   getCategories,
@@ -86,7 +86,7 @@ export function ProductProvider({ children }) {
         }
       }
     } catch {}
-    return initialProducts.map(normalizeProduct);
+    return [];
   });
 
   // Active products for live customer storefront browsing
@@ -106,8 +106,9 @@ export function ProductProvider({ children }) {
         }
       }
     } catch {}
-    return initialCategories.filter(c => c.id !== 'sets' && c.id !== 'two-piece-sets' && c.slug !== 'sets' && c.slug !== 'two-piece-sets');
+    return [];
   });
+  const [catalogueError, setCatalogueError] = useState(null);
 
   const [sizes] = useState(initialSizes);
 
@@ -206,14 +207,14 @@ export function ProductProvider({ children }) {
         ]);
 
         if (isMounted) {
-          if (Array.isArray(liveProducts) && liveProducts.length > 0) {
+          if (Array.isArray(liveProducts)) {
             const normalized = liveProducts.map(normalizeProduct);
             setAllProducts(normalized);
             try {
               localStorage.setItem('penny_live_catalogue_cache', JSON.stringify(normalized));
             } catch {}
           }
-          if (Array.isArray(liveCategories) && liveCategories.length > 0) {
+          if (Array.isArray(liveCategories)) {
             const activeLiveCats = liveCategories.filter(
               c => c.id !== 'sets' && c.id !== 'two-piece-sets' && c.slug !== 'sets' && c.slug !== 'two-piece-sets'
             );
@@ -239,9 +240,13 @@ export function ProductProvider({ children }) {
             });
             setSizeGuideData(prev => ({ ...prev, ...guidesMap }));
           }
+          setCatalogueError(null);
         }
       } catch (err) {
-        console.warn("Could not sync with live backend catalogue:", err);
+        if (isMounted) {
+          setCatalogueError(err instanceof Error ? err.message : 'Could not load the catalogue.');
+        }
+        console.error("Could not sync with live backend catalogue:", err);
       }
     }
     syncBackendCatalogue();
@@ -615,6 +620,7 @@ export function ProductProvider({ children }) {
         products,
         archivedProducts,
         categories,
+        catalogueError,
         sizes,
         featuredProducts,
         announcements,

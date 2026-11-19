@@ -1,4 +1,4 @@
-import { products as defaultProducts, categories as defaultCategories, sizes as defaultSizes } from '../data/mockCatalogue';
+import { sizes as defaultSizes } from '../data/mockCatalogue';
 
 const API_BASE = '/api';
 const LIVE_BACKEND_URL = 'https://penny-kbrh.onrender.com';
@@ -39,22 +39,17 @@ const getAuthHeaders = () => {
   return headers;
 };
 
-// Fetch catalogue from backend API with fallback to default mock catalogue
+// Fetch catalogue from the backend API. Callers may choose to display a
+// previously cached response, but this function never invents catalogue data.
 export const getProducts = async (options = {}) => {
   const { includeArchived = true } = options;
-  try {
-    const url = includeArchived ? `${API_BASE}/products?includeArchived=true` : `${API_BASE}/products`;
-    const res = await safeFetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        return data.data;
-      }
-    }
-  } catch (err) {
-    console.warn("Backend API unavailable, falling back to default catalogue.", err.message);
+  const url = includeArchived ? `${API_BASE}/products?includeArchived=true` : `${API_BASE}/products`;
+  const res = await safeFetch(url);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success || !Array.isArray(data.data)) {
+    throw new Error(data.message || `Catalogue request failed (${res.status}).`);
   }
-  return defaultProducts;
+  return data.data;
 };
 
 export const createProductApi = async (productData) => {
@@ -197,36 +192,21 @@ export const updateSizeGuideApi = async (category, guideData) => {
 };
 
 export const getProductById = async (id) => {
-  try {
-    const res = await safeFetch(`${API_BASE}/products/${id}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.data) {
-        return data.data;
-      }
-    }
-  } catch (err) {
-    console.warn(`Backend API unavailable for product ${id}, falling back.`, err.message);
+  const res = await safeFetch(`${API_BASE}/products/${encodeURIComponent(id)}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success || !data.data) {
+    throw new Error(data.message || `Product request failed (${res.status}).`);
   }
-  const products = getStoredProducts();
-  const product = products.find(p => p.id === id || p.slug === id);
-  if (!product) throw new Error("Product not found");
-  return product;
+  return data.data;
 };
 
 export const getCategories = async () => {
-  try {
-    const res = await safeFetch(`${API_BASE}/categories`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        return data.data;
-      }
-    }
-  } catch (err) {
-    console.warn("Backend API unavailable, falling back to default categories.", err.message);
+  const res = await safeFetch(`${API_BASE}/categories`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success || !Array.isArray(data.data)) {
+    throw new Error(data.message || `Category request failed (${res.status}).`);
   }
-  return defaultCategories;
+  return data.data;
 };
 
 export const getSizes = async () => {
