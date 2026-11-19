@@ -132,6 +132,18 @@ test('checkout transaction retains concurrency, rollback, and duplicate-payment 
   assert.match(paymentsSource, /Order was already registered\./);
 });
 
+test('administrative payment mutations require admin authorization and validate status', () => {
+  assert.match(paymentsSource, /router\.put\('\/config\/bank', requireAuth, requireAdmin/);
+  assert.match(paymentsSource, /router\.patch\('\/orders\/:id\/status', requireAuth, requireAdmin/);
+  assert.match(paymentsSource, /router\.post\('\/orders\/:id\/confirm-payment', requireAuth, requireAdmin/);
+  assert.match(paymentsSource, /message: 'Invalid order status\.'/);
+});
+
+test('order cancellation restores the immutable snapshot variant only', () => {
+  assert.match(paymentsSource, /const variantId = item\.variant_id/);
+  assert.match(paymentsSource, /without its original variant/);
+});
+
 test('admin middleware rejects unauthenticated and non-admin requests', () => {
   const unauthenticated = responseDouble();
   requireAuth({ headers: {} }, unauthenticated, () => {

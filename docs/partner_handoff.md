@@ -214,13 +214,15 @@ Order status/payment updates must not rewrite historical item details.
 Variant inventory tables, adjustment records, and checkout stock locking now exist,
 and the migration verified 426 variants. Checkout now persists the selected
 variant reference, and cancellation restores that exact variant in a transaction.
+The inventory adjustment and order status/payment mutation routes now require
+authenticated admin access, order statuses are allow-listed, and cancellation
+restores stock only through the immutable `order_items.variant_id` snapshot while
+recording the admin actor.
+
 Remaining work includes:
 
-- verify every checkout path reserves/decrements the correct variant;
-- add focused concurrency and failure-path tests for the existing row-locking and
-  non-negative-stock checks;
-- record adjustment reason, reference, and admin actor consistently;
-- validate refund-specific behavior with the payment provider.
+- validate refund-specific behavior with the payment provider; this codebase does
+  not currently expose a provider refund endpoint.
 
 Relevant files include [server/src/routes/products.js](../server/src/routes/products.js)
 and [server/src/routes/payments.js](../server/src/routes/payments.js).
@@ -315,7 +317,7 @@ safeguards, and admin authorization. Remaining coverage includes:
 - duplicate payment verification;
 - immutable order snapshots;
 - database failure behavior without JSON fallback;
-- admin authorization on all mutation routes.
+- provider-side refund verification.
 
 ### 14. Repair or remove the broken seed script — **Complete**
 

@@ -43,6 +43,14 @@ import FormattedMessage from '../components/common/FormattedMessage';
 import { useDialog } from '../context/DialogContext';
 import ProductFormModal from '../components/admin/ProductFormModal';
 
+const adminAuthHeaders = () => {
+  const token = localStorage.getItem('penny_admin_token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -200,7 +208,7 @@ export default function AdminDashboard() {
     try {
       const res = await fetch('/api/payments/config/bank', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: adminAuthHeaders(),
         body: JSON.stringify(bankForm),
       });
 
@@ -715,7 +723,7 @@ export default function AdminDashboard() {
     try {
       await fetch(`/api/payments/orders/${orderId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: adminAuthHeaders(),
         body: JSON.stringify({ status: newStatus }),
       });
     } catch (e) {
@@ -734,7 +742,7 @@ export default function AdminDashboard() {
     try {
       const response = await fetch(`/api/payments/orders/${orderId}/confirm-payment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: adminAuthHeaders(),
       });
 
       const data = await response.json();

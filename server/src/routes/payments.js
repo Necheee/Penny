@@ -5,6 +5,7 @@ import { sendOrderConfirmationEmail } from '../utils/receiptEmail.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
 import { minorUnitsToDecimal, toMinorUnits } from '../utils/money.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 dotenv.config();
 
@@ -173,7 +174,7 @@ router.get('/config', async (req, res) => {
  * PUT /api/payments/config/bank
  * Updates official bank transfer details in Neon PostgreSQL & memory
  */
-router.put('/config/bank', async (req, res) => {
+router.put('/config/bank', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { bankName, accountName, accountNumber, instructions } = req.body;
 
@@ -569,18 +570,31 @@ router.post('/verify', async (req, res) => {
  * PATCH /api/payments/orders/:id/status
  * Updates the fulfillment status of an order in Neon DB or local development storage
  */
-router.patch('/orders/:id/status', async (req, res) => {
+router.patch('/orders/:id/status', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
+  const allowedStatuses = new Set([
+    'Awaiting Payment',
+    'Processing',
+    'Shipped',
+    'Delivered',
+    'Cancelled',
+  ]);
+
+  if (!allowedStatuses.has(status)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid order status.',
+    });
+  }
 
   let order = ordersStore.find(o => o.id === id);
 
-  if (status) {
-    // 1. Update in Neon Cloud DB
-    try {
-      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-        const pool = getPool();
-        const client = await pool.connect();
+  // 1. Update in Neon Cloud DB
+  try {
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      const pool = getPool();
+      const client = await pool.connect();
         try {
           await client.query('BEGIN');
           const currentResult = await client.query(
@@ -620,21 +634,10 @@ router.patch('/orders/:id/status', async (req, res) => {
             );
 
             for (const item of itemResult.rows) {
-              let variantId = item.variant_id;
-              if (!variantId && item.product_id) {
-                const variantResult = await client.query(
-                  `SELECT id
-                   FROM product_variants
-                   WHERE product_id = $1 AND size = $2 AND color_name = $3
-                   FOR UPDATE`,
-                  [item.product_id, item.size, item.color],
-                );
-                variantId = variantResult.rows[0]?.id;
-              }
-
+              const variantId = item.variant_id;
               if (!variantId) {
                 throw Object.assign(new Error(
-                  `Cannot restore inventory for order item ${item.product_id || '(unknown product)'}.`,
+                  `Cannot restore inventory for order item ${item.product_id || '(unknown product)'} without its original variant.`,
                 ), { statusCode: 409 });
               }
 
@@ -689,20 +692,19 @@ router.patch('/orders/:id/status', async (req, res) => {
           message: `Order status updated to ${status}.`,
           order,
         });
-      }
-    } catch (e) {
-      console.error('[ORDERS] Could not update status in Neon PostgreSQL:', e);
-      return res.status(503).json({
-        success: false,
-        message: 'Order status could not be updated because the database is unavailable.',
-      });
     }
+  } catch (e) {
+    console.error('[ORDERS] Could not update status in Neon PostgreSQL:', e);
+    return res.status(503).json({
+      success: false,
+      message: 'Order status could not be updated because the database is unavailable.',
+    });
+  }
 
-    // 2. Update local store
-    if (order) {
-      order.status = status;
-      writeJsonFile('orders.json', ordersStore);
-    }
+  // 2. Update local store
+  if (order) {
+    order.status = status;
+    writeJsonFile('orders.json', ordersStore);
   }
 
   return res.status(200).json({
@@ -716,7 +718,7 @@ router.patch('/orders/:id/status', async (req, res) => {
  * POST /api/payments/orders/:id/confirm-payment
  * Confirms bank transfer receipt for an order in Neon DB and dispatches confirmation receipt email to the customer
  */
-router.post('/orders/:id/confirm-payment', async (req, res) => {
+router.post('/orders/:id/confirm-payment', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     let order = ordersStore.find(o => o.id === id);
