@@ -6,20 +6,20 @@ Updated: 2026-11-19
 
 - Repository: `Necheee/Penny`
 - Branch: `main`
-- `HEAD`: `1158952`
-- Branch is ten commits ahead of `origin/main`.
+- `HEAD`: `94254c9`
+- Branch is twelve commits ahead of `origin/main`.
 - Source worktree was clean before this handoff update; this document is tracked.
 - The database is a remote PostgreSQL/Neon instance configured through `server/.env`.
 - Do not expose or commit `server/.env`.
 - Linux Node.js `v26.13.1` is available at `/usr/local/bin/node`.
 
-Recent commits:
+Recent relevant commits:
 
-1. `3d664d4` - add admin authentication to product/category mutations.
-2. `90c1d94` - add `ProductStatus` and the catalogue migration foundation.
-3. `5b9c691` - add product variants and product images.
+1. `94254c9` - persist selected variant references and restore inventory on cancellation.
+2. `c827220` - update partner handoff documentation and migration status.
+3. `1158952` - add Prisma 7 configuration and update package dependencies.
 4. `b05f252` - add inventory adjustments and checkout stock locking.
-5. `1158952` - add Prisma 7 configuration and update package dependencies.
+5. `5b9c691` - add product variants and product images.
 
 ## Database migration status
 
@@ -28,7 +28,9 @@ was applied successfully on 2026-11-18 after a database backup was confirmed.
 
 The migration in [server/prisma/migrations/0002_relational_order_snapshots/migration.sql](../server/prisma/migrations/0002_relational_order_snapshots/migration.sql)
 was applied successfully with `prisma migrate deploy` on 2026-11-19.
-`prisma migrate status` reports that the database is up to date with both
+The migration in [server/prisma/migrations/0003_order_item_variant_references/migration.sql](../server/prisma/migrations/0003_order_item_variant_references/migration.sql)
+was applied successfully with `prisma migrate deploy` on 2026-11-19.
+`prisma migrate status` reports that the database is up to date with all three
 migrations.
 
 Verified live data after migration:
@@ -48,11 +50,11 @@ Verified live data after migration:
 
 The migration was applied directly with `psql`, not through Prisma CLI.
 
-The live database now has `_prisma_migrations` with
-`0001_catalogue_foundation` recorded as applied. This was reconciled with
-Prisma 7's `prisma migrate resolve --applied` command after verifying the
-migration had already been applied. Future deployments may use Prisma CLI, but
-should still verify migration status before applying changes.
+The live database has all three migrations recorded in `_prisma_migrations`.
+The initially direct-applied catalogue migration was reconciled with Prisma 7's
+`prisma migrate resolve --applied` command after verifying it had already been
+applied. Future deployments may use Prisma CLI, but should still verify
+migration status before applying changes.
 
 Prisma tooling is now runnable from Linux. Node.js `v26.13.1` is installed and
 `npm run prisma:validate` succeeds. Prisma Client generation also succeeds.
@@ -210,17 +212,15 @@ Order status/payment updates must not rewrite historical item details.
 ### 7. Complete auditable inventory and reservation behavior — **Partial**
 
 Variant inventory tables, adjustment records, and checkout stock locking now exist,
-and the migration verified 426 variants. Remaining work includes:
+and the migration verified 426 variants. Checkout now persists the selected
+variant reference, and cancellation restores that exact variant in a transaction.
+Remaining work includes:
 
 - verify every checkout path reserves/decrements the correct variant;
-- enforce variant-level stock for all purchasable items;
-- prevent negative stock under concurrent checkout;
+- add focused concurrency and failure-path tests for the existing row-locking and
+  non-negative-stock checks;
 - record adjustment reason, reference, and admin actor consistently;
-- add focused concurrency and failure-path tests.
-
-Cancellation now restores the exact variant quantity in a transaction and records
-an idempotent `ORDER_CANCELLATION` adjustment. The remaining cancellation work is
-to validate refund-specific behavior with the payment provider.
+- validate refund-specific behavior with the payment provider.
 
 Relevant files include [server/src/routes/products.js](../server/src/routes/products.js)
 and [server/src/routes/payments.js](../server/src/routes/payments.js).
@@ -338,13 +338,14 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 
 ## Recommended next session
 
-1. Reconcile `_prisma_migrations` safely. **Complete.**
-2. Add focused tests or a controlled smoke test for the migrated catalogue. **Category GET smoke test complete.**
-3. Remove the remaining category backend JSON and in-memory operational fallbacks. **Complete.**
-4. Verify admin login → category save → product/variant save → storefront read. **Complete.**
-5. Begin the order schema work; relational order snapshot migration, write path, relational reads, and legacy JSON cleanup are **Complete**.
-6. Repair or remove the missing `prisma/seed.js` script. **Complete.**
-7. Make relational variants and images authoritative in the API and frontend. **Complete.**
+1. Add focused regression, concurrency, and failure-path coverage for inventory,
+   payment verification, and immutable order snapshots.
+2. Finish Decimal-safe display/model normalization for product and order prices.
+3. Resolve the remaining frontend/API catalogue model mismatch.
+4. Remove the remaining operational frontend catalogue cache and mock fallbacks.
+5. Complete admin-to-storefront-to-checkout end-to-end verification.
+6. Review administrative mutation routes for authorization and explicit error
+   handling, including refund-specific inventory behavior.
 
 ## Validation notes
 
