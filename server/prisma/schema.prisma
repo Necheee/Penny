@@ -87,6 +87,7 @@ model ProductVariant {
   productId     String   @map("product_id")
   product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   inventoryAdjustments InventoryAdjustment[]
+  orderItems    OrderItem[]
   size          String   // "XS", "S", "M", "L", "XL", "XXL"
   colorName     String   @map("color_name") // e.g. "Charcoal", "Cream", "Olive"
   colorHex      String?  @map("color_hex") // e.g. "#36454f"
@@ -139,6 +140,8 @@ model OrderItem {
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String?  @map("product_id")
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId String?  @map("variant_id")
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
   name      String
   size      String
   color     String
@@ -147,6 +150,7 @@ model OrderItem {
   imageUrl  String?  @map("image_url")
 
   @@index([orderId])
+  @@index([variantId])
   @@map("order_items")
 }
 

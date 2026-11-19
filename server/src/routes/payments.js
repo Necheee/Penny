@@ -491,12 +491,13 @@ router.post('/verify', async (req, res) => {
         for (const item of newOrder.items) {
           await client.query(
             `INSERT INTO order_items
-              (id, order_id, product_id, name, size, color, image_url, quantity, unit_price)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+              (id, order_id, product_id, variant_id, name, size, color, image_url, quantity, unit_price)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
             [
               randomUUID(),
               newOrder.id,
               item.productId,
+              item.variantId,
               item.name,
               item.size,
               item.color,
@@ -570,7 +571,108 @@ router.patch('/orders/:id/status', async (req, res) => {
     try {
       if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
         const pool = getPool();
-        await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [status, id]);
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          const currentResult = await client.query(
+            'SELECT status FROM orders WHERE id = $1 FOR UPDATE',
+            [id],
+          );
+          if (currentResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+              success: false,
+              message: 'Order not found.',
+            });
+          }
+
+          const currentStatus = currentResult.rows[0].status;
+          const cancellationResult = status === 'Cancelled'
+            ? await client.query(
+              `SELECT 1
+               FROM inventory_adjustments
+               WHERE reason = 'ORDER_CANCELLATION' AND reference = $1
+               LIMIT 1`,
+              [id],
+            )
+            : { rows: [] };
+
+          if (
+            status === 'Cancelled'
+            && currentStatus !== 'Cancelled'
+            && cancellationResult.rows.length === 0
+          ) {
+            const itemResult = await client.query(
+              `SELECT product_id, variant_id, size, color, quantity
+               FROM order_items
+               WHERE order_id = $1
+               FOR UPDATE`,
+              [id],
+            );
+
+            for (const item of itemResult.rows) {
+              let variantId = item.variant_id;
+              if (!variantId && item.product_id) {
+                const variantResult = await client.query(
+                  `SELECT id
+                   FROM product_variants
+                   WHERE product_id = $1 AND size = $2 AND color_name = $3
+                   FOR UPDATE`,
+                  [item.product_id, item.size, item.color],
+                );
+                variantId = variantResult.rows[0]?.id;
+              }
+
+              if (!variantId) {
+                throw Object.assign(new Error(
+                  `Cannot restore inventory for order item ${item.product_id || '(unknown product)'}.`,
+                ), { statusCode: 409 });
+              }
+
+              const restored = await client.query(
+                `UPDATE product_variants
+                 SET stock_quantity = stock_quantity + $1, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $2
+                 RETURNING product_id, stock_quantity`,
+                [item.quantity, variantId],
+              );
+              if (restored.rows.length === 0) {
+                throw Object.assign(new Error('The order item variant no longer exists.'), {
+                  statusCode: 409,
+                });
+              }
+
+              await client.query(
+                `INSERT INTO inventory_adjustments
+                  (id, variant_id, product_id, quantity_delta, reason, reference, actor_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [
+                  randomUUID(),
+                  variantId,
+                  restored.rows[0].product_id,
+                  item.quantity,
+                  'ORDER_CANCELLATION',
+                  id,
+                  req.user?.id || null,
+                ],
+              );
+            }
+          }
+
+          await client.query('UPDATE orders SET status = $1 WHERE id = $2', [status, id]);
+          await client.query('COMMIT');
+        } catch (transactionError) {
+          await client.query('ROLLBACK');
+          if (transactionError.statusCode) {
+            return res.status(transactionError.statusCode).json({
+              success: false,
+              message: transactionError.message,
+            });
+          }
+          throw transactionError;
+        } finally {
+          client.release();
+        }
         const dbRes = await pool.query(`${relationalOrderSelect} WHERE o.id = $1 GROUP BY o.id`, [id]);
         order = dbRes.rows[0] ? mapDbOrder(dbRes.rows[0]) : null;
         return res.status(200).json({

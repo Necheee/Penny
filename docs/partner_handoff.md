@@ -216,8 +216,11 @@ and the migration verified 426 variants. Remaining work includes:
 - enforce variant-level stock for all purchasable items;
 - prevent negative stock under concurrent checkout;
 - record adjustment reason, reference, and admin actor consistently;
-- define cancellation/refund stock restoration behavior;
 - add focused concurrency and failure-path tests.
+
+Cancellation now restores the exact variant quantity in a transaction and records
+an idempotent `ORDER_CANCELLATION` adjustment. The remaining cancellation work is
+to validate refund-specific behavior with the payment provider.
 
 Relevant files include [server/src/routes/products.js](../server/src/routes/products.js)
 and [server/src/routes/payments.js](../server/src/routes/payments.js).
@@ -268,7 +271,7 @@ The catalogue migration was initially applied directly with `psql`; its
 `_prisma_migrations` bookkeeping was subsequently reconciled with
 `prisma migrate resolve --applied`. The relational order snapshot migration was
 then applied with `prisma migrate deploy`, and `prisma migrate status` confirms
-that both migrations are applied and the database schema is up to date.
+that all three migrations are applied and the database schema is up to date.
 
 ### 12. Harden catalogue and administrative workflows — **Partial**
 
@@ -322,8 +325,8 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 3. Choose Prisma or `pg` as the single active catalogue data layer. **Complete:
    retain `pg`; Prisma is the schema contract and migration tool.**
 4. Make relational variants/images/status authoritative in the API and frontend. **Complete.**
-5. Verify and harden inventory adjustment, reservation, cancellation, and
-   concurrency behavior. **Partial.**
+5. Verify and harden inventory adjustment, reservation, refund-specific
+   cancellation, and concurrency behavior. **Partial.**
 6. Convert active currency calculations and payment totals to Decimal-safe
    values. **Partial: calculations are complete; display/model normalization
    remains.**
@@ -354,7 +357,10 @@ The following live checks were completed with `psql`:
 - Status, stock, image URL, and foreign-key checks passed.
 - Migration `0002_relational_order_snapshots` was applied successfully with
   `prisma migrate deploy`.
-- `prisma migrate status` confirmed that both migrations are applied and the
+- Migration `0003_order_item_variant_references` was applied successfully with
+  `prisma migrate deploy`; `order_items.variant_id` now records the selected
+  variant for new orders.
+- `prisma migrate status` confirmed that all three migrations are applied and the
   database schema is up to date.
 - Live verification found 8 orders and 13 backfilled `order_items`.
 - Live `orders` totals were returned as `NUMERIC(12, 2)` values, including
