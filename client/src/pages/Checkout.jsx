@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Check, ShieldCheck, ArrowLeft, ShoppingBag, Truck, CreditCard, AlertCircle, Loader2, Building2, Copy, Clock, User, Printer, MapPin, Phone, Mail, Edit3, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { printOrderReceipt } from '../utils/printReceipt';
+import { fromMinorUnits, toMinorUnits } from '../utils/money';
 
 const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
@@ -117,7 +118,7 @@ const Checkout = () => {
     }
   }
 
-  const grandTotal = cartSubtotal + shippingCost;
+  const grandTotal = fromMinorUnits(toMinorUnits(cartSubtotal) + toMinorUnits(shippingCost));
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -261,7 +262,7 @@ const Checkout = () => {
         const handler = window.PaystackPop.setup({
           key: initData.publicKey,
           email: formData.email,
-          amount: Math.round(grandTotal * 100), // in kobo
+          amount: toMinorUnits(grandTotal), // in kobo
           currency: 'NGN',
           ref: transactionRef,
           metadata: {

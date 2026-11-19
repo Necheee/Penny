@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { sendOrderConfirmationEmail } from '../utils/receiptEmail.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
+import { minorUnitsToDecimal, toMinorUnits } from '../utils/money.js';
 
 dotenv.config();
 
@@ -234,7 +235,7 @@ router.post('/initialize', async (req, res) => {
 
     const orderRef = `PNY-${Date.now().toString().slice(-6)}`;
     const paystackRef = `paystack_${orderRef}_${Math.random().toString(36).substring(2, 7)}`;
-    const amountInKobo = Math.round(Number(amount) * 100);
+    const amountInKobo = Number(toMinorUnits(amount));
 
     // If real Paystack Secret Key is configured, initialize transaction via Paystack API
     const isRealPaystack = PAYSTACK_SECRET_KEY && !PAYSTACK_SECRET_KEY.includes('mock') && !PAYSTACK_SECRET_KEY.includes('your_');
@@ -383,9 +384,11 @@ router.post('/verify', async (req, res) => {
       transferAccountName: orderData?.transferAccountName || '',
       paymentConfirmed: !isBankTransfer,
       itemsCount: Array.isArray(orderData?.cartItems) ? orderData.cartItems.reduce((s, i) => s + (i.quantity || 1), 0) : 1,
-      subtotal: Number(orderData?.cartSubtotal || 0),
-      deliveryFee: Number(orderData?.shippingCost || 0),
-      total: Number(orderData?.grandTotal || (Number(orderData?.cartSubtotal || 0) + Number(orderData?.shippingCost || 0))),
+      subtotal: minorUnitsToDecimal(toMinorUnits(orderData?.cartSubtotal)),
+      deliveryFee: minorUnitsToDecimal(toMinorUnits(orderData?.shippingCost)),
+      total: minorUnitsToDecimal(
+        toMinorUnits(orderData?.cartSubtotal) + toMinorUnits(orderData?.shippingCost),
+      ),
       status: isBankTransfer ? 'Awaiting Payment' : 'Processing',
       paidAt: paymentDetails.paidAt,
       createdAt: new Date().toISOString(),
@@ -396,7 +399,7 @@ router.post('/verify', async (req, res) => {
         name: item.name,
         size: item.selectedSize || item.size || 'M',
         color: item.selectedColor || item.color || 'Standard',
-        price: Number(item.price || 0),
+        price: minorUnitsToDecimal(toMinorUnits(item.price)),
         quantity: Number(item.quantity || 1),
         image: item.images?.primary || item.image || '/images/products/linen-set-1.jpg',
       })) : [],

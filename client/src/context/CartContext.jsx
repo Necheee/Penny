@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
+import { fromMinorUnits, toMinorUnits } from '../utils/money';
 
 const CartContext = createContext();
 
@@ -156,7 +157,11 @@ export function CartProvider({ children }) {
   }, [cartItems]);
 
   const cartSubtotal = useMemo(() => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+    const subtotalMinorUnits = cartItems.reduce(
+      (total, item) => total + (toMinorUnits(item.price) * item.quantity),
+      0,
+    );
+    return fromMinorUnits(subtotalMinorUnits);
   }, [cartItems]);
 
   return (

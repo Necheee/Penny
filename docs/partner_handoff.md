@@ -148,16 +148,17 @@ be considered removed.
 ### 5. Use Decimal-safe currency values — **Partial**
 
 Database storage and Prisma models now use `Decimal(12, 2)`/`NUMERIC(12, 2)` for
-order and item currency values. Remaining work is to remove repeated
-`Number(...)` conversions and floating-point arithmetic from payment and checkout
-calculations:
+order and item currency values. Checkout subtotals, totals, Paystack amounts,
+and PostgreSQL order writes now use integer minor-unit arithmetic and fixed
+two-decimal values. Remaining work is to remove repeated `Number(...)`
+conversions from non-calculation display and model-normalization paths:
 
 - `Product.price`
 - `Order.subtotal`
 - `Order.deliveryFee`
 - `Order.total`
 - `OrderItem.unitPrice`
-- payment and checkout total calculations
+- payment and checkout total calculations **Complete**
 
 Use database Decimal/Numeric values and avoid floating-point arithmetic for payment
 amounts.
