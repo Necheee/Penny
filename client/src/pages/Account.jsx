@@ -276,24 +276,8 @@ export default function Account() {
         } catch (apiErr) {}
       }
 
-      let localOrders = [];
-      try {
-        localOrders = JSON.parse(localStorage.getItem('penny_orders') || '[]');
-      } catch {}
-
-      // Combine and deduplicate orders by id
-      const combined = [...backendOrders, ...localOrders];
-      const seen = new Set();
-      const uniqueOrders = [];
-      for (const ord of combined) {
-        if (ord && ord.id && !seen.has(ord.id)) {
-          seen.add(ord.id);
-          uniqueOrders.push(ord);
-        }
-      }
-
       // Filter by logged-in user email, userId or matching customer full name
-      const userOrders = uniqueOrders.filter(ord => {
+      const userOrders = backendOrders.filter(ord => {
         const orderEmail = (ord.email || '').toLowerCase().trim();
         const orderCustomer = (ord.customer || '').toLowerCase().trim();
 
@@ -303,13 +287,9 @@ export default function Account() {
         return false;
       });
 
-      // Filter out deleted orders
-      const deletedIds = new Set(JSON.parse(localStorage.getItem('penny_deleted_order_ids') || '[]'));
-      const activeUserOrders = userOrders.filter(ord => !deletedIds.has(ord.id));
-
       // Sort newest first
-      activeUserOrders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-      setOrders(activeUserOrders);
+      userOrders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setOrders(userOrders);
     } catch (err) {
       console.error('Error loading order history:', err);
     } finally {
@@ -371,34 +351,25 @@ export default function Account() {
   const handleDeleteOrder = async (orderId) => {
     const shouldDelete = await confirm({
       title: `Delete Order #${orderId}`,
-      message: `Are you sure you want to remove this order from your personal order history? This will delete the local summary for this device.`,
+      message: `Are you sure you want to remove this order from your personal order history?`,
       confirmText: 'Delete Order',
       cancelText: 'Keep',
       isDestructive: true,
     });
     if (!shouldDelete) return;
 
-    setOrders(prev => prev.filter(o => o.id !== orderId));
-
-    // Update localStorage penny_orders
-    const local = JSON.parse(localStorage.getItem('penny_orders') || '[]');
-    localStorage.setItem('penny_orders', JSON.stringify(local.filter(o => o.id !== orderId)));
-
-    // Track deleted order IDs
-    const deleted = JSON.parse(localStorage.getItem('penny_deleted_order_ids') || '[]');
-    if (!deleted.includes(orderId)) {
-      deleted.push(orderId);
-      localStorage.setItem('penny_deleted_order_ids', JSON.stringify(deleted));
-    }
-
-    refreshNotifications?.();
-    window.dispatchEvent(new Event('penny_notifications_updated'));
-
-    // Call backend API
     try {
-      await fetch(`/api/payments/orders/${orderId}`, { method: 'DELETE' });
+      const response = await fetch(`/api/payments/orders/${orderId}`, { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'The order could not be deleted.');
+      }
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      refreshNotifications?.();
+      window.dispatchEvent(new Event('penny_notifications_updated'));
     } catch (e) {
-      console.warn('Backend order delete error:', e);
+      console.error('Backend order delete error:', e);
+      showAlertDialog(e.message || 'The order could not be deleted.');
     }
   };
 

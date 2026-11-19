@@ -115,62 +115,9 @@ export default function AdminDashboard() {
   const [modalNewSubSubtypes, setModalNewSubSubtypes] = useState('');
   const [styleInputs, setStyleInputs] = useState({});
 
-  // Orders state initialized from localStorage with fallback, and synced from /api/payments/orders
-  const [orders, setOrders] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('penny_orders');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error("Failed to parse stored orders in admin", e);
-        }
-      }
-    }
-    return [
-      {
-        id: 'PNY-892140',
-        customer: 'Alex Balogun',
-        email: 'alex.balogun@gmail.com',
-        phone: '+234 803 456 7890',
-        state: 'Lagos',
-        address: '14 Victoria Island Crescent, Apt 4B',
-        itemsCount: 2,
-        subtotal: 92000,
-        deliveryFee: 5000,
-        total: 97000,
-        status: 'Processing',
-        date: '2026-10-12',
-        paymentMethod: 'bank_transfer',
-        paymentConfirmed: true,
-        items: [
-          {
-            id: 'p-1',
-            name: 'Classic Linen Resort Shirt',
-            size: 'L',
-            color: 'Cream',
-            price: 42000,
-            quantity: 1,
-            image: '/images/products/linen-set-1.jpg'
-          },
-          {
-            id: 'p-2',
-            name: 'Cotton Lounge Set',
-            size: 'M',
-            color: 'Charcoal',
-            price: 50000,
-            quantity: 1,
-            image: '/images/products/lounge-set-1.jpg'
-          }
-        ]
-      }
-    ];
-  });
-
-  // Sync orders to localStorage whenever updated
-  useEffect(() => {
-    localStorage.setItem('penny_orders', JSON.stringify(orders));
-  }, [orders]);
+  // Orders are loaded from the backend and are not persisted as a client-side source of truth.
+  const [orders, setOrders] = useState([]);
+  const [ordersError, setOrdersError] = useState('');
 
   // Loading state for orders refresh
   const [isRefreshingOrders, setIsRefreshingOrders] = useState(false);
@@ -179,17 +126,17 @@ export default function AdminDashboard() {
   const loadBackendData = async () => {
     try {
       setIsRefreshingOrders(true);
+      setOrdersError('');
       const [ordersRes, configRes] = await Promise.all([
         fetch('/api/payments/orders'),
         fetch('/api/payments/config'),
       ]);
 
-      if (ordersRes.ok) {
-        const ordersData = await ordersRes.json();
-        if (ordersData.success && Array.isArray(ordersData.data)) {
-          setOrders(ordersData.data);
-        }
+      const ordersData = await ordersRes.json().catch(() => ({}));
+      if (!ordersRes.ok || !ordersData.success || !Array.isArray(ordersData.data)) {
+        throw new Error(ordersData.message || 'Could not load orders from the backend.');
       }
+      setOrders(ordersData.data);
 
       if (configRes.ok) {
         const configData = await configRes.json();
@@ -201,7 +148,8 @@ export default function AdminDashboard() {
         }
       }
     } catch (err) {
-      console.warn('Could not fetch backend data:', err);
+      console.error('Could not fetch backend data:', err);
+      setOrdersError(err.message || 'Could not load orders from the backend.');
     } finally {
       setIsRefreshingOrders(false);
     }
@@ -214,11 +162,16 @@ export default function AdminDashboard() {
       fetch('/api/payments/orders')
         .then(res => res.json())
         .then(data => {
-          if (data.success && Array.isArray(data.data)) {
-            setOrders(data.data);
+          if (!data.success || !Array.isArray(data.data)) {
+            throw new Error(data.message || 'Could not refresh orders from the backend.');
           }
+          setOrders(data.data);
+          setOrdersError('');
         })
-        .catch(() => {});
+        .catch(err => {
+          console.error('Could not refresh backend orders:', err);
+          setOrdersError(err.message || 'Could not refresh orders from the backend.');
+        });
     }, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -1841,6 +1794,9 @@ export default function AdminDashboard() {
                 Customer Orders ({orders.length})
               </h3>
               <p className="text-xs text-neutral-500 mt-1">Manage dispatch, address verification, and delivery statuses.</p>
+              {ordersError && (
+                <p className="text-xs text-red-600 mt-2">{ordersError}</p>
+              )}
             </div>
             <button
               type="button"

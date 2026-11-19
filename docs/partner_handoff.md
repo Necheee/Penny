@@ -199,7 +199,7 @@ The relational model uses `ProductImage`, `ProductVariant`, `Category`, and
 `ProductStatus`. Update the normalization layer, admin forms, storefront reads,
 cart data, and checkout payloads deliberately rather than hiding the mismatch.
 
-### 9. Remove operational frontend localStorage fallbacks — **Not complete**
+### 9. Remove operational frontend localStorage fallbacks — **Partial**
 
 Frontend localStorage must become optional, read-only UI cache rather than an
 authoritative fallback:
@@ -208,6 +208,10 @@ authoritative fallback:
 - mock-product fallback in `client/src/services/api.js`;
 - checkout order writes in `client/src/pages/Checkout.jsx`;
 - admin order initialization/persistence in `client/src/pages/AdminDashboard.jsx`.
+
+Order records are no longer read from or written to frontend `penny_orders`
+localStorage in checkout, account history, notifications, or the admin
+dashboard. Catalogue cache cleanup remains outstanding.
 
 Network/database failures should surface explicitly instead of creating
 success-shaped local orders or catalogue records.
@@ -296,8 +300,8 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 1. Reconcile `_prisma_migrations` safely. **Complete.**
 2. Add focused tests or a controlled smoke test for the migrated catalogue. **Category GET smoke test complete.**
 3. Remove the remaining category backend JSON and in-memory operational fallbacks. **Complete.**
-4. Verify admin login → category save → product/variant save → storefront read. **Next.**
-5. Only then begin the order schema and frontend `localStorage` work.
+4. Verify admin login → category save → product/variant save → storefront read. **Complete.**
+5. Begin the order schema work; frontend order `localStorage` removal is **Complete**.
 6. Repair or remove the missing `prisma/seed.js` script. **Complete.**
 
 ## Validation notes
@@ -316,3 +320,7 @@ Prisma 7 CLI checks completed in Linux:
 - `npx prisma generate` generates `@prisma/client` successfully.
 - No automated test suite or test script is currently configured in
   `server/package.json`.
+
+The authenticated catalogue smoke test also passed against the configured
+database: admin login, category creation, product creation with a relational
+variant, public product/category reads, and cleanup of the temporary records.

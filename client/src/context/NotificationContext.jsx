@@ -74,24 +74,7 @@ export function NotificationProvider({ children }) {
         } catch (e) {}
       }
 
-      // 3. Fetch local orders
-      let localOrders = [];
-      try {
-        localOrders = JSON.parse(localStorage.getItem('penny_orders') || '[]');
-      } catch (e) {}
-
-      // Combine & deduplicate orders by id
-      const combined = [...backendOrders, ...localOrders];
-      const seen = new Set();
-      const uniqueOrders = [];
-      for (const ord of combined) {
-        if (ord && ord.id && !seen.has(ord.id)) {
-          seen.add(ord.id);
-          uniqueOrders.push(ord);
-        }
-      }
-
-      const userOrders = uniqueOrders.filter(ord => {
+      const userOrders = backendOrders.filter(ord => {
         const orderEmail = (ord.email || '').toLowerCase().trim();
         const orderCustomer = (ord.customer || '').toLowerCase().trim();
         if (userId && ord.userId && ord.userId === userId) return true;
@@ -100,16 +83,14 @@ export function NotificationProvider({ children }) {
         return false;
       });
 
-      // Filter out deleted orders & dismissed notifications (merging local + cloud)
-      let deletedIds = new Set();
+      // Filter out dismissed notifications (merging local + cloud)
       let dismissedIds = new Set(cloudDismissed);
       try {
-        deletedIds = new Set(JSON.parse(localStorage.getItem('penny_deleted_order_ids') || '[]'));
         const localDismissed = JSON.parse(localStorage.getItem('penny_dismissed_notifications') || '[]');
         localDismissed.forEach(id => dismissedIds.add(id));
       } catch (e) {}
 
-      const activeOrders = userOrders.filter(ord => !deletedIds.has(ord.id) && !dismissedIds.has(ord.id));
+      const activeOrders = userOrders.filter(ord => !dismissedIds.has(ord.id));
 
       // 4. Fetch customer care inquiries
       let userInquiries = [];

@@ -239,32 +239,13 @@ const Checkout = () => {
         });
 
         const verifyData = await verifyRes.json();
-        const confirmedOrder = verifyData?.order || {
-          id: generatedOrderRef,
-          customer: `${formData.firstName} ${formData.lastName}`.trim(),
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          paymentMethod: 'bank_transfer',
-          paymentConfirmed: false,
-          status: 'Awaiting Payment',
-          subtotal: cartSubtotal,
-          deliveryFee: shippingCost,
-          total: grandTotal,
-          items: cartItems,
-          createdAt: new Date().toISOString()
-        };
+        if (!verifyRes.ok || !verifyData.success || !verifyData.order) {
+          throw new Error(verifyData.message || 'The order could not be saved. Please try again.');
+        }
 
-        setCompletedOrder(confirmedOrder);
-        try {
-          const existing = JSON.parse(localStorage.getItem('penny_orders') || '[]');
-          const filtered = existing.filter(o => o.id !== confirmedOrder.id);
-          localStorage.setItem('penny_orders', JSON.stringify([confirmedOrder, ...filtered]));
-        } catch {}
+        setCompletedOrder(verifyData.order);
 
-        setOrderId(confirmedOrder.id);
+        setOrderId(verifyData.order.id);
         setIsProcessing(false);
         setOrderComplete(true);
         clearCart();
@@ -313,25 +294,19 @@ const Checkout = () => {
               });
 
               const verifyData = await verifyRes.json();
-              if (verifyData?.order) {
-                try {
-                  const existing = JSON.parse(localStorage.getItem('penny_orders') || '[]');
-                  const filtered = existing.filter(o => o.id !== verifyData.order.id);
-                  localStorage.setItem('penny_orders', JSON.stringify([verifyData.order, ...filtered]));
-                } catch {}
+              if (!verifyRes.ok || !verifyData.success || !verifyData.order) {
+                throw new Error(verifyData.message || 'The order could not be confirmed.');
               }
-              setOrderId(generatedOrderRef);
+              setCompletedOrder(verifyData.order);
+              setOrderId(verifyData.order.id);
               setIsProcessing(false);
               setOrderComplete(true);
               clearCart();
               window.dispatchEvent(new Event('penny_notifications_updated'));
             } catch (verErr) {
               console.error('Order verification error:', verErr);
-              setOrderId(generatedOrderRef);
               setIsProcessing(false);
-              setOrderComplete(true);
-              clearCart();
-              window.dispatchEvent(new Event('penny_notifications_updated'));
+              setPaymentError(verErr.message || 'The order could not be confirmed. Please try again.');
             }
           },
           onClose: () => {
@@ -356,32 +331,13 @@ const Checkout = () => {
         });
 
         const verifyData = await verifyRes.json();
-        const confirmedOrder = verifyData?.order || {
-          id: generatedOrderRef,
-          customer: `${formData.firstName} ${formData.lastName}`.trim(),
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          paymentMethod: 'paystack',
-          paymentConfirmed: true,
-          status: 'Processing',
-          subtotal: cartSubtotal,
-          deliveryFee: shippingCost,
-          total: grandTotal,
-          items: cartItems,
-          createdAt: new Date().toISOString()
-        };
+        if (!verifyRes.ok || !verifyData.success || !verifyData.order) {
+          throw new Error(verifyData.message || 'The order could not be saved. Please try again.');
+        }
 
-        setCompletedOrder(confirmedOrder);
-        try {
-          const existing = JSON.parse(localStorage.getItem('penny_orders') || '[]');
-          const filtered = existing.filter(o => o.id !== confirmedOrder.id);
-          localStorage.setItem('penny_orders', JSON.stringify([confirmedOrder, ...filtered]));
-        } catch {}
+        setCompletedOrder(verifyData.order);
 
-        setOrderId(confirmedOrder.id);
+        setOrderId(verifyData.order.id);
         setIsProcessing(false);
         setOrderComplete(true);
         clearCart();
