@@ -10,10 +10,7 @@ dotenv.config();
 const router = express.Router();
 
 function mapDbOrder(row) {
-  let items = [];
-  try {
-    items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
-  } catch {}
+  const items = Array.isArray(row.order_items) ? row.order_items : [];
 
   return {
     id: row.id,
@@ -34,11 +31,41 @@ function mapDbOrder(row) {
     deliveryFee: Number(row.delivery_fee || 0),
     total: Number(row.total || 0),
     status: row.status,
-    items,
+    items: items.map(item => ({
+      id: item.id,
+      productId: item.product_id || null,
+      name: item.name,
+      size: item.size,
+      color: item.color,
+      price: Number(item.unit_price || 0),
+      quantity: Number(item.quantity || 1),
+      image: item.image_url || '/images/products/linen-set-1.jpg',
+    })),
     paidAt: row.paid_at,
     createdAt: row.created_at,
   };
 }
+
+const relationalOrderSelect = `
+  SELECT o.*,
+    COALESCE(
+      json_agg(
+        json_build_object(
+          'id', oi.id,
+          'product_id', oi.product_id,
+          'name', oi.name,
+          'size', oi.size,
+          'color', oi.color,
+          'image_url', oi.image_url,
+          'quantity', oi.quantity,
+          'unit_price', oi.unit_price
+        ) ORDER BY oi.id
+      ) FILTER (WHERE oi.id IS NOT NULL),
+      '[]'::json
+    ) AS order_items
+  FROM orders o
+  LEFT JOIN order_items oi ON oi.order_id = o.id
+`;
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || '';
 const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY || '';
@@ -384,12 +411,22 @@ router.post('/verify', async (req, res) => {
         await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [newOrder.reference]);
 
         const existing = await client.query(
-          'SELECT * FROM orders WHERE id = $1 OR reference = $2 ORDER BY created_at DESC LIMIT 1 FOR UPDATE',
+          `SELECT * FROM orders
+           WHERE id = $1 OR reference = $2
+           ORDER BY created_at DESC
+           LIMIT 1
+           FOR UPDATE`,
           [newOrder.id, newOrder.reference],
         );
         if (existing.rows.length > 0) {
           await client.query('COMMIT');
-          const existingOrder = mapDbOrder(existing.rows[0]);
+          const existingOrderResult = await pool.query(
+            `${relationalOrderSelect} WHERE o.id = $1 GROUP BY o.id`,
+            [existing.rows[0].id],
+          );
+          const existingOrder = existingOrderResult.rows[0]
+            ? mapDbOrder(existingOrderResult.rows[0])
+            : mapDbOrder(existing.rows[0]);
           return res.status(200).json({
             success: true,
             message: 'Order was already registered.',
@@ -446,7 +483,7 @@ router.post('/verify', async (req, res) => {
           newOrder.state, newOrder.city, newOrder.address, newOrder.shippingMethod, newOrder.paymentMethod,
           newOrder.transferAccountName || '', newOrder.paymentConfirmed, newOrder.itemsCount,
           newOrder.subtotal, newOrder.deliveryFee, newOrder.total, newOrder.status,
-          JSON.stringify(newOrder.items), newOrder.paidAt, newOrder.createdAt, newOrder.userId
+          JSON.stringify([]), newOrder.paidAt, newOrder.createdAt, newOrder.userId
         ]);
         for (const item of newOrder.items) {
           await client.query(
@@ -468,6 +505,13 @@ router.post('/verify', async (req, res) => {
         }
         await client.query('COMMIT');
         console.log(`[ORDERS] Order #${newOrder.id} and inventory successfully saved to PostgreSQL.`);
+        return res.status(200).json({
+          success: true,
+          message: isBankTransfer
+            ? 'Order registered successfully, awaiting bank transfer confirmation.'
+            : 'Payment verified and order confirmed successfully.',
+          order: newOrder,
+        });
       } catch (dbErr) {
         await client.query('ROLLBACK');
         if (dbErr.statusCode) {
@@ -510,7 +554,7 @@ router.post('/verify', async (req, res) => {
 
 /**
  * PATCH /api/payments/orders/:id/status
- * Updates the fulfillment status of an order in Neon DB & memory
+ * Updates the fulfillment status of an order in Neon DB or local development storage
  */
 router.patch('/orders/:id/status', async (req, res) => {
   const { id } = req.params;
@@ -524,9 +568,20 @@ router.patch('/orders/:id/status', async (req, res) => {
       if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
         const pool = getPool();
         await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [status, id]);
+        const dbRes = await pool.query(`${relationalOrderSelect} WHERE o.id = $1 GROUP BY o.id`, [id]);
+        order = dbRes.rows[0] ? mapDbOrder(dbRes.rows[0]) : null;
+        return res.status(200).json({
+          success: true,
+          message: `Order status updated to ${status}.`,
+          order,
+        });
       }
     } catch (e) {
-      console.warn('[ORDERS] Could not update status in Neon PostgreSQL:', e.message);
+      console.error('[ORDERS] Could not update status in Neon PostgreSQL:', e);
+      return res.status(503).json({
+        success: false,
+        message: 'Order status could not be updated because the database is unavailable.',
+      });
     }
 
     // 2. Update local store
@@ -562,9 +617,29 @@ router.post('/orders/:id/confirm-payment', async (req, res) => {
           'UPDATE orders SET payment_confirmed = true, status = $1, paid_at = $2 WHERE id = $3',
           ['Processing', paidAt, id]
         );
+        const dbRes = await pool.query(`${relationalOrderSelect} WHERE o.id = $1 GROUP BY o.id`, [id]);
+        order = dbRes.rows[0] ? mapDbOrder(dbRes.rows[0]) : null;
+        if (!order) {
+          return res.status(404).json({
+            success: false,
+            message: 'Order not found.',
+          });
+        }
+        sendOrderConfirmationEmail(order).catch(err => {
+          console.warn('[ORDERS] Background email sending failed:', err.message);
+        });
+        return res.status(200).json({
+          success: true,
+          message: 'Bank transfer confirmed successfully and receipt email sent to customer.',
+          order,
+        });
       }
     } catch (e) {
-      console.warn('[ORDERS] Could not confirm payment in Neon PostgreSQL:', e.message);
+      console.error('[ORDERS] Could not confirm payment in Neon PostgreSQL:', e);
+      return res.status(503).json({
+        success: false,
+        message: 'Payment confirmation could not be saved because the database is unavailable.',
+      });
     }
 
     if (order) {
@@ -612,19 +687,29 @@ router.get('/my-orders', async (req, res) => {
       try {
         const pool = getPool();
         const dbRes = await pool.query(`
-          SELECT * FROM orders 
-          WHERE (user_id IS NOT NULL AND user_id = $1)
-             OR (email IS NOT NULL AND LOWER(email) = LOWER($2))
-             OR ($3 != '' AND LOWER(customer) ILIKE $4)
-          ORDER BY created_at DESC
-        `, [userId || 'none', email || 'none', customer, `%${customer}%`]);
+            ${relationalOrderSelect}
+            WHERE (o.user_id IS NOT NULL AND o.user_id = $1)
+               OR (o.email IS NOT NULL AND LOWER(o.email) = LOWER($2))
+               OR ($3 != '' AND LOWER(o.customer) ILIKE $4)
+            GROUP BY o.id
+            ORDER BY o.created_at DESC
+          `, [userId || 'none', email || 'none', customer, `%${customer}%`]);
 
         if (dbRes.rows && dbRes.rows.length > 0) {
           matchedOrders = dbRes.rows.map(mapDbOrder);
         }
       } catch (dbErr) {
-        console.warn('[ORDERS] my-orders query error from DB:', dbErr.message);
+        console.error('[ORDERS] my-orders query error from DB:', dbErr);
+        return res.status(503).json({
+          success: false,
+          message: 'Orders could not be retrieved because the database is unavailable.',
+        });
       }
+      return res.status(200).json({
+        success: true,
+        count: matchedOrders.length,
+        data: matchedOrders,
+      });
     }
 
     if (matchedOrders.length === 0) {
@@ -652,25 +737,37 @@ router.get('/my-orders', async (req, res) => {
 
 /**
  * GET /api/payments/orders
- * Returns registered orders from Neon PostgreSQL Cloud DB (with memory store fallback)
+ * Returns registered orders from Neon PostgreSQL Cloud DB or local development storage
  */
 router.get('/orders', async (req, res) => {
   try {
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       const pool = getPool();
-      const dbRes = await pool.query('SELECT * FROM orders ORDER BY created_at DESC');
+      const dbRes = await pool.query(`
+        ${relationalOrderSelect}
+        GROUP BY o.id
+        ORDER BY o.created_at DESC
+      `);
       if (dbRes.rows && dbRes.rows.length > 0) {
         const mappedOrders = dbRes.rows.map(mapDbOrder);
-        ordersStore = mappedOrders;
         return res.status(200).json({
           success: true,
           count: mappedOrders.length,
           data: mappedOrders,
         });
       }
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: [],
+      });
     }
   } catch (dbErr) {
-    console.warn('[ORDERS] Could not query Neon PostgreSQL, using cache fallback:', dbErr.message);
+    console.error('[ORDERS] Could not query Neon PostgreSQL:', dbErr);
+    return res.status(503).json({
+      success: false,
+      message: 'Orders could not be retrieved because the database is unavailable.',
+    });
   }
 
   return res.status(200).json({
@@ -694,9 +791,17 @@ router.delete('/orders/:id', async (req, res) => {
       if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
         const pool = getPool();
         await pool.query('DELETE FROM orders WHERE id = $1', [id]);
+        return res.status(200).json({
+          success: true,
+          message: `Order #${id} deleted successfully.`,
+        });
       }
     } catch (e) {
-      console.warn('[ORDERS] DB delete warning:', e.message);
+      console.error('[ORDERS] DB delete failed:', e);
+      return res.status(503).json({
+        success: false,
+        message: 'Order could not be deleted because the database is unavailable.',
+      });
     }
 
     return res.status(200).json({

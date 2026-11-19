@@ -313,7 +313,7 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 2. Add focused tests or a controlled smoke test for the migrated catalogue. **Category GET smoke test complete.**
 3. Remove the remaining category backend JSON and in-memory operational fallbacks. **Complete.**
 4. Verify admin login → category save → product/variant save → storefront read. **Complete.**
-5. Begin the order schema work; relational order snapshot migration and write path are **Complete**. Existing order reads and legacy JSON cleanup remain.
+5. Begin the order schema work; relational order snapshot migration, write path, relational reads, and legacy JSON cleanup are **Complete**.
 6. Repair or remove the missing `prisma/seed.js` script. **Complete.**
 
 ## Validation notes
@@ -339,6 +339,8 @@ Prisma 7 CLI checks completed in Linux:
 - `npx prisma generate` generates `@prisma/client` successfully.
 - No automated test suite or test script is currently configured in
   `server/package.json`.
+- PostgreSQL order reads now join immutable `order_items` snapshots, and new
+  PostgreSQL orders no longer use the legacy `orders.items` JSON payload.
 
 The authenticated catalogue smoke test also passed against the configured
 database: admin login, category creation, product creation with a relational
