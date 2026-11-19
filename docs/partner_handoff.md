@@ -7,8 +7,8 @@ Updated: 2026-11-19
 - Repository: `Necheee/Penny`
 - Branch: `main`
 - `HEAD`: `1158952`
-- Branch is five commits ahead of `origin/main`.
-- Source worktree was clean before this handoff update; this document is currently untracked.
+- Branch is ten commits ahead of `origin/main`.
+- Source worktree was clean before this handoff update; this document is tracked.
 - The database is a remote PostgreSQL/Neon instance configured through `server/.env`.
 - Do not expose or commit `server/.env`.
 - Linux Node.js `v26.13.1` is available at `/usr/local/bin/node`.
@@ -59,8 +59,9 @@ Prisma tooling is now runnable from Linux. Node.js `v26.13.1` is installed and
 
 ## Current application architecture
 
-The database schema now contains the relational catalogue structures, but the
-application has not yet been converted to Prisma or made database-only.
+The database schema contains the relational catalogue structures. The
+application uses `pg` as its active database-backed runtime persistence layer;
+it has not been converted to Prisma.
 
 ### Architecture guardrails
 
@@ -147,9 +148,9 @@ This avoids maintaining two competing runtime persistence implementations. Any
 future move to Prisma must be an intentional, repository-wide migration rather
 than a route-by-route hybrid.
 
-The next implementation step is to make the relational variant and image tables
-authoritative in the API and frontend while preserving the existing response
-shape during the transition.
+The remaining implementation work is to finish the frontend/API model
+transition and remove legacy compatibility paths while preserving the existing
+response shape where required.
 
 ### 4. Complete catalogue model usage — **Complete**
 
@@ -159,6 +160,9 @@ normalization layer follows those relational values, including empty relational
 arrays, instead of inventing defaults. Legacy JSON columns remain as
 compatibility mirrors for the existing response shape and older records, but
 are no longer authoritative for relational catalogue data.
+
+This marks relational data authority as complete; the remaining legacy response
+shape and frontend migration work is tracked separately under item 8.
 
 ## Full remaining implementation roadmap
 
@@ -258,12 +262,13 @@ migration/deployment tooling; they are not a second runtime persistence path.
 The remaining catalogue work is to remove legacy JSON fields from the active
 normalization and write paths, not to introduce Prisma into those routes.
 
-### 11. Complete database migration/deployment hygiene — **Not complete**
+### 11. Complete database migration/deployment hygiene — **Complete**
 
-The catalogue migration was applied directly with `psql`, but the live database
-does not have `_prisma_migrations` bookkeeping. Safely reconcile this before
-using `prisma migrate deploy` or future automated deployments. Validate the
-Prisma schema and migration state against the live database.
+The catalogue migration was initially applied directly with `psql`; its
+`_prisma_migrations` bookkeeping was subsequently reconciled with
+`prisma migrate resolve --applied`. The relational order snapshot migration was
+then applied with `prisma migrate deploy`, and `prisma migrate status` confirms
+that both migrations are applied and the database schema is up to date.
 
 ### 12. Harden catalogue and administrative workflows — **Partial**
 
@@ -318,12 +323,14 @@ now database-only and no `server/prisma/seed.js` implementation exists.
    retain `pg`; Prisma is the schema contract and migration tool.**
 4. Make relational variants/images/status authoritative in the API and frontend. **Complete.**
 5. Verify and harden inventory adjustment, reservation, cancellation, and
-   concurrency behavior.
-6. Convert active currency calculations and payment totals to Decimal-safe values.
+   concurrency behavior. **Partial.**
+6. Convert active currency calculations and payment totals to Decimal-safe
+   values. **Partial: calculations are complete; display/model normalization
+   remains.**
 7. Make order items immutable relational snapshots. **Complete.**
-8. Remove operational frontend localStorage catalogue/order fallbacks.
-9. Complete admin-to-storefront-to-checkout end-to-end verification.
-10. Add focused regression and integration coverage.
+8. Remove operational frontend localStorage catalogue/order fallbacks. **Partial.**
+9. Complete admin-to-storefront-to-checkout end-to-end verification. **Partial.**
+10. Add focused regression and integration coverage. **Not complete.**
 11. Repair or remove the broken seed script. **Complete.**
 
 ## Recommended next session
