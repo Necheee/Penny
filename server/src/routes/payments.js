@@ -10,7 +10,7 @@ dotenv.config();
 
 const router = express.Router();
 
-function mapDbOrder(row) {
+export function mapDbOrder(row) {
   const items = Array.isArray(row.order_items) ? row.order_items : [];
 
   return {
@@ -45,6 +45,14 @@ function mapDbOrder(row) {
     paidAt: row.paid_at,
     createdAt: row.created_at,
   };
+}
+
+export function validateOrderItem(item) {
+  const quantity = Number.isInteger(item.quantity) && item.quantity > 0 ? item.quantity : 0;
+  if (!item.productId || !item.size || !item.color || quantity === 0) {
+    return 'Each order item must identify a product, size, color, and positive quantity.';
+  }
+  return null;
 }
 
 const relationalOrderSelect = `
@@ -438,12 +446,13 @@ router.post('/verify', async (req, res) => {
         }
 
         for (const item of newOrder.items) {
-          const quantity = Number.isInteger(item.quantity) && item.quantity > 0 ? item.quantity : 0;
-          if (!item.productId || !item.size || !item.color || quantity === 0) {
-            throw Object.assign(new Error('Each order item must identify a product, size, color, and positive quantity.'), {
+          const validationError = validateOrderItem(item);
+          if (validationError) {
+            throw Object.assign(new Error(validationError), {
               statusCode: 400,
             });
           }
+          const quantity = item.quantity;
 
           const variantResult = await client.query(
             `SELECT id, stock_quantity

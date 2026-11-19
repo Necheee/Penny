@@ -162,6 +162,19 @@ export function formatProductRow(row, relations = {}) {
   };
 }
 
+export function validateInventoryAdjustmentInput(body = {}) {
+  const quantityDelta = Number(body.quantityDelta);
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+
+  if (!Number.isInteger(quantityDelta) || quantityDelta === 0 || !reason) {
+    return {
+      error: 'A non-zero integer quantityDelta and adjustment reason are required.',
+    };
+  }
+
+  return { quantityDelta, reason };
+}
+
 // ==========================================
 // 1. PUBLIC STOREFRONT ROUTES
 // ==========================================
@@ -604,13 +617,12 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
  */
 router.patch('/:id/variants/:variantId/inventory', requireAuth, requireAdmin, async (req, res) => {
   const { id, variantId } = req.params;
-  const quantityDelta = Number(req.body?.quantityDelta);
-  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  const { quantityDelta, reason, error } = validateInventoryAdjustmentInput(req.body);
 
-  if (!Number.isInteger(quantityDelta) || quantityDelta === 0 || !reason) {
+  if (error) {
     return res.status(400).json({
       success: false,
-      message: 'A non-zero integer quantityDelta and adjustment reason are required.',
+      message: error,
     });
   }
 

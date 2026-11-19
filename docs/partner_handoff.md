@@ -401,8 +401,10 @@ Prisma 7 CLI checks completed in Linux:
 
 - `npm run prisma:validate` passes with Prisma `7.10.1`.
 - `npx prisma generate` generates `@prisma/client` successfully.
-- No automated test suite or test script is currently configured in
-  `server/package.json`.
+- A focused Node `node:test` regression suite is configured in
+  `server/package.json` and currently covers currency arithmetic, relational
+  catalogue authority, checkout item validation, order snapshot mapping,
+  checkout concurrency/rollback safeguards, and admin authorization.
 - PostgreSQL order reads now join immutable `order_items` snapshots, and new
   PostgreSQL orders no longer use the legacy `orders.items` JSON payload.
 
