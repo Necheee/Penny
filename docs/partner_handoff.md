@@ -352,6 +352,31 @@ now database-only and no `server/prisma/seed.js` implementation exists.
 6. Review administrative mutation routes for authorization and explicit error
    handling, including refund-specific inventory behavior.
 
+## Practical completion scope
+
+The implementation work documented above is a hardening backlog rather than a
+set of launch-blocking features. The core catalogue, migration, persistence,
+payment, order snapshot, and inventory foundations are already in place.
+
+Use the following three milestones to keep remaining work bounded:
+
+1. **Ship confidence**
+   - Complete and verify the admin-to-storefront-to-checkout workflow.
+   - Verify category, product, variant, image, stock, activation/archive,
+     order snapshot, and inventory behavior end to end.
+
+2. **Prevent regressions**
+   - Add focused tests for checkout locking/concurrency, duplicate payment
+     verification, immutable snapshots, database failures, inventory
+     adjustments, status transitions, and admin authorization.
+
+3. **Follow-up cleanup**
+   - Finish Decimal-safe display normalization.
+   - Finish the relational frontend/API model migration.
+   - Remove remaining catalogue cache and local fallback authority.
+   - Review refund and administrative mutation behavior for authorization and
+     explicit errors.
+
 ## Validation notes
 
 The following live checks were completed with `psql`:
