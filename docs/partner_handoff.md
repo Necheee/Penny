@@ -1,26 +1,24 @@
 # PENNY Partner Handoff
 
-Updated: 2026-11-19
+Updated: 2026-11-22
 
 ## Current repository state
 
 - Repository: `Necheee/Penny`
 - Branch: `main`
-- `HEAD`: `94254c9`
-- Branch is twelve commits ahead of `origin/main`.
-- The current worktree includes the frontend catalogue-model migration and this
-  handoff update; no unrelated changes should be reverted.
+- `HEAD`: `b0578c8`
+- Branches `main` and `penny_dev_branch` are fully synchronized with remote.
+- All 15 audit concerns from `PRE_UPLOAD_AUDIT_AND_SECURITY_REPORT.md` are 100% resolved across Phases 1, 2, and 3.
 - The database is a remote PostgreSQL/Neon instance configured through `server/.env`.
 - Do not expose or commit `server/.env`.
-- Linux Node.js `v26.13.1` is available at `/usr/local/bin/node`.
 
 Recent relevant commits:
 
-1. `94254c9` - persist selected variant references and restore inventory on cancellation.
-2. `c827220` - update partner handoff documentation and migration status.
-3. `1158952` - add Prisma 7 configuration and update package dependencies.
-4. `b05f252` - add inventory adjustments and checkout stock locking.
-5. `5b9c691` - add product variants and product images.
+1. `b0578c8` - complete phase 2 and phase 3 hardening, auth locks, and operational polish.
+2. `a6731a8` - complete phase 1 catalog onboarding hardening, BigInt fix, atomic UUIDs, in-place variant diffs, safe product cloning, multi-image manager, and R2 validation.
+3. `19ce98d` - resolve phase 1 pre-upload catalog and media upload blockers.
+4. `94254c9` - persist selected variant references and restore inventory on cancellation.
+5. `b05f252` - add inventory adjustments and checkout stock locking.
 
 ## Database migration status
 
@@ -112,6 +110,18 @@ from `DATABASE_URL` there and is no longer declared in the Prisma schema.
   `server/prisma.config.ts`.
 - `npm run prisma:validate` passes.
 - `npx prisma generate` generates `@prisma/client` successfully.
+- JWT signature lockdown: dev secret fallback and unverified `jwt.decode` fallback removed.
+- Order endpoints (`GET /orders`, `DELETE /orders/:id`) protected with admin or order-owner authorization.
+- Customer routes (`profile`, `change-password`, `sync`, `cart`, `notifications-state`) scoped to verified JWT sessions.
+- Direct Bank Transfer flow with admin payment confirmation and automated luxury receipt generation.
+- Authoritative server-side price and delivery fee recalculation from PostgreSQL during checkout.
+- Cart `BigInt * Number` TypeError resolved with defensive fallback and sanitized currency strings.
+- Atomic product creation with cryptographic UUIDs and non-destructive variant diff/upsert preserving order references.
+- Multi-Image Manager in `ProductFormModal.jsx` with individual deletion and cover photo selector.
+- Cloudflare R2 upload error handling (Multer 413) and public endpoint validation.
+- Storefront draft/archive isolation and server-side catalogue pagination.
+- Variant stock synchronization on product `inStock` toggles.
+- Runtime DDL statements removed from GET/POST request loops.
 
 ## What remains
 

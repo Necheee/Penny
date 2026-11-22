@@ -7,25 +7,28 @@ This document outlines the structured development phases for **PENNY**, covering
 ## High-Level Phase Overview
 
 ```
-[Phases 1-10: Frontend Storefront]                  --> COMPLETED
+[Phases 1-10: Frontend Storefront]                          --> COMPLETED
                  │
                  ▼
-[Phase 11: Admin Dashboard UI & Workflows]            --> COMPLETED
+[Phase 11: Admin Dashboard UI & Workflows]                    --> COMPLETED
                  │
                  ▼
-[Phase 12: Backend Server & Neon Cloud PostgreSQL]    --> COMPLETED
+[Phase 12: Backend Server & Neon Cloud PostgreSQL]            --> COMPLETED
                  │
                  ▼
-[Phase 13: Full-Stack Integration & Persistent Sync]  --> COMPLETED
+[Phase 13: Full-Stack Integration & Persistent Sync]          --> COMPLETED
                  │
                  ▼
-[Phase 14: Payment Workflows & Transactional Emails]  --> COMPLETED
+[Phase 14: Payment Workflows & Transactional Emails]          --> COMPLETED
                  │
                  ▼
-[Phase 15: Production Deployment & SEO (Live Launch)] --> CURRENT TARGET
+[Phase 15: Catalogue, Security & Scaling Hardening]           --> COMPLETED
                  │
                  ▼
-[Phase 16: Academic Defense & Documentation (FYP)]
+[Phase 16: Production Deployment & Live Launch]               --> CURRENT TARGET
+                 │
+                 ▼
+[Phase 17: Academic Defense & Final Deliverables (FYP)]
 ```
 
 ---
@@ -200,31 +203,69 @@ The objective of Phase 14 was to automate purchasing, payment identification, an
 
 ---
 
-## Phase 15: Production Deployment & Optimization
+## Phase 15: Catalogue, Security & Scaling Hardening (Completed)
 
-The objective of Phase 15 is to publish PENNY live to the web.
+The objective of Phase 15 was to perform a rigorous pre-upload audit and resolve all architectural, security, payment, and media data-loss vectors across the platform prior to mass catalog ingestion and live customer traffic. All 15 audit concerns were resolved across three structured remediation steps:
 
-### Phase 15.1: Performance & SEO
+### Phase 15.1: Catalogue & Media Pipeline Hardening (Phase 1 Remediation)
+- **Cart BigInt Arithmetic Protection:** Fixed `BigInt * Number` multiplication TypeError in `CartContext.jsx` with defensive floating-point fallback and sanitized currency strings in `money.js`.
+- **Atomic Product Creation & Cryptographic UUIDs:** Replaced 4-digit timestamp IDs (`p-XXXX`) with collision-free UUIDs (`p-${crypto.randomUUID()}`), removed destructive `ON CONFLICT (id) DO UPDATE` to eliminate silent product overwrites, added automatic slug deduplication, and wrapped product insertion in atomic transactions in `products.js`.
+- **Non-Destructive Variant Upsert:** Replaced destructive variant deletion (`DELETE FROM product_variants`) with an in-place diff and update algorithm that matches existing variants by ID or `(size, color_name)`. Stable variant IDs prevent foreign-key nullification in `order_items` and cascading deletions in `inventory_adjustments`. Variants referenced by existing customer orders are soft-retired (`stock_quantity = 0`) instead of deleted.
+- **Safe Product Duplication:** Stripped legacy IDs and SKUs on cloning in `AdminDashboard.jsx` and `ProductFormModal.jsx`; server generates fresh UUIDs and SKUs inside an atomic transaction.
+- **Multi-Image Manager & Cloudflare R2 Guardrails:**
+  - Built an interactive Multi-Image Manager in `ProductFormModal.jsx` allowing admins to upload multiple photos, set cover images, and delete individual images down to a single photo.
+  - Disabled the **Save Product** button while images are actively uploading.
+  - Added backend validation in `products.js` rejecting raw `data:` base64 URLs.
+  - Enforced `R2_PUBLIC_URL` validation in `media.js` and wrapped Multer upload limits (`LIMIT_FILE_SIZE` -> 413).
+- **Scope Refinement:** Product descriptions and specs (`description`, `material`, `fit`, `care`, `shipping`) were intentionally removed from the storefront per business aesthetic design requirements.
 
-- **Task 15.1.1:** Add OpenGraph and Twitter meta tags for rich social sharing cards.
-- **Task 15.1.2:** Convert assets to modern formats (`.webp`), implement lazy loading, and compress bundle.
-- **Task 15.1.3:** Implement a branded 404 "Page Not Found" screen.
+### Phase 15.2: Critical Security & Payment Hardening (Phase 2 Remediation)
+- **JWT Signature Lockdown:** Eliminated `jwt.decode` unverified payload fallbacks and hardcoded dev secrets in `token.js`. Tokens are strictly verified against `JWT_SECRET`.
+- **Order & Customer Data Protection:**
+  - Added `requireAuth, requireAdmin` to `GET /api/payments/orders` in `payments.js`.
+  - Secured `DELETE /api/payments/orders/:id` with `requireAuth`, allowing only authenticated admins or verified order owners.
+  - Scoped `GET /api/payments/my-orders` strictly to verified customer JWT sessions (`req.user.id` / `req.user.email`), requiring both email and order reference for unauthenticated guest lookups.
+  - Removed insecure client-side fallbacks in `Account.jsx` and `NotificationContext.jsx` that previously dumped all orders.
+  - Closed the guest checkout account takeover flaw in `customer-login` in `auth.js`.
+  - Protected customer profile, password change, customer sync, cart, and notification state with `requireAuth` and user-ownership verification.
+  - Protected contact message routes (`GET /messages`, `PATCH /messages/:id/read`, `POST /messages/:id/reply`, `GET /my-inquiries`) in `contact.js`.
+- **Authoritative Server-Side Pricing:**
+  - In `POST /api/payments/verify`, recalculated order subtotals and delivery fees directly from PostgreSQL database prices (`product_variants JOIN products FOR UPDATE`).
+  - Validated Paystack kobo amount and NGN currency before confirming card orders.
 
-### Phase 15.2: Hosting & Continuous Deployment
-
-- **Task 15.2.1:** Deploy frontend to Vercel / Netlify with GitHub CI/CD automation.
-- **Task 15.2.2:** Deploy backend and database to cloud infrastructure (Render, Railway, or Supabase).
-- **Task 15.2.3:** Configure custom domain name and verify SSL certificate.
+### Phase 15.3: Scaling, Inventory UI & Polish (Phase 3 Remediation)
+- **Catalogue Privacy & Pagination:** Enforced that `GET /api/products` only exposes active, non-archived products to public users. Draft and archived reads require verified admin tokens. Added `page` and `limit` query parameters for server-side pagination.
+- **Variant Stock Toggle Persistence:** Fixed `inStock` calculation in `formatProductRow` in `products.js` to respect both `row.in_stock` and variant stock quantities. Explicit stock toggles (`inStock: false`) zero out variant stock, and toggling back on restores base stock.
+- **Database Performance & DDL Hygiene:** Relocated runtime `ALTER TABLE users ADD COLUMN IF NOT EXISTS...` queries out of user request loops into `initCloudDatabase()` in `cloudDb.js`, eliminating schema locks on GET/POST requests.
+- **Auth Link Aliases & Rich Color Palettes:** Added `/signin`, `/login`, `/create-account`, `/register`, and `/forgot-password` route aliases to `App.jsx`. Expanded color swatches in `ProductModal.jsx` with case-insensitive matching, hex input support, and variant-assigned `colorHex` fallbacks across 60+ fashion colors.
 
 ---
 
-## Phase 16: Academic Defense & Final Year Project Deliverables
+## Phase 16: Production Deployment & Optimization (Current Target)
 
-The objective of Phase 16 is to prepare all required academic documentation and presentation materials.
+The objective of Phase 16 is to publish PENNY live to the web.
 
-- **Task 16.1:** System Architecture Diagram (Client-Server data flow and component hierarchy).
-- **Task 16.2:** Entity-Relationship Diagram (ERD) with relational cardinalities.
-- **Task 16.3:** API Documentation (Swagger / Postman collection).
-- **Task 16.4:** Test Suite & Results (Unit tests for cart/delivery calculations and end-to-end checkout flow).
-- **Task 16.5:** Final Project Report Chapters (Introduction, Literature Review, Methodology, Implementation, Testing, and Conclusion).
-- **Task 16.6:** Presentation slide deck and live defense demonstration script.
+### Phase 16.1: Performance & SEO
+
+- **Task 16.1.1:** Add OpenGraph and Twitter meta tags for rich social sharing cards.
+- **Task 16.1.2:** Convert assets to modern formats (`.webp`), implement lazy loading, and compress bundle.
+- **Task 16.1.3:** Implement a branded 404 "Page Not Found" screen.
+
+### Phase 16.2: Hosting & Continuous Deployment
+
+- **Task 16.2.1:** Deploy frontend to Vercel / Netlify with GitHub CI/CD automation.
+- **Task 16.2.2:** Deploy backend and database to cloud infrastructure (Render, Railway, or Supabase).
+- **Task 16.2.3:** Configure custom domain name and verify SSL certificate.
+
+---
+
+## Phase 17: Academic Defense & Final Year Project Deliverables
+
+The objective of Phase 17 is to prepare all required academic documentation and presentation materials.
+
+- **Task 17.1:** System Architecture Diagram (Client-Server data flow and component hierarchy).
+- **Task 17.2:** Entity-Relationship Diagram (ERD) with relational cardinalities.
+- **Task 17.3:** API Documentation (Swagger / Postman collection).
+- **Task 17.4:** Test Suite & Results (Unit tests for cart/delivery calculations and end-to-end checkout flow).
+- **Task 17.5:** Final Project Report Chapters (Introduction, Literature Review, Methodology, Implementation, Testing, and Conclusion).
+- **Task 17.6:** Presentation slide deck and live defense demonstration script.
