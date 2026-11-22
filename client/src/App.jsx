@@ -48,6 +48,11 @@ function App() {
                         <Route path="/account/register" element={<CreateAccount />} />
                         <Route path="/account/forgot-password" element={<ForgotPassword />} />
                         <Route path="/account" element={<Account />} />
+                        <Route path="/signin" element={<SignIn />} />
+                        <Route path="/login" element={<SignIn />} />
+                        <Route path="/create-account" element={<CreateAccount />} />
+                        <Route path="/register" element={<CreateAccount />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
                         
                         {/* Wishlist Route */}
                         <Route path="/wishlist" element={<Wishlist />} />

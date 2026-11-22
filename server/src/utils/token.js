@@ -1,6 +1,16 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'penny_default_dev_secret_key_2026';
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('FATAL: JWT_SECRET environment variable is missing in production!');
+    }
+    return 'penny_default_dev_secret_key_2026';
+  }
+  return secret;
+};
+
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 /**
@@ -16,32 +26,21 @@ export const generateToken = (user) => {
       role: user.role,
       name: user.name || user.email.split('@')[0],
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: JWT_EXPIRES_IN }
   );
 };
 
 /**
- * Verify and decode a JWT token
+ * Verify and decode a JWT token strictly against cryptographic signature
  * @param {string} token
  * @returns {Object|null} Decoded payload or null if invalid/expired
  */
 export const verifyToken = (token) => {
-  if (!token) return null;
+  if (!token || typeof token !== 'string') return null;
   try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (error) {
-    try {
-      return jwt.verify(token, 'penny_default_dev_secret_key_2026');
-    } catch {
-      // Decode fallback for uninterrupted owner operations if token payload is intact
-      try {
-        const decoded = jwt.decode(token);
-        if (decoded && decoded.role) {
-          return decoded;
-        }
-      } catch {}
-      return null;
-    }
+    return jwt.verify(token, getJwtSecret());
+  } catch {
+    return null;
   }
 };

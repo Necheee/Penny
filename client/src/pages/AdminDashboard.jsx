@@ -137,7 +137,7 @@ export default function AdminDashboard() {
       setIsRefreshingOrders(true);
       setOrdersError('');
       const [ordersRes, configRes] = await Promise.all([
-        fetch('/api/payments/orders'),
+        fetch('/api/payments/orders', { headers: adminAuthHeaders() }),
         fetch('/api/payments/config'),
       ]);
 
@@ -168,7 +168,7 @@ export default function AdminDashboard() {
     loadBackendData();
     // Auto-refresh orders every 10 seconds so new customer orders appear in real-time
     const interval = setInterval(() => {
-      fetch('/api/payments/orders')
+      fetch('/api/payments/orders', { headers: adminAuthHeaders() })
         .then(res => res.json())
         .then(data => {
           if (!data.success || !Array.isArray(data.data)) {
@@ -804,7 +804,9 @@ export default function AdminDashboard() {
   const fetchMessages = async () => {
     try {
       setIsLoadingMessages(true);
-      const res = await fetch('/api/contact/messages');
+      const res = await fetch('/api/contact/messages', {
+        headers: adminAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) {
@@ -828,6 +830,7 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(`/api/contact/messages/${id}/read`, {
         method: 'PATCH',
+        headers: adminAuthHeaders(),
       });
       if (res.ok) {
         setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'read' } : m));
@@ -847,7 +850,7 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(`/api/contact/messages/${replyModalMessage.id}/reply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: adminAuthHeaders(),
         body: JSON.stringify({ replyText: replyText.trim() }),
       });
       const data = await res.json();

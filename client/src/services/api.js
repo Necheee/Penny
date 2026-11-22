@@ -44,7 +44,7 @@ const getAuthHeaders = () => {
 export const getProducts = async (options = {}) => {
   const { includeArchived = true } = options;
   const url = includeArchived ? `${API_BASE}/products?includeArchived=true` : `${API_BASE}/products`;
-  const res = await safeFetch(url);
+  const res = await safeFetch(url, { headers: getAuthHeaders() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.success || !Array.isArray(data.data)) {
     throw new Error(data.message || `Catalogue request failed (${res.status}).`);

@@ -237,39 +237,23 @@ export default function Account() {
       const userFullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
       const userId = user?.id || '';
 
-      // 1. Direct query to my-orders (matches by user_id in DB, email, or customer name)
+      // 1. Direct query to my-orders strictly for the authenticated customer
       try {
         const queryParams = new URLSearchParams();
         if (userEmail) queryParams.append('email', userEmail);
         if (userId) queryParams.append('userId', userId);
         if (userFullName) queryParams.append('customer', userFullName);
 
-        const res = await fetch(`/api/payments/my-orders?${queryParams.toString()}`);
+        const token = localStorage.getItem('penny_customer_token');
+        const res = await fetch(`/api/payments/my-orders?${queryParams.toString()}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         if (res.ok) {
           const data = await res.json();
           backendOrders = Array.isArray(data.data) ? data.data : [];
         }
       } catch (apiErr) {
-        console.warn('Could not fetch server orders via my-orders, falling back:', apiErr);
-      }
-
-      // 2. Fallback to general orders query if needed
-      if (backendOrders.length === 0) {
-        try {
-          const res = await fetch('/api/payments/orders');
-          if (res.ok) {
-            const data = await res.json();
-            const allOrders = Array.isArray(data.data) ? data.data : [];
-            backendOrders = allOrders.filter(ord => {
-              const orderEmail = (ord.email || '').toLowerCase().trim();
-              const orderCustomer = (ord.customer || '').toLowerCase().trim();
-              if (userId && ord.userId && ord.userId === userId) return true;
-              if (userEmail && orderEmail && orderEmail === userEmail) return true;
-              if (userFullName && orderCustomer && (orderCustomer.includes(userFullName.toLowerCase()) || userFullName.toLowerCase().includes(orderCustomer))) return true;
-              return false;
-            });
-          }
-        } catch (apiErr) {}
+        console.warn('Could not fetch server orders via my-orders:', apiErr);
       }
 
       // Filter by logged-in user email, userId or matching customer full name
@@ -313,7 +297,10 @@ export default function Account() {
   const loadCloudNotificationsState = useCallback(async () => {
     if (!user) return;
     try {
-      const res = await fetch(`/api/auth/notifications-state?email=${encodeURIComponent(user.email || '')}&userId=${encodeURIComponent(user.id || '')}`);
+      const token = localStorage.getItem('penny_customer_token');
+      const res = await fetch(`/api/auth/notifications-state?email=${encodeURIComponent(user.email || '')}&userId=${encodeURIComponent(user.id || '')}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.dismissedNotifications)) {
@@ -355,7 +342,11 @@ export default function Account() {
     if (!shouldDelete) return;
 
     try {
-      const response = await fetch(`/api/payments/orders/${orderId}`, { method: 'DELETE' });
+      const token = localStorage.getItem('penny_customer_token');
+      const response = await fetch(`/api/payments/orders/${orderId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'The order could not be deleted.');
@@ -387,9 +378,13 @@ export default function Account() {
 
     // Sync cloud state for cross-device consistency
     try {
+      const token = localStorage.getItem('penny_customer_token');
       await fetch('/api/auth/notifications-state', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           email: user?.email,
           userId: user?.id,
@@ -413,7 +408,11 @@ export default function Account() {
     refreshNotifications?.();
     window.dispatchEvent(new Event('penny_notifications_updated'));
     try {
-      await fetch(`/api/contact/messages/${inquiryId}`, { method: 'DELETE' });
+      const token = localStorage.getItem('penny_customer_token');
+      await fetch(`/api/contact/messages/${inquiryId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
     } catch (e) {
       console.warn('Backend inquiry delete error:', e);
     }
@@ -425,7 +424,10 @@ export default function Account() {
       if (!isSilent && userInquiries.length === 0) {
         setIsLoadingInquiries(true);
       }
-      const res = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user.id || '')}`);
+      const token = localStorage.getItem('penny_customer_token');
+      const res = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user.id || '')}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) {

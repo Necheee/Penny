@@ -5,15 +5,81 @@ import { Plus, Minus, X, ShoppingBag, Heart, Check, Sparkles, Send, Loader2, Pal
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 
-const getColorHex = (colorName) => {
-  const map = {
-    'Black': '#1a1a1a', 'White': '#ffffff', 'Cream': '#f5f5dc',
-    'Olive': '#556b2f', 'Navy': '#000080', 'Charcoal': '#36454f',
-    'Taupe': '#483c32', 'Heather Grey': '#9ea2a2', 'Sand': '#c2b280',
-    'Rust': '#b7410e', 'Washed Blue': '#7895b6', 'Chocolate': '#3b2f2f',
-    'Sage': '#9dc183', 'Off-White': '#f8f8f2'
-  };
-  return map[colorName] || '#cccccc';
+const COLOR_PALETTE_MAP = {
+  black: '#1a1a1a',
+  white: '#ffffff',
+  cream: '#f5f5dc',
+  ivory: '#fffff0',
+  oatmeal: '#e3dac9',
+  ecru: '#c2b280',
+  bone: '#e3dac9',
+  linen: '#faf0e6',
+  beige: '#f5f5dc',
+  sand: '#c2b280',
+  tan: '#d2b48c',
+  khaki: '#c3b091',
+  camel: '#c19a6b',
+  taupe: '#483c32',
+  brown: '#654321',
+  chocolate: '#3b2f2f',
+  mocha: '#4e3629',
+  espresso: '#362b28',
+  coffee: '#4a2c11',
+  terracotta: '#e2725b',
+  clay: '#b66a50',
+  brick: '#cb4154',
+  rust: '#b7410e',
+  olive: '#556b2f',
+  sage: '#9dc183',
+  'army green': '#4b5320',
+  'forest green': '#228b22',
+  'hunter green': '#355e3b',
+  emerald: '#50c878',
+  navy: '#000080',
+  'washed blue': '#7895b6',
+  'sky blue': '#87ceeb',
+  'baby blue': '#89cff0',
+  indigo: '#4b0082',
+  'royal blue': '#4169e1',
+  charcoal: '#36454f',
+  'heather grey': '#9ea2a2',
+  'heather gray': '#9ea2a2',
+  grey: '#808080',
+  gray: '#808080',
+  'slate grey': '#708090',
+  'slate gray': '#708090',
+  silver: '#c0c0c0',
+  ash: '#b2beb5',
+  burgundy: '#5c0617',
+  maroon: '#800000',
+  wine: '#722f37',
+  plum: '#dda0dd',
+  mauve: '#e0b0ff',
+  lilac: '#c8a2c8',
+  lavender: '#e6e6fa',
+  pink: '#ffc0cb',
+  blush: '#de5d83',
+  rose: '#ff007f',
+  red: '#c41e3a',
+  crimson: '#dc143c',
+  orange: '#ff7f00',
+  amber: '#ffbf00',
+  yellow: '#ffdb58',
+  mustard: '#ffdb58',
+  gold: '#ffd700',
+  peach: '#ffe5b4',
+  coral: '#ff7f50',
+  'off-white': '#f8f8f2',
+  'off white': '#f8f8f2',
+};
+
+const getColorHex = (colorName, fallbackHex = null) => {
+  if (fallbackHex && typeof fallbackHex === 'string' && fallbackHex.startsWith('#')) return fallbackHex;
+  if (!colorName || typeof colorName !== 'string') return fallbackHex || '#cccccc';
+  const clean = colorName.trim();
+  if (clean.startsWith('#')) return clean;
+  const lower = clean.toLowerCase();
+  return COLOR_PALETTE_MAP[lower] || fallbackHex || '#cccccc';
 };
 
 import { useCart } from '../../context/CartContext';
@@ -384,7 +450,7 @@ export default function ProductModal({ productId, closeModal }) {
                   key={color}
                   onClick={() => setSelectedColor(color)}
                   className={`w-7 h-7 rounded-full shadow-sm transition-transform cursor-pointer ${selectedColor === color ? 'ring-2 ring-offset-2 ring-brand-charcoal scale-110' : 'border border-black/10 hover:scale-110'}`}
-                  style={{ backgroundColor: getColorHex(color) }}
+                  style={{ backgroundColor: getColorHex(color, product.variants?.find(v => v.colorName?.toLowerCase() === color.toLowerCase())?.colorHex) }}
                   aria-label={`Select color ${color}`}
                   aria-pressed={selectedColor === color}
                 />

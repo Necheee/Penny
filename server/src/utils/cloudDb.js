@@ -55,6 +55,10 @@ export async function initCloudDatabase() {
         addresses JSONB DEFAULT '[]'::jsonb,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS cart TEXT DEFAULT '[]';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS seen_notifications TEXT DEFAULT '[]';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS dismissed_notifications TEXT DEFAULT '[]';
       CREATE TABLE IF NOT EXISTS orders (
         id VARCHAR(100) PRIMARY KEY,
         reference VARCHAR(100),

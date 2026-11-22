@@ -116,22 +116,41 @@ router.post('/logout', requireAuth, (req, res) => {
 });
 
 /**
+ * Helper to verify caller is admin or acting strictly on their own user resource
+ */
+const isAuthorizedUserOrAdmin = (req, targetEmail, targetUserId) => {
+  if (!req.user) return false;
+  if (req.user.role === 'admin') return true;
+  const callerEmail = (req.user.email || '').trim().toLowerCase();
+  const callerId = (req.user.id || '').trim();
+  const tEmail = (targetEmail || '').trim().toLowerCase();
+  const tId = (targetUserId || '').trim();
+
+  if (tEmail && callerEmail && callerEmail === tEmail) return true;
+  if (tId && callerId && callerId === tId) return true;
+  return false;
+};
+
+/**
  * GET /api/auth/customer-profile
  * Fetches customer profile by email or userId from Neon Cloud or local users.json
  */
-router.get('/customer-profile', async (req, res) => {
+router.get('/customer-profile', requireAuth, async (req, res) => {
   try {
-    const email = (req.query.email || '').trim().toLowerCase();
-    const userId = (req.query.userId || '').trim();
-    if (!email && !userId) {
-      return res.status(400).json({ success: false, message: 'Email or userId query is required.' });
+    const email = (req.query.email || req.user.email || '').trim().toLowerCase();
+    const userId = (req.query.userId || req.user.id || '').trim();
+
+    if (!isAuthorizedUserOrAdmin(req, email, userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden. You may only access your own profile.',
+      });
     }
 
     // 1. Check Neon Cloud Database
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       try {
         const pool = getPool();
-        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cart TEXT DEFAULT '[]';`);
         const { rows } = await pool.query(
           'SELECT * FROM users WHERE (LOWER(email) = $1 AND $1 != \'\') OR (id = $2 AND $2 != \'\') LIMIT 1',
           [email, userId]
@@ -186,18 +205,21 @@ router.get('/customer-profile', async (req, res) => {
  * GET /api/auth/cart
  * Retrieves synced cloud cart for logged-in user
  */
-router.get('/cart', async (req, res) => {
+router.get('/cart', requireAuth, async (req, res) => {
   try {
-    const email = (req.query.email || '').trim().toLowerCase();
-    const userId = (req.query.userId || '').trim();
-    if (!email && !userId) {
-      return res.status(400).json({ success: false, message: 'Email or userId is required.' });
+    const email = (req.query.email || req.user.email || '').trim().toLowerCase();
+    const userId = (req.query.userId || req.user.id || '').trim();
+
+    if (!isAuthorizedUserOrAdmin(req, email, userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden. You may only access your own cart.',
+      });
     }
 
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       try {
         const pool = getPool();
-        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cart TEXT DEFAULT '[]';`);
         const { rows } = await pool.query(
           'SELECT cart FROM users WHERE (LOWER(email) = $1 AND $1 != \'\') OR (id = $2 AND $2 != \'\')',
           [email, userId]
@@ -224,14 +246,17 @@ router.get('/cart', async (req, res) => {
  * POST /api/auth/cart
  * Updates cloud cart for logged-in user across devices
  */
-router.post('/cart', async (req, res) => {
+router.post('/cart', requireAuth, async (req, res) => {
   try {
     const { email, userId, cart } = req.body;
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanUserId = (userId || '').trim();
+    const cleanEmail = (email || req.user.email || '').trim().toLowerCase();
+    const cleanUserId = (userId || req.user.id || '').trim();
 
-    if (!cleanEmail && !cleanUserId) {
-      return res.status(400).json({ success: false, message: 'Email or userId is required.' });
+    if (!isAuthorizedUserOrAdmin(req, cleanEmail, cleanUserId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden. You may only update your own cart.',
+      });
     }
 
     const safeCart = Array.isArray(cart) ? cart : [];
@@ -240,7 +265,6 @@ router.post('/cart', async (req, res) => {
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       try {
         const pool = getPool();
-        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cart TEXT DEFAULT '[]';`);
         await pool.query(
           'UPDATE users SET cart = $1 WHERE (LOWER(email) = $2 AND $2 != \'\') OR (id = $3 AND $3 != \'\')',
           [cartJson, cleanEmail, cleanUserId]
@@ -267,20 +291,21 @@ router.post('/cart', async (req, res) => {
  * GET /api/auth/notifications-state
  * Retrieves seen and dismissed notification IDs from user profile
  */
-router.get('/notifications-state', async (req, res) => {
+router.get('/notifications-state', requireAuth, async (req, res) => {
   try {
-    const email = (req.query.email || '').trim().toLowerCase();
-    const userId = (req.query.userId || '').trim();
+    const email = (req.query.email || req.user.email || '').trim().toLowerCase();
+    const userId = (req.query.userId || req.user.id || '').trim();
 
-    if (!email && !userId) {
-      return res.status(200).json({ success: true, seenNotifications: [], dismissedNotifications: [] });
+    if (!isAuthorizedUserOrAdmin(req, email, userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden. You may only access your own notifications state.',
+      });
     }
 
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       try {
         const pool = getPool();
-        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS seen_notifications TEXT DEFAULT '[]';`);
-        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS dismissed_notifications TEXT DEFAULT '[]';`);
         const { rows } = await pool.query(
           'SELECT seen_notifications, dismissed_notifications FROM users WHERE (LOWER(email) = $1 AND $1 != \'\') OR (id = $2 AND $2 != \'\')',
           [email, userId]
@@ -318,14 +343,17 @@ router.get('/notifications-state', async (req, res) => {
  * POST /api/auth/notifications-state
  * Saves seen and dismissed notification IDs for cross-device sync
  */
-router.post('/notifications-state', async (req, res) => {
+router.post('/notifications-state', requireAuth, async (req, res) => {
   try {
     const { email, userId, seenNotifications, dismissedNotifications } = req.body;
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanUserId = (userId || '').trim();
+    const cleanEmail = (email || req.user.email || '').trim().toLowerCase();
+    const cleanUserId = (userId || req.user.id || '').trim();
 
-    if (!cleanEmail && !cleanUserId) {
-      return res.status(400).json({ success: false, message: 'Email or userId required.' });
+    if (!isAuthorizedUserOrAdmin(req, cleanEmail, cleanUserId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden. You may only update your own notifications state.',
+      });
     }
 
     const hasSeen = Array.isArray(seenNotifications);
@@ -334,9 +362,6 @@ router.post('/notifications-state', async (req, res) => {
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       try {
         const pool = getPool();
-        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS seen_notifications TEXT DEFAULT '[]';`);
-        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS dismissed_notifications TEXT DEFAULT '[]';`);
-
         if (hasSeen && hasDismissed) {
           const seenJson = JSON.stringify(seenNotifications);
           const dismissedJson = JSON.stringify(dismissedNotifications);
@@ -564,15 +589,11 @@ router.post('/customer-login', async (req, res) => {
         }
       }
     } else {
-      // User registered through guest checkout or sync without password: set password now
-      const newHash = await bcrypt.hash(password, 10);
-      try {
-        if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-          const pool = getPool();
-          await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, userRow.id]);
-        }
-      } catch {}
-      isMatch = true;
+      // User registered through guest checkout or sync without password: do NOT auto-assign password and grant login!
+      return res.status(401).json({
+        success: false,
+        message: 'This account was created during guest checkout and has no password. Please create an account to set your password.',
+      });
     }
 
     if (!isMatch) {
@@ -618,15 +639,22 @@ router.post('/customer-login', async (req, res) => {
 
 /**
  * POST /api/auth/customer-change-password
- * Changes customer password with current password verification and bcrypt hashing
+ * Changes customer password with current password verification and bcrypt hashing (requires authentication)
  */
-router.post('/customer-change-password', async (req, res) => {
+router.post('/customer-change-password', requireAuth, async (req, res) => {
   try {
     const { email, userId, currentPassword, newPassword } = req.body;
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanUserId = (userId || '').trim();
+    const cleanEmail = (email || req.user.email || '').trim().toLowerCase();
+    const cleanUserId = (userId || req.user.id || '').trim();
 
-    if ((!cleanEmail && !cleanUserId) || !currentPassword || !newPassword) {
+    if (!isAuthorizedUserOrAdmin(req, cleanEmail, cleanUserId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden. You may only change your own password.',
+      });
+    }
+
+    if (!currentPassword || !newPassword) {
       return res.status(400).json({ success: false, message: 'Current password and new password are required.' });
     }
 
@@ -662,18 +690,23 @@ router.post('/customer-change-password', async (req, res) => {
       }
     }
 
-    // Verify current password if one is set
-    if (currentHash) {
-      let isCurrentValid = false;
-      if (currentHash.startsWith('$2')) {
-        isCurrentValid = await bcrypt.compare(currentPassword, currentHash);
-      } else {
-        isCurrentValid = (currentHash === currentPassword);
-      }
+    if (!currentHash) {
+      return res.status(400).json({
+        success: false,
+        message: 'This account has no existing password set. Please create an account or reset password.',
+      });
+    }
 
-      if (!isCurrentValid) {
-        return res.status(400).json({ success: false, message: 'Current password does not match.' });
-      }
+    // Verify current password if one is set
+    let isCurrentValid = false;
+    if (currentHash.startsWith('$2')) {
+      isCurrentValid = await bcrypt.compare(currentPassword, currentHash);
+    } else {
+      isCurrentValid = (currentHash === currentPassword);
+    }
+
+    if (!isCurrentValid) {
+      return res.status(400).json({ success: false, message: 'Current password does not match.' });
     }
 
     // Hash the new password
@@ -709,9 +742,9 @@ router.post('/customer-change-password', async (req, res) => {
 
 /**
  * POST /api/auth/customer-sync
- * Upserts customer profile to Neon Cloud and local storage users.json with safe password hashing
+ * Upserts customer profile to Neon Cloud and local storage users.json with safe password hashing (requires authentication)
  */
-router.post('/customer-sync', async (req, res) => {
+router.post('/customer-sync', requireAuth, async (req, res) => {
   try {
     const { id, email, previousEmail, firstName, lastName, phone, addresses, cart, password } = req.body;
     if (!email) {
@@ -719,7 +752,14 @@ router.post('/customer-sync', async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const userId = id || `usr_${Date.now()}`;
+    const userId = id || req.user.id || `usr_${Date.now()}`;
+
+    if (!isAuthorizedUserOrAdmin(req, cleanEmail, userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden. You may only update your own profile.',
+      });
+    }
     const cleanFirst = firstName ? firstName.trim() : '';
     const cleanLast = lastName ? lastName.trim() : '';
     const cleanPhone = phone ? phone.trim() : '';
@@ -747,8 +787,6 @@ router.post('/customer-sync', async (req, res) => {
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       try {
         const pool = getPool();
-        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cart TEXT DEFAULT '[]';`);
-        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);`);
 
         // If email was changed from a previous email address, migrate linked orders and inquiries
         if (previousEmail && previousEmail.trim().toLowerCase() !== cleanEmail) {

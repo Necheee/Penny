@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { verifyToken } from '../utils/token.js';
 import { getPool } from '../utils/cloudDb.js';
 import { deleteR2Object } from '../utils/r2.js';
 import { minorUnitsToDecimal, toMinorUnits } from '../utils/money.js';
@@ -234,7 +235,7 @@ export function formatProductRow(row, relations = {}) {
       : (Array.isArray(availableSizes) ? availableSizes : []),
     featured: !!row.featured,
     inStock: hasRelationalVariants
-      ? relationalVariants.some(variant => variant.stockQuantity > 0)
+      ? (row.in_stock !== false && relationalVariants.some(variant => variant.stockQuantity > 0))
       : row.in_stock !== false,
     status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(row.status)
       ? row.status
@@ -284,9 +285,21 @@ router.get('/', async (req, res) => {
 
     const { category, featured, search, includeArchived, archivedOnly } = req.query;
 
-    if (archivedOnly === 'true') {
+    const authHeader = req.headers.authorization;
+    let isAdmin = false;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const decoded = verifyToken(authHeader.split(' ')[1]);
+      if (decoded && decoded.role === 'admin') {
+        isAdmin = true;
+      }
+    }
+
+    if (archivedOnly === 'true' && isAdmin) {
       result = result.filter(p => p.status === 'ARCHIVED' || !!p.isArchived);
-    } else if (includeArchived !== 'true') {
+    } else if (includeArchived === 'true' && isAdmin) {
+      // Admin requested all products including archived and drafts
+    } else {
+      // Public storefront: strictly active, non-archived products
       result = result.filter(p => p.status === 'ACTIVE' && !p.isArchived);
     }
 
@@ -308,9 +321,21 @@ router.get('/', async (req, res) => {
       );
     }
 
+    const totalCount = result.length;
+    const pageNum = req.query.page ? Math.max(1, parseInt(req.query.page, 10) || 1) : null;
+    const limitNum = req.query.limit ? Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 24)) : null;
+
+    if (pageNum && limitNum) {
+      const startIndex = (pageNum - 1) * limitNum;
+      result = result.slice(startIndex, startIndex + limitNum);
+    }
+
     return res.status(200).json({
       success: true,
       count: result.length,
+      totalCount,
+      page: pageNum || 1,
+      totalPages: limitNum ? Math.ceil(totalCount / limitNum) : 1,
       data: result,
     });
   } catch (error) {
@@ -682,6 +707,12 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
             images: body.images,
             variants: body.variants,
           });
+        } else if (body.inStock === false) {
+          // Zero out variant stock when admin explicitly marks product out of stock
+          await client.query('UPDATE product_variants SET stock_quantity = 0 WHERE product_id = $1', [id]);
+        } else if (body.inStock === true) {
+          // Restore default stock if all variants were 0
+          await client.query('UPDATE product_variants SET stock_quantity = 10 WHERE product_id = $1 AND stock_quantity = 0', [id]);
         }
 
         await client.query('COMMIT');

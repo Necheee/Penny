@@ -21,12 +21,15 @@ export function NotificationProvider({ children }) {
       const userEmail = (user.email || '').toLowerCase().trim();
       const userFullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
       const userId = user.id || '';
+      const token = localStorage.getItem('penny_customer_token');
 
       // 1. Fetch cloud notifications state (seen & dismissed)
       let cloudDismissed = [];
       let cloudSeen = [];
       try {
-        const stateRes = await fetch(`/api/auth/notifications-state?email=${encodeURIComponent(userEmail)}&userId=${encodeURIComponent(userId)}`);
+        const stateRes = await fetch(`/api/auth/notifications-state?email=${encodeURIComponent(userEmail)}&userId=${encodeURIComponent(userId)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         if (stateRes.ok) {
           const stateData = await stateRes.json();
           cloudDismissed = Array.isArray(stateData.dismissedNotifications) ? stateData.dismissedNotifications : [];
@@ -41,7 +44,7 @@ export function NotificationProvider({ children }) {
         }
       } catch (e) {}
 
-      // 2. Fetch server orders (my-orders query with fallback)
+      // 2. Fetch server orders strictly for the authenticated customer
       let backendOrders = [];
       try {
         const queryParams = new URLSearchParams();
@@ -49,30 +52,14 @@ export function NotificationProvider({ children }) {
         if (userId) queryParams.append('userId', userId);
         if (userFullName) queryParams.append('customer', userFullName);
 
-        const res = await fetch(`/api/payments/my-orders?${queryParams.toString()}`);
+        const res = await fetch(`/api/payments/my-orders?${queryParams.toString()}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         if (res.ok) {
           const data = await res.json();
           backendOrders = Array.isArray(data.data) ? data.data : [];
         }
       } catch (e) {}
-
-      if (backendOrders.length === 0) {
-        try {
-          const resAll = await fetch('/api/payments/orders');
-          if (resAll.ok) {
-            const dataAll = await resAll.json();
-            const all = Array.isArray(dataAll.data) ? dataAll.data : [];
-            backendOrders = all.filter(ord => {
-              const orderEmail = (ord.email || '').toLowerCase().trim();
-              const orderCustomer = (ord.customer || '').toLowerCase().trim();
-              if (userId && ord.userId && ord.userId === userId) return true;
-              if (userEmail && orderEmail && orderEmail === userEmail) return true;
-              if (userFullName && orderCustomer && (orderCustomer.includes(userFullName.toLowerCase()) || userFullName.toLowerCase().includes(orderCustomer))) return true;
-              return false;
-            });
-          }
-        } catch (e) {}
-      }
 
       const userOrders = backendOrders.filter(ord => {
         const orderEmail = (ord.email || '').toLowerCase().trim();
@@ -171,9 +158,13 @@ export function NotificationProvider({ children }) {
       setUnreadCount(0);
 
       if (user) {
+        const token = localStorage.getItem('penny_customer_token');
         fetch('/api/auth/notifications-state', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             email: user.email,
             userId: user.id,

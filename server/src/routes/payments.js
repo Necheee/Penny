@@ -6,6 +6,7 @@ import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
 import { minorUnitsToDecimal, toMinorUnits } from '../utils/money.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { verifyToken } from '../utils/token.js';
 
 dotenv.config();
 
@@ -326,6 +327,7 @@ router.post('/verify', async (req, res) => {
     const isBankTransfer = orderData?.paymentMethod === 'bank_transfer' || reference.startsWith('transfer_');
 
     let isVerified = false;
+    let verifyJson = null;
     let paymentDetails = {
       reference,
       channel: isBankTransfer ? 'bank_transfer' : 'card',
@@ -347,7 +349,7 @@ router.post('/verify', async (req, res) => {
               Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
             },
           });
-          const verifyJson = await verifyRes.json();
+          verifyJson = await verifyRes.json();
 
           if (verifyJson.status && verifyJson.data?.status === 'success') {
             isVerified = true;
@@ -448,6 +450,8 @@ router.post('/verify', async (req, res) => {
           });
         }
 
+        let calculatedSubtotalMinor = 0n;
+
         for (const item of newOrder.items) {
           const validationError = validateOrderItem(item);
           if (validationError) {
@@ -458,12 +462,13 @@ router.post('/verify', async (req, res) => {
           const quantity = item.quantity;
 
           const variantResult = await client.query(
-            `SELECT id, product_id, size, color_name, stock_quantity
-             FROM product_variants
-             WHERE id = COALESCE($1, id)
-               AND product_id = $2
-               AND size = $3
-               AND color_name = $4
+            `SELECT v.id, v.product_id, v.size, v.color_name, v.stock_quantity, p.price, p.name AS product_name
+             FROM product_variants v
+             JOIN products p ON p.id = v.product_id
+             WHERE v.id = COALESCE($1, v.id)
+               AND v.product_id = $2
+               AND v.size = $3
+               AND v.color_name = $4
              FOR UPDATE`,
             [item.variantId || null, item.productId, item.size, item.color],
           );
@@ -498,6 +503,33 @@ router.post('/verify', async (req, res) => {
           item.variantId = variant.id;
           item.size = variant.size;
           item.color = variant.color_name;
+
+          // Authoritative price calculation directly from database
+          const itemPriceMinor = toMinorUnits(variant.price);
+          item.price = minorUnitsToDecimal(itemPriceMinor);
+          calculatedSubtotalMinor += itemPriceMinor * BigInt(quantity);
+        }
+
+        // Authoritative shipping & total calculation
+        const isLagos = (newOrder.state || '').toLowerCase().includes('lagos');
+        const isFreeShipping = calculatedSubtotalMinor >= 20000000n; // Free shipping for >= ₦200,000
+        const calculatedDeliveryMinor = isFreeShipping ? 0n : (isLagos ? 350000n : 650000n);
+        const calculatedTotalMinor = calculatedSubtotalMinor + calculatedDeliveryMinor;
+
+        newOrder.subtotal = minorUnitsToDecimal(calculatedSubtotalMinor);
+        newOrder.deliveryFee = minorUnitsToDecimal(calculatedDeliveryMinor);
+        newOrder.total = minorUnitsToDecimal(calculatedTotalMinor);
+
+        // If paying via Paystack in production, strictly verify amount in kobo and currency
+        if (!isBankTransfer) {
+          const isRealPaystack = PAYSTACK_SECRET_KEY && !PAYSTACK_SECRET_KEY.includes('mock') && !PAYSTACK_SECRET_KEY.includes('your_');
+          if (isRealPaystack && verifyJson && verifyJson.data) {
+            if (BigInt(verifyJson.data.amount) !== calculatedTotalMinor || verifyJson.data.currency !== 'NGN') {
+              throw Object.assign(new Error('Paid transaction amount or currency does not match calculated order total.'), {
+                statusCode: 400,
+              });
+            }
+          }
         }
 
         await client.query(`
@@ -800,29 +832,71 @@ router.post('/orders/:id/confirm-payment', requireAuth, requireAdmin, async (req
 
 /**
  * GET /api/payments/my-orders
- * Retrieve orders belonging to the customer by email, user_id, or name.
- * Direct cloud database synchronization for cross-device visibility.
+ * Retrieve orders belonging strictly to the verified customer.
+ * Unauthenticated guests must provide both their email and exact order reference.
  */
 router.get('/my-orders', async (req, res) => {
   try {
-    const email = (req.query.email || '').trim().toLowerCase();
-    const userId = (req.query.userId || '').trim();
-    const customer = (req.query.customer || '').trim();
+    const authHeader = req.headers.authorization;
+    let authUser = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      authUser = verifyToken(authHeader.split(' ')[1]);
+    }
+
+    const email = (req.query.email || authUser?.email || '').trim().toLowerCase();
+    const userId = (req.query.userId || authUser?.id || '').trim();
+    const orderId = (req.query.orderId || req.query.reference || '').trim();
+
+    // Prevent open enumeration of customer orders
+    if (!authUser && (!email || !orderId)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Guests must supply both email and order reference.',
+      });
+    }
 
     let matchedOrders = [];
 
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       try {
         const pool = getPool();
-        const dbRes = await pool.query(`
+        let queryText = '';
+        let queryParams = [];
+
+        if (authUser && authUser.role === 'admin') {
+          // Admin can query by userId, email, or view all
+          queryText = `
             ${relationalOrderSelect}
-            WHERE (o.user_id IS NOT NULL AND o.user_id = $1)
-               OR (o.email IS NOT NULL AND LOWER(o.email) = LOWER($2))
-               OR ($3 != '' AND LOWER(o.customer) ILIKE $4)
+            WHERE ($1 != '' AND o.user_id = $1)
+               OR ($2 != '' AND LOWER(o.email) = LOWER($2))
+               OR ($1 = '' AND $2 = '')
             GROUP BY o.id
             ORDER BY o.created_at DESC
-          `, [userId || 'none', email || 'none', customer, `%${customer}%`]);
+          `;
+          queryParams = [userId, email];
+        } else if (authUser) {
+          // Authenticated customer can strictly only access their own orders
+          queryText = `
+            ${relationalOrderSelect}
+            WHERE o.user_id = $1
+               OR (o.email IS NOT NULL AND LOWER(o.email) = LOWER($2))
+            GROUP BY o.id
+            ORDER BY o.created_at DESC
+          `;
+          queryParams = [authUser.id, authUser.email];
+        } else {
+          // Unauthenticated guest must match both email and exact order ID or reference
+          queryText = `
+            ${relationalOrderSelect}
+            WHERE LOWER(o.email) = LOWER($1)
+              AND (o.id = $2 OR o.reference = $2)
+            GROUP BY o.id
+            ORDER BY o.created_at DESC
+          `;
+          queryParams = [email, orderId];
+        }
 
+        const dbRes = await pool.query(queryText, queryParams);
         if (dbRes.rows && dbRes.rows.length > 0) {
           matchedOrders = dbRes.rows.map(mapDbOrder);
         }
@@ -842,9 +916,9 @@ router.get('/my-orders', async (req, res) => {
 
     if (matchedOrders.length === 0) {
       matchedOrders = ordersStore.filter(o => {
+        if (authUser && authUser.role === 'admin') return true;
         if (userId && o.userId === userId) return true;
-        if (email && (o.email || '').toLowerCase() === email) return true;
-        if (customer && (o.customer || '').toLowerCase().includes(customer.toLowerCase())) return true;
+        if (email && (o.email || '').toLowerCase() === email && (!orderId || o.id === orderId || o.reference === orderId)) return true;
         return false;
       });
     }
@@ -865,9 +939,9 @@ router.get('/my-orders', async (req, res) => {
 
 /**
  * GET /api/payments/orders
- * Returns registered orders from Neon PostgreSQL Cloud DB or local development storage
+ * Returns registered orders from Neon PostgreSQL Cloud DB for authenticated administrators
  */
-router.get('/orders', async (req, res) => {
+router.get('/orders', requireAuth, requireAdmin, async (req, res) => {
   try {
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       const pool = getPool();
@@ -907,11 +981,44 @@ router.get('/orders', async (req, res) => {
 
 /**
  * DELETE /api/payments/orders/:id
- * Deletes an order from storage and database
+ * Deletes an order from storage and database (Admin or verified order owner only)
  */
-router.delete('/orders/:id', async (req, res) => {
+router.delete('/orders/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const caller = req.user;
+
+    // If caller is not admin, verify they own this order
+    if (caller.role !== 'admin') {
+      let isOwner = false;
+      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+        const pool = getPool();
+        const checkRes = await pool.query('SELECT user_id, email FROM orders WHERE id = $1', [id]);
+        if (checkRes.rows.length === 0) {
+          return res.status(404).json({ success: false, message: 'Order not found.' });
+        }
+        const orderRow = checkRes.rows[0];
+        if (orderRow.user_id === caller.id || (orderRow.email && orderRow.email.toLowerCase() === caller.email.toLowerCase())) {
+          isOwner = true;
+        }
+      } else {
+        const localOrder = ordersStore.find(o => o.id === id);
+        if (!localOrder) {
+          return res.status(404).json({ success: false, message: 'Order not found.' });
+        }
+        if (localOrder.userId === caller.id || (localOrder.email && localOrder.email.toLowerCase() === caller.email.toLowerCase())) {
+          isOwner = true;
+        }
+      }
+
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access forbidden. You may only delete your own orders.',
+        });
+      }
+    }
+
     ordersStore = ordersStore.filter(o => o.id !== id);
     writeJsonFile('orders.json', ordersStore);
 

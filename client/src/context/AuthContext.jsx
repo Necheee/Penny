@@ -145,10 +145,14 @@ export function AuthProvider({ children }) {
    */
   const changePassword = async (currentPassword, newPassword) => {
     if (!user) throw new Error('You must be signed in to change your password.');
+    const token = localStorage.getItem('penny_customer_token');
 
     const res = await fetch('/api/auth/customer-change-password', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         email: user.email,
         userId: user.id,
@@ -196,9 +200,13 @@ export function AuthProvider({ children }) {
 
     // Sync to backend Neon Cloud with previousEmail to link past orders and inquiries
     try {
+      const token = localStorage.getItem('penny_customer_token');
       await fetch('/api/auth/customer-sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           ...updatedUser,
           previousEmail: oldEmail !== newEmail ? oldEmail : null,
@@ -245,8 +253,13 @@ export function AuthProvider({ children }) {
     const cleanUserId = (activeUser.id || '').trim();
     if (!cleanEmail && !cleanUserId) return;
 
+    const token = localStorage.getItem('penny_customer_token');
+    if (!token) return;
+
     try {
-      const res = await fetch(`/api/auth/customer-profile?email=${encodeURIComponent(cleanEmail)}&userId=${encodeURIComponent(cleanUserId)}`);
+      const res = await fetch(`/api/auth/customer-profile?email=${encodeURIComponent(cleanEmail)}&userId=${encodeURIComponent(cleanUserId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         if (data && data.user) {

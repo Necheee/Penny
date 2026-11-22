@@ -2,6 +2,8 @@ import express from 'express';
 import nodemailer from 'nodemailer';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { verifyToken } from '../utils/token.js';
 
 const router = express.Router();
 
@@ -73,9 +75,9 @@ async function getTransporter() {
 
 /**
  * GET /api/contact/messages
- * Retrieves all customer inquiries/messages for the Admin Dashboard
+ * Retrieves all customer inquiries/messages for the Admin Dashboard (Admin only)
  */
-router.get('/messages', async (req, res) => {
+router.get('/messages', requireAuth, requireAdmin, async (req, res) => {
   try {
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
       const pool = getPool();
@@ -130,9 +132,9 @@ router.get('/messages', async (req, res) => {
 
 /**
  * PATCH /api/contact/messages/:id/read
- * Marks a message as read in storage and database
+ * Marks a message as read in storage and database (Admin only)
  */
-router.patch('/messages/:id/read', async (req, res) => {
+router.patch('/messages/:id/read', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const item = inquiriesStore.find(i => i.id === id);
@@ -156,9 +158,9 @@ router.patch('/messages/:id/read', async (req, res) => {
 
 /**
  * POST /api/contact/messages/:id/reply
- * Dispatches an email response directly to the customer and records the reply
+ * Dispatches an email response directly to the customer and records the reply (Admin only)
  */
-router.post('/messages/:id/reply', async (req, res) => {
+router.post('/messages/:id/reply', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { replyText } = req.body;
@@ -271,16 +273,25 @@ ${replyText.trim()}
 
 /**
  * GET /api/contact/my-inquiries
- * Retrieves inquiries submitted by a specific user email or userId
+ * Retrieves inquiries submitted by a specific user email or userId (requires authenticated owner or admin)
  */
-router.get('/my-inquiries', async (req, res) => {
+router.get('/my-inquiries', requireAuth, async (req, res) => {
   try {
-    const { email, userId } = req.query;
+    const email = (req.query.email || req.user.email || '').trim().toLowerCase();
+    const userId = (req.query.userId || req.user.id || '').trim();
+
+    if (req.user.role !== 'admin' && req.user.email?.toLowerCase() !== email && req.user.id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden. You may only view your own inquiries.',
+      });
+    }
+
     if (!email && !userId) {
       return res.status(400).json({ success: false, message: 'Email or userId query parameter required.' });
     }
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanUserId = (userId || '').trim();
+    const cleanEmail = email;
+    const cleanUserId = userId;
 
     // Check PostgreSQL first
     try {
@@ -546,23 +557,45 @@ router.post('/', async (req, res) => {
 
 /**
  * DELETE /api/contact/messages/:id
- * Deletes an inquiry message from storage and database
+ * Deletes an inquiry message from storage and database (Admin or Author only)
  */
 router.delete('/messages/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    inquiriesStore = inquiriesStore.filter(i => i.id !== id);
-    writeJsonFile('inquiries.json', inquiriesStore);
-
-    try {
-      if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-        const pool = getPool();
-        await pool.query('DELETE FROM contact_inquiries WHERE id = $1', [id]);
-      }
-    } catch (e) {
-      console.warn('[CONTACT INQUIRY] DB delete warning:', e.message);
+    const authHeader = req.headers.authorization;
+    let authUser = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      authUser = verifyToken(authHeader.split(' ')[1]);
     }
 
+    const { id } = req.params;
+
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      const pool = getPool();
+      const existingRes = await pool.query('SELECT * FROM contact_inquiries WHERE id = $1', [id]);
+      if (existingRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Inquiry not found.' });
+      }
+      const existing = existingRes.rows[0];
+
+      // Only an admin or the authenticated author of the inquiry can delete it
+      const isAuthorized = authUser && (
+        authUser.role === 'admin' ||
+        (existing.email && authUser.email && existing.email.toLowerCase() === authUser.email.toLowerCase()) ||
+        (existing.user_id && authUser.id && existing.user_id === authUser.id)
+      );
+
+      if (!isAuthorized) {
+        return res.status(403).json({ success: false, message: 'Access denied. You do not have permission to delete this inquiry.' });
+      }
+
+      await pool.query('DELETE FROM contact_inquiries WHERE id = $1', [id]);
+      inquiriesStore = inquiriesStore.filter(i => i.id !== id);
+      writeJsonFile('inquiries.json', inquiriesStore);
+      return res.status(200).json({ success: true, message: `Inquiry #${id} deleted successfully.` });
+    }
+
+    inquiriesStore = inquiriesStore.filter(i => i.id !== id);
+    writeJsonFile('inquiries.json', inquiriesStore);
     return res.status(200).json({
       success: true,
       message: `Inquiry #${id} deleted successfully.`,

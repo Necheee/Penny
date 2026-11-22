@@ -21,10 +21,15 @@ export function CartProvider({ children }) {
   // Sync to Cloud Cart Helper
   const syncCartToCloud = useCallback(async (items) => {
     if (!user?.email) return;
+    const token = localStorage.getItem('penny_customer_token');
+    if (!token) return;
     try {
       await fetch('/api/auth/cart', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           email: user.email,
           userId: user.id || null,
@@ -39,8 +44,14 @@ export function CartProvider({ children }) {
   // Fetch Cloud Cart from Server
   const fetchCloudCart = useCallback(async () => {
     if (!user?.email) return;
+    const token = localStorage.getItem('penny_customer_token');
+    if (!token) return;
     try {
-      const res = await fetch(`/api/auth/cart?email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user.id || '')}`);
+      const res = await fetch(`/api/auth/cart?email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user.id || '')}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.cart)) {
