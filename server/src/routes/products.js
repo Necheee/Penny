@@ -13,32 +13,97 @@ function normalizePrice(value) {
   return minorUnitsToDecimal(toMinorUnits(value));
 }
 
-async function syncProductRelations(pool, productId, { images, variants }) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+async function syncProductRelations(clientOrPool, productId, { images, variants }) {
+  const isPool = typeof clientOrPool.connect === 'function';
+  const client = isPool ? await clientOrPool.connect() : clientOrPool;
+  const shouldManageTransaction = isPool;
 
+  try {
+    if (shouldManageTransaction) {
+      await client.query('BEGIN');
+    }
+
+    // 1. Safe Variant Sync (Diff & In-place update to preserve foreign-key references)
     if (Array.isArray(variants)) {
-      await client.query('DELETE FROM product_variants WHERE product_id = $1', [productId]);
+      const existingRes = await client.query(
+        'SELECT id, size, color_name, color_hex, stock_quantity, sku FROM product_variants WHERE product_id = $1',
+        [productId]
+      );
+      const existingVariants = existingRes.rows;
+      const processedVariantIds = new Set();
+
       for (const variant of variants) {
-        await client.query(`
-          INSERT INTO product_variants (
-            id, product_id, size, color_name, color_hex, stock_quantity, sku
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `, [
-          variant.id || crypto.randomUUID(),
-          productId,
-          String(variant.size || 'One Size'),
-          String(variant.colorName || variant.color || 'Standard'),
-          variant.colorHex || null,
-          Math.max(0, Number(variant.stockQuantity ?? 0)),
-          variant.sku || null,
-        ]);
+        const size = String(variant.size || 'One Size').trim();
+        const colorName = String(variant.colorName || variant.color || 'Standard').trim();
+        const stockQuantity = Math.max(0, Number(variant.stockQuantity ?? 10));
+        const colorHex = variant.colorHex || null;
+
+        // Match existing variant by ID if provided, or by (size, color_name)
+        const matched = existingVariants.find(
+          v => (variant.id && v.id === variant.id) ||
+               (v.size.toLowerCase() === size.toLowerCase() && v.color_name.toLowerCase() === colorName.toLowerCase())
+        );
+
+        if (matched) {
+          // Update in place — primary key stays stable, order_items & inventory_adjustments are preserved!
+          await client.query(`
+            UPDATE product_variants
+            SET size = $1, color_name = $2, color_hex = $3, stock_quantity = $4, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $5
+          `, [size, colorName, colorHex, stockQuantity, matched.id]);
+          processedVariantIds.add(matched.id);
+        } else {
+          // Brand new variant
+          const newVariantId = crypto.randomUUID();
+          let sku = typeof variant.sku === 'string' && variant.sku.trim() ? variant.sku.trim() : null;
+          if (!sku) {
+            sku = `${productId}-${size.toLowerCase().replace(/[^a-z0-9]+/g, '')}-${colorName.toLowerCase().replace(/[^a-z0-9]+/g, '')}-${crypto.randomBytes(3).toString('hex')}`;
+          }
+          await client.query(`
+            INSERT INTO product_variants (
+              id, product_id, size, color_name, color_hex, stock_quantity, sku, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          `, [
+            newVariantId,
+            productId,
+            size,
+            colorName,
+            colorHex,
+            stockQuantity,
+            sku,
+          ]);
+          processedVariantIds.add(newVariantId);
+        }
+      }
+
+      // Handle variants that were removed by the admin
+      const removedVariants = existingVariants.filter(v => !processedVariantIds.has(v.id));
+      if (removedVariants.length > 0) {
+        const removedIds = removedVariants.map(v => v.id);
+        // Check if any removed variants are referenced by customer orders
+        const refRes = await client.query(
+          'SELECT DISTINCT variant_id FROM order_items WHERE variant_id = ANY($1::text[])',
+          [removedIds]
+        );
+        const referencedIds = new Set(refRes.rows.map(r => r.variant_id));
+
+        for (const removed of removedVariants) {
+          if (referencedIds.has(removed.id)) {
+            // Soft-retire to preserve order snapshots and cancellation integrity
+            await client.query(
+              'UPDATE product_variants SET stock_quantity = 0, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+              [removed.id]
+            );
+          } else {
+            // Safe to delete because no customer orders reference this variant
+            await client.query('DELETE FROM product_variants WHERE id = $1', [removed.id]);
+          }
+        }
       }
     }
 
+    // 2. Safe Image Sync with Base64 Protection
     if (images && typeof images === 'object') {
-      await client.query('DELETE FROM product_images WHERE product_id = $1', [productId]);
       const imageUrls = [
         { url: images.primary, isPrimary: true },
         ...(Array.isArray(images.gallery)
@@ -46,6 +111,14 @@ async function syncProductRelations(pool, productId, { images, variants }) {
           : []),
       ].filter(image => typeof image.url === 'string' && image.url.trim());
 
+      // Reject raw base64 data URLs to prevent database/localStorage bloat
+      for (const image of imageUrls) {
+        if (image.url.startsWith('data:')) {
+          throw new Error('Raw base64 data URLs cannot be saved as product images. Upload images to Cloudflare R2 first.');
+        }
+      }
+
+      await client.query('DELETE FROM product_images WHERE product_id = $1', [productId]);
       for (const image of imageUrls) {
         await client.query(`
           INSERT INTO product_images (id, url, is_primary, product_id)
@@ -54,12 +127,18 @@ async function syncProductRelations(pool, productId, { images, variants }) {
       }
     }
 
-    await client.query('COMMIT');
+    if (shouldManageTransaction) {
+      await client.query('COMMIT');
+    }
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (shouldManageTransaction) {
+      await client.query('ROLLBACK');
+    }
     throw error;
   } finally {
-    client.release();
+    if (shouldManageTransaction) {
+      client.release();
+    }
   }
 }
 
@@ -351,113 +430,125 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       }
     }
 
-    const newId = id || `p-${Date.now().toString().slice(-4)}`;
-    const slug = req.body.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const pool = getPool();
+    const client = await pool.connect();
 
-    const newProduct = {
-      id: newId,
-      slug,
-      name,
-      category: category || 'tops',
-      subcategory: typeof subcategory === 'string' ? subcategory : subcategory?.name || '',
-      subtype: subtype || '',
-      price: normalizePrice(price),
-      description: description || '',
-      material: material || '100% Cotton',
-      fit: fit || 'Relaxed fit',
-      care: care || 'Machine wash cold.',
-      shipping: shipping || 'Free delivery on orders above ₦200,000.',
-      images: images || {
-        primary: '/images/products/linen-set-1.jpg',
-        gallery: []
-      },
-      colors: Array.isArray(colors) ? colors : ['Black', 'White'],
-      availableSizes: Array.isArray(availableSizes) ? availableSizes : ['S', 'M', 'L', 'XL'],
-      featured: !!featured,
-      inStock: inStock !== false,
-      status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(status)
-        ? status
-        : (isArchived ? 'ARCHIVED' : 'ACTIVE'),
-      isArchived: status !== undefined ? status === 'ARCHIVED' : !!isArchived,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    try {
+      await client.query('BEGIN');
 
-    {
-      try {
-        const pool = getPool();
-        const dbRes = await pool.query(`
-          INSERT INTO products (
-            id, slug, name, category, subcategory, subtype, price,
-            description, material, fit, care, shipping, images,
-            colors, available_sizes, featured, in_stock, is_archived, status, created_at, updated_at
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7,
-            $8, $9, $10, $11, $12, $13,
-            $14, $15, $16, $17, $18, $19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-          ) ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            slug = EXCLUDED.slug,
-            category = EXCLUDED.category,
-            subcategory = EXCLUDED.subcategory,
-            subtype = EXCLUDED.subtype,
-            price = EXCLUDED.price,
-            description = EXCLUDED.description,
-            material = EXCLUDED.material,
-            fit = EXCLUDED.fit,
-            care = EXCLUDED.care,
-            shipping = EXCLUDED.shipping,
-            images = EXCLUDED.images,
-            colors = EXCLUDED.colors,
-            available_sizes = EXCLUDED.available_sizes,
-            featured = EXCLUDED.featured,
-            in_stock = EXCLUDED.in_stock,
-            is_archived = EXCLUDED.is_archived,
-            status = EXCLUDED.status,
-            updated_at = CURRENT_TIMESTAMP
-          RETURNING *;
-        `, [
-          newProduct.id,
-          newProduct.slug,
-          newProduct.name,
-          newProduct.category,
-          newProduct.subcategory,
-          newProduct.subtype,
-          newProduct.price,
-          newProduct.description,
-          newProduct.material,
-          newProduct.fit,
-          newProduct.care,
-          newProduct.shipping,
-          JSON.stringify(newProduct.images),
-          JSON.stringify(newProduct.colors),
-          JSON.stringify(newProduct.availableSizes),
-          newProduct.featured,
-          newProduct.inStock,
-          newProduct.isArchived,
-          newProduct.status
-        ]);
+      const rawId = typeof id === 'string' ? id.trim() : '';
+      const newId = (rawId && !/^p-\d{1,5}$/.test(rawId))
+        ? rawId
+        : `p-${crypto.randomUUID()}`;
 
-        if (dbRes.rows.length > 0) {
-          await syncProductRelations(pool, newProduct.id, {
-            images: newProduct.images,
-            variants,
-          });
-          const relations = await loadProductRelations(pool, dbRes.rows);
-          const persisted = formatProductRow(dbRes.rows[0], relations.get(newProduct.id));
-          return res.status(201).json({
-            success: true,
-            message: 'Product created and saved to cloud database.',
-            data: persisted,
-          });
-        }
-      } catch (dbErr) {
-        console.error('[PRODUCTS API] DB insert error:', dbErr.message);
-        return res.status(503).json({
+      // Prevent accidental overwrite by verifying ID uniqueness
+      const idCheckRes = await client.query('SELECT id FROM products WHERE id = $1', [newId]);
+      if (idCheckRes.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
           success: false,
-          message: 'Product could not be saved to the database.',
+          message: `A product with ID '${newId}' already exists. Use PUT /api/products/${newId} to update an existing product.`,
         });
       }
+
+      // Generate clean, deduplicated URL slug
+      let baseSlug = (req.body.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')).trim();
+      if (!baseSlug) baseSlug = `product-${crypto.randomBytes(3).toString('hex')}`;
+      let finalSlug = baseSlug;
+
+      const slugCheckRes = await client.query('SELECT id FROM products WHERE slug = $1', [finalSlug]);
+      if (slugCheckRes.rows.length > 0) {
+        finalSlug = `${baseSlug}-${crypto.randomBytes(3).toString('hex')}`;
+      }
+
+      const newProduct = {
+        id: newId,
+        slug: finalSlug,
+        name,
+        category: category || 'tops',
+        subcategory: typeof subcategory === 'string' ? subcategory : subcategory?.name || '',
+        subtype: subtype || '',
+        price: normalizePrice(price),
+        description: description || '',
+        material: material || '100% Cotton',
+        fit: fit || 'Relaxed fit',
+        care: care || 'Machine wash cold.',
+        shipping: shipping || 'Free delivery on orders above ₦200,000.',
+        images: images || {
+          primary: '/images/products/linen-set-1.jpg',
+          gallery: []
+        },
+        colors: Array.isArray(colors) ? colors : ['Black', 'White'],
+        availableSizes: Array.isArray(availableSizes) ? availableSizes : ['S', 'M', 'L', 'XL'],
+        featured: !!featured,
+        inStock: inStock !== false,
+        status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(status)
+          ? status
+          : (isArchived ? 'ARCHIVED' : 'ACTIVE'),
+        isArchived: status !== undefined ? status === 'ARCHIVED' : !!isArchived,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const dbRes = await client.query(`
+        INSERT INTO products (
+          id, slug, name, category, subcategory, subtype, price,
+          description, material, fit, care, shipping, images,
+          colors, available_sizes, featured, in_stock, is_archived, status, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7,
+          $8, $9, $10, $11, $12, $13,
+          $14, $15, $16, $17, $18, $19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        RETURNING *;
+      `, [
+        newProduct.id,
+        newProduct.slug,
+        newProduct.name,
+        newProduct.category,
+        newProduct.subcategory,
+        newProduct.subtype,
+        newProduct.price,
+        newProduct.description,
+        newProduct.material,
+        newProduct.fit,
+        newProduct.care,
+        newProduct.shipping,
+        JSON.stringify(newProduct.images),
+        JSON.stringify(newProduct.colors),
+        JSON.stringify(newProduct.availableSizes),
+        newProduct.featured,
+        newProduct.inStock,
+        newProduct.isArchived,
+        newProduct.status
+      ]);
+
+      if (dbRes.rows.length > 0) {
+        await syncProductRelations(client, newProduct.id, {
+          images: newProduct.images,
+          variants,
+        });
+
+        await client.query('COMMIT');
+
+        const relations = await loadProductRelations(pool, dbRes.rows);
+        const persisted = formatProductRow(dbRes.rows[0], relations.get(newProduct.id));
+        return res.status(201).json({
+          success: true,
+          message: 'Product created and saved to cloud database.',
+          data: persisted,
+        });
+      }
+    } catch (dbErr) {
+      await client.query('ROLLBACK');
+      console.error('[PRODUCTS API] DB insert error:', dbErr.message);
+      const isClientError = dbErr.message.includes('base64') || dbErr.code === '23505';
+      return res.status(isClientError ? 400 : 503).json({
+        success: false,
+        message: dbErr.message || 'Product could not be saved to the database.',
+      });
+    } finally {
+      client.release();
     }
   } catch (error) {
     console.error('Error creating product:', error);
@@ -536,76 +627,89 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
       updatedAt: new Date().toISOString(),
     };
 
-    {
-      try {
-        const pool = getPool();
-        const dbRes = await pool.query(`
-          UPDATE products SET
-            name = $2,
-            slug = $3,
-            category = $4,
-            subcategory = $5,
-            subtype = $6,
-            price = $7,
-            description = $8,
-            material = $9,
-            fit = $10,
-            care = $11,
-            shipping = $12,
-            images = $13,
-            colors = $14,
-            available_sizes = $15,
-            featured = $16,
-            in_stock = $17,
-            is_archived = $18,
-            status = $19,
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id = $1
-          RETURNING *;
-        `, [
-          updated.id,
-          updated.name,
-          updated.slug,
-          updated.category,
-          updated.subcategory,
-          updated.subtype,
-          updated.price,
-          updated.description,
-          updated.material,
-          updated.fit,
-          updated.care,
-          updated.shipping,
-          JSON.stringify(updated.images),
-          JSON.stringify(updated.colors),
-          JSON.stringify(updated.availableSizes),
-          updated.featured,
-          updated.inStock,
-          updated.isArchived,
-          updated.status
-        ]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-        if (dbRes.rows.length > 0) {
-          if (Array.isArray(body.variants) || body.images !== undefined) {
-            await syncProductRelations(pool, id, {
-              images: body.images,
-              variants: body.variants,
-            });
-          }
-          const relations = await loadProductRelations(pool, dbRes.rows);
-          const persisted = formatProductRow(dbRes.rows[0], relations.get(id));
-          return res.status(200).json({
-            success: true,
-            message: 'Product updated and persisted to database.',
-            data: persisted,
+      const dbRes = await client.query(`
+        UPDATE products SET
+          name = $2,
+          slug = $3,
+          category = $4,
+          subcategory = $5,
+          subtype = $6,
+          price = $7,
+          description = $8,
+          material = $9,
+          fit = $10,
+          care = $11,
+          shipping = $12,
+          images = $13,
+          colors = $14,
+          available_sizes = $15,
+          featured = $16,
+          in_stock = $17,
+          is_archived = $18,
+          status = $19,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING *;
+      `, [
+        updated.id,
+        updated.name,
+        updated.slug,
+        updated.category,
+        updated.subcategory,
+        updated.subtype,
+        updated.price,
+        updated.description,
+        updated.material,
+        updated.fit,
+        updated.care,
+        updated.shipping,
+        JSON.stringify(updated.images),
+        JSON.stringify(updated.colors),
+        JSON.stringify(updated.availableSizes),
+        updated.featured,
+        updated.inStock,
+        updated.isArchived,
+        updated.status
+      ]);
+
+      if (dbRes.rows.length > 0) {
+        if (Array.isArray(body.variants) || body.images !== undefined) {
+          await syncProductRelations(client, id, {
+            images: body.images,
+            variants: body.variants,
           });
         }
-      } catch (dbErr) {
-        console.error('[PRODUCTS API] DB update error:', dbErr.message);
-        return res.status(503).json({
+
+        await client.query('COMMIT');
+
+        const relations = await loadProductRelations(pool, dbRes.rows);
+        const persisted = formatProductRow(dbRes.rows[0], relations.get(id));
+        return res.status(200).json({
+          success: true,
+          message: 'Product updated and persisted to database.',
+          data: persisted,
+        });
+      } else {
+        await client.query('ROLLBACK');
+        return res.status(404).json({
           success: false,
-          message: 'Product could not be updated in the database.',
+          message: `Product with ID '${id}' not found for update.`,
         });
       }
+    } catch (dbErr) {
+      await client.query('ROLLBACK');
+      console.error('[PRODUCTS API] DB update error:', dbErr.message);
+      const isClientError = dbErr.message.includes('base64');
+      return res.status(isClientError ? 400 : 503).json({
+        success: false,
+        message: dbErr.message || 'Product could not be updated in the database.',
+      });
+    } finally {
+      client.release();
     }
   } catch (error) {
     console.error('Error updating product:', error);

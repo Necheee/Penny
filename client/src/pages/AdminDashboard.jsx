@@ -362,12 +362,21 @@ export default function AdminDashboard() {
 
   // Duplicate / Clone Existing Product (1-Click Product Addition)
   const handleDuplicateProduct = (product) => {
+    // Strip IDs and SKUs from cloned variants so we avoid primary key & unique SKU collisions
+    const cleanVariants = Array.isArray(product.variants)
+      ? product.variants.map(({ id, sku, ...v }) => ({
+          ...v,
+          stockQuantity: Number(v.stockQuantity ?? 10),
+        }))
+      : undefined;
+
     setEditingProduct({
       ...product,
       id: null,
       name: `Copy of ${product.name}`,
       featured: false,
       isArchived: false,
+      variants: cleanVariants,
     });
     setIsProductModalOpen(true);
   };
@@ -413,7 +422,9 @@ export default function AdminDashboard() {
           images: imagesPayload,
         });
       } else {
-        const newId = `p-${Date.now().toString().slice(-4)}`;
+        const newId = typeof crypto !== 'undefined' && crypto.randomUUID
+          ? `p-${crypto.randomUUID()}`
+          : `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const newProduct = {
           id: newId,
           name: formData.name,

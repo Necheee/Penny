@@ -63,7 +63,28 @@ router.post(
   '/upload',
   requireAuth,
   requireAdmin,
-  upload.single('image'),
+  (req, res, next) => {
+    upload.single('image')(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({
+            success: false,
+            message: 'Image exceeds the maximum allowed file size of 15MB.',
+          });
+        }
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+        });
+      } else if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message || 'Invalid image file provided.',
+        });
+      }
+      next();
+    });
+  },
   async (req, res) => {
     try {
       if (!req.file) {
@@ -78,6 +99,15 @@ router.post(
         return res.status(500).json({
           success: false,
           message: 'Cloudflare R2 storage is not configured. Please populate R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME in your environment variables.',
+        });
+      }
+
+      // Verify public R2 URL configuration to avoid returning broken 403 S3 endpoints
+      const publicBaseUrl = (process.env.R2_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+      if (!publicBaseUrl) {
+        return res.status(500).json({
+          success: false,
+          message: 'Cloudflare R2 Public URL (R2_PUBLIC_URL) is not configured in server/.env. Public image access requires a public custom domain or r2.dev URL.',
         });
       }
 
@@ -99,13 +129,6 @@ router.post(
           CacheControl: 'public, max-age=31536000, immutable',
         })
       );
-
-      // Build public URL
-      let publicBaseUrl = (process.env.R2_PUBLIC_URL || '').trim().replace(/\/+$/, '');
-      if (!publicBaseUrl) {
-        const accountId = (process.env.R2_ACCOUNT_ID || '').trim();
-        publicBaseUrl = `https://${bucketName}.${accountId}.r2.cloudflarestorage.com`;
-      }
 
       const fileUrl = `${publicBaseUrl}/${objectKey}`;
 

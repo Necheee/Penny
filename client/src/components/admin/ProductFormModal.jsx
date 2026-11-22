@@ -69,7 +69,9 @@ export default function ProductFormModal({
         isArchived: !!editingProduct.isArchived,
         colors: Array.isArray(editingProduct.colors) ? editingProduct.colors : ['Black', 'White'],
         availableSizes: Array.isArray(editingProduct.availableSizes) ? editingProduct.availableSizes : ['S', 'M', 'L', 'XL'],
-        variants: Array.isArray(editingProduct.variants) ? editingProduct.variants : [],
+        variants: Array.isArray(editingProduct.variants)
+          ? editingProduct.variants.map(v => editingProduct.id ? v : { ...v, id: undefined, sku: undefined })
+          : [],
         imageUrl: loadedImages[0] || '',
         images: loadedImages,
       });
@@ -980,15 +982,24 @@ export default function ProductFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 border border-neutral-200 text-xs font-bold uppercase tracking-wider hover:bg-neutral-50 cursor-pointer"
+              disabled={isUploadingImage}
+              className="px-5 py-2.5 border border-neutral-200 text-xs font-bold uppercase tracking-wider hover:bg-neutral-50 cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black cursor-pointer"
+              disabled={isUploadingImage}
+              className={`px-6 py-2.5 bg-brand-charcoal text-white text-xs font-bold uppercase tracking-wider hover:bg-black cursor-pointer flex items-center gap-2 ${isUploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              Save Product
+              {isUploadingImage ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Uploading Image...
+                </>
+              ) : (
+                'Save Product'
+              )}
             </button>
           </div>
         </form>
