@@ -381,6 +381,16 @@ export default function AdminDashboard() {
   // Save Product (Add or Edit) with Context Sync
   const handleSaveProduct = async (formData) => {
     try {
+      const primaryImage = formData.images?.primary || (Array.isArray(formData.images) ? formData.images[0] : '') || formData.imageUrl || '/images/products/linen-set-1.jpg';
+      const galleryImages = Array.isArray(formData.images?.gallery)
+        ? formData.images.gallery
+        : (Array.isArray(formData.images) ? formData.images.slice(1) : []);
+
+      const imagesPayload = {
+        primary: primaryImage,
+        gallery: galleryImages,
+      };
+
       if (editingProduct && editingProduct.id) {
         await updateProduct({
           ...editingProduct,
@@ -400,10 +410,7 @@ export default function AdminDashboard() {
           colors: formData.colors,
           availableSizes: formData.availableSizes,
           variants: formData.variants,
-          images: {
-            ...editingProduct.images,
-            primary: formData.imageUrl || editingProduct.images?.primary || '/images/products/linen-set-1.jpg'
-          }
+          images: imagesPayload,
         });
       } else {
         const newId = `p-${Date.now().toString().slice(-4)}`;
@@ -425,10 +432,7 @@ export default function AdminDashboard() {
           colors: formData.colors,
           availableSizes: formData.availableSizes,
           variants: formData.variants,
-          images: {
-            primary: formData.imageUrl || '/images/products/linen-set-1.jpg',
-            gallery: ['/images/products/linen-set-2.jpg']
-          }
+          images: imagesPayload,
         };
         await addProduct(newProduct);
       }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, X, CheckCircle2, Cloud, Loader2, Archive } from 'lucide-react';
+import { Upload, X, CheckCircle2, Cloud, Loader2, Archive, Star, Trash2, Plus } from 'lucide-react';
 
 export default function ProductFormModal({
   isOpen,
@@ -30,12 +30,14 @@ export default function ProductFormModal({
     availableSizes: ['S', 'M', 'L', 'XL'],
     variants: [],
     imageUrl: '',
+    images: [],
   });
 
   const [isAddingCustomSub, setIsAddingCustomSub] = useState(false);
   const [customSubcategoryInput, setCustomSubcategoryInput] = useState('');
   const [isAddingCustomSubtype, setIsAddingCustomSubtype] = useState(false);
   const [customSubtypeInput, setCustomSubtypeInput] = useState('');
+  const [manualUrlInput, setManualUrlInput] = useState('');
 
   const [isDragging, setIsDragging] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -47,6 +49,10 @@ export default function ProductFormModal({
     if (!isOpen) return;
 
     if (editingProduct) {
+      const primary = editingProduct.images?.primary || (typeof editingProduct.images === 'string' ? editingProduct.images : '');
+      const gallery = Array.isArray(editingProduct.images?.gallery) ? editingProduct.images.gallery : [];
+      const loadedImages = [primary, ...gallery].filter(Boolean);
+
       setFormData({
         name: editingProduct.name || '',
         category: editingProduct.category || 'tops',
@@ -64,7 +70,8 @@ export default function ProductFormModal({
         colors: Array.isArray(editingProduct.colors) ? editingProduct.colors : ['Black', 'White'],
         availableSizes: Array.isArray(editingProduct.availableSizes) ? editingProduct.availableSizes : ['S', 'M', 'L', 'XL'],
         variants: Array.isArray(editingProduct.variants) ? editingProduct.variants : [],
-        imageUrl: editingProduct.images?.primary || (typeof editingProduct.images === 'string' ? editingProduct.images : ''),
+        imageUrl: loadedImages[0] || '',
+        images: loadedImages,
       });
     } else {
       const firstCat = categoryList[0];
@@ -90,9 +97,11 @@ export default function ProductFormModal({
         availableSizes: firstCat?.id === 'care-accessories' ? ['One Size'] : ['S', 'M', 'L', 'XL'],
         variants: [],
         imageUrl: '',
+        images: [],
       });
     }
 
+    setManualUrlInput('');
     setIsAddingCustomSub(false);
     setCustomSubcategoryInput('');
     setIsAddingCustomSubtype(false);
@@ -126,54 +135,65 @@ export default function ProductFormModal({
     setCustomSubcategoryInput('');
   };
 
-  // Image upload handling with Cloudflare R2
-  const processImageFile = async (file) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
+  // Multi-image upload handling with Cloudflare R2
+  const processImageFiles = async (files) => {
+    const fileList = Array.from(files || []).filter(f => f && f.type.startsWith('image/'));
+    if (!fileList.length) {
       showAlertDialog({
         title: 'Unsupported File Format',
-        message: 'Please upload an image file (PNG, JPG, or WEBP).',
+        message: 'Please upload image files (PNG, JPG, or WEBP).',
         type: 'warning',
       });
       return;
     }
 
-    // Instant local preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setFormData(prev => ({ ...prev, imageUrl: e.target.result }));
-    };
-    reader.readAsDataURL(file);
-
     setIsUploadingImage(true);
-    setUploadMessage('Compressing and uploading to Cloudflare R2...');
+    setUploadMessage(`Compressing & uploading ${fileList.length > 1 ? fileList.length + ' images' : 'image'} to Cloudflare R2...`);
 
     try {
       const token = localStorage.getItem('penny_admin_token');
-      const dataPayload = new FormData();
-      dataPayload.append('image', file);
+      const uploadedUrls = [];
 
-      const response = await fetch('/api/admin/media/upload', {
-        method: 'POST',
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: dataPayload,
-      });
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        if (fileList.length > 1) {
+          setUploadMessage(`Uploading image ${i + 1} of ${fileList.length} to Cloudflare R2...`);
+        }
+        const dataPayload = new FormData();
+        dataPayload.append('image', file);
 
-      const data = await response.json();
-
-      if (response.ok && data.success && data.url) {
-        setFormData(prev => ({ ...prev, imageUrl: data.url }));
-        setUploadMessage(data.message || 'Image uploaded to Cloudflare R2 successfully.');
-      } else {
-        console.warn('Backend upload returned notice:', data.message);
-        setUploadMessage(data.message || 'Cloudflare R2 upload pending. Please check R2 keys in .env.');
-        showAlertDialog({
-          title: 'Cloudflare R2 Storage',
-          message: data.message || 'Could not upload to Cloudflare R2. Please check your R2 environment variables in server/.env.',
-          type: 'warning',
+        const response = await fetch('/api/admin/media/upload', {
+          method: 'POST',
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: dataPayload,
         });
+
+        const data = await response.json();
+        if (response.ok && data.success && data.url) {
+          uploadedUrls.push(data.url);
+        } else {
+          console.warn('Backend upload returned notice:', data.message);
+          showAlertDialog({
+            title: 'Cloudflare R2 Notice',
+            message: data.message || 'Could not upload to Cloudflare R2. Please check your R2 environment variables in server/.env.',
+            type: 'warning',
+          });
+        }
+      }
+
+      if (uploadedUrls.length > 0) {
+        setFormData(prev => {
+          const current = Array.isArray(prev.images) ? [...prev.images] : (prev.imageUrl ? [prev.imageUrl] : []);
+          const merged = [...current, ...uploadedUrls];
+          return {
+            ...prev,
+            images: merged,
+            imageUrl: merged[0] || '',
+          };
+        });
+        setUploadMessage(`${uploadedUrls.length} image(s) uploaded to Cloudflare R2 successfully.`);
       }
     } catch (err) {
       console.warn('Could not connect to media upload endpoint:', err);
@@ -181,6 +201,51 @@ export default function ProductFormModal({
     } finally {
       setIsUploadingImage(false);
     }
+  };
+
+  // Remove an individual image from the product
+  const handleRemoveImage = (indexToRemove) => {
+    setFormData(prev => {
+      const current = Array.isArray(prev.images) ? [...prev.images] : (prev.imageUrl ? [prev.imageUrl] : []);
+      const updated = current.filter((_, idx) => idx !== indexToRemove);
+      return {
+        ...prev,
+        images: updated,
+        imageUrl: updated[0] || '',
+      };
+    });
+  };
+
+  // Set any image as the primary cover (moves it to index 0)
+  const handleSetAsCover = (indexToCover) => {
+    setFormData(prev => {
+      const current = Array.isArray(prev.images) ? [...prev.images] : (prev.imageUrl ? [prev.imageUrl] : []);
+      if (indexToCover <= 0 || indexToCover >= current.length) return prev;
+      const target = current[indexToCover];
+      const remaining = current.filter((_, idx) => idx !== indexToCover);
+      const updated = [target, ...remaining];
+      return {
+        ...prev,
+        images: updated,
+        imageUrl: updated[0] || '',
+      };
+    });
+  };
+
+  // Add manual URL or public path
+  const handleAddManualUrl = () => {
+    const url = manualUrlInput.trim();
+    if (!url) return;
+    setFormData(prev => {
+      const current = Array.isArray(prev.images) ? [...prev.images] : (prev.imageUrl ? [prev.imageUrl] : []);
+      const updated = [...current, url];
+      return {
+        ...prev,
+        images: updated,
+        imageUrl: updated[0] || '',
+      };
+    });
+    setManualUrlInput('');
   };
 
   const handleSubmit = (e) => {
@@ -238,8 +303,17 @@ export default function ProductFormModal({
       }
     }
 
+    const finalImages = Array.isArray(formData.images) && formData.images.length > 0
+      ? formData.images
+      : (formData.imageUrl ? [formData.imageUrl] : []);
+
     onSave({
       ...formData,
+      imageUrl: finalImages[0] || '/images/products/linen-set-1.jpg',
+      images: {
+        primary: finalImages[0] || '/images/products/linen-set-1.jpg',
+        gallery: finalImages.slice(1),
+      },
       subcategory: finalSubcategory,
       subtype: finalSubtype,
       variants,
@@ -611,18 +685,25 @@ export default function ProductFormModal({
             </div>
           </div>
 
-          {/* Interactive Image Dropzone & Preview (Cloudflare R2) */}
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">
-              Product Imagery (Cloudflare R2 Upload & Compression)
-            </label>
-            
+          {/* Interactive Multi-Image Manager (Cloudflare R2) */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-charcoal">
+                Product Imagery ({(formData.images?.length || 0)} {(formData.images?.length === 1 ? 'Image' : 'Images')})
+              </label>
+              <p className="text-[10px] text-neutral-400 mt-0.5">
+                Decide whether this piece has 1, 2, or more images. The Cover image is displayed on cards; secondary images appear in the product details gallery. Click the trash icon to delete any image you don't want.
+              </p>
+            </div>
+
             <input 
               type="file" 
               ref={fileInputRef} 
+              multiple
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) processImageFile(file);
+                const files = e.target.files;
+                if (files?.length) processImageFiles(files);
+                e.target.value = '';
               }} 
               accept="image/png, image/jpeg, image/webp" 
               className="hidden" 
@@ -635,8 +716,8 @@ export default function ProductFormModal({
               onDrop={(e) => {
                 e.preventDefault();
                 setIsDragging(false);
-                const file = e.dataTransfer.files?.[0];
-                if (file) processImageFile(file);
+                const files = e.dataTransfer.files;
+                if (files?.length) processImageFiles(files);
               }}
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed p-4 text-center cursor-pointer transition-colors rounded-xs ${
@@ -647,7 +728,7 @@ export default function ProductFormModal({
             >
               <Upload className="w-5 h-5 mx-auto text-neutral-400 mb-1.5" />
               <p className="text-xs font-bold text-brand-charcoal">
-                Click to browse or drag and drop image file here
+                Click to browse or drag & drop images here (Select one or multiple)
               </p>
               <p className="text-[10px] text-neutral-400 mt-0.5">
                 Automatically compressed with sharp and uploaded to Cloudflare R2.
@@ -656,7 +737,7 @@ export default function ProductFormModal({
 
             {/* Upload in Progress Indicator */}
             {isUploadingImage && (
-              <div className="mt-3 p-3 bg-neutral-100 border border-neutral-300 flex items-center gap-3 animate-pulse rounded-xs">
+              <div className="p-3 bg-neutral-100 border border-neutral-300 flex items-center gap-3 animate-pulse rounded-xs">
                 <Loader2 className="w-4 h-4 animate-spin text-brand-charcoal shrink-0" />
                 <div className="text-left text-xs">
                   <p className="font-bold text-brand-charcoal">Uploading to Cloudflare R2...</p>
@@ -665,59 +746,111 @@ export default function ProductFormModal({
               </div>
             )}
 
-            {/* Thumbnail Preview Card */}
-            {formData.imageUrl && !isUploadingImage && (
-              <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 flex items-center justify-between gap-4 rounded-xs">
-                <div className="flex items-center gap-3">
-                  <img 
-                    src={formData.imageUrl} 
-                    alt="Preview" 
-                    className="w-14 h-16 object-cover bg-white border border-neutral-200 rounded-xs shrink-0" 
-                  />
-                  <div className="text-left overflow-hidden">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
-                        <CheckCircle2 className="w-3 h-3" /> Image Ready
-                      </span>
-                      {(formData.imageUrl.includes('r2.dev') || formData.imageUrl.includes('r2.cloudflarestorage.com')) && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 text-[9px] font-bold uppercase rounded-xs">
-                          <Cloud className="w-2.5 h-2.5" /> Cloudflare R2
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-neutral-600 font-mono truncate max-w-xs mt-0.5" title={formData.imageUrl}>
-                      {formData.imageUrl.startsWith('data:') ? 'Local High-Res Image Preview' : formData.imageUrl}
-                    </p>
-                    {uploadMessage && (
-                      <p className="text-[10px] text-neutral-400 mt-0.5">{uploadMessage}</p>
-                    )}
-                  </div>
+            {/* Image Cards List: Shows each image with Delete and Make Cover buttons */}
+            {(formData.images && formData.images.length > 0) && (
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 block">
+                  Current Assigned Images ({formData.images.length})
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {formData.images.map((imgUrl, idx) => {
+                    const isCover = idx === 0;
+                    const isR2 = imgUrl.includes('r2.dev') || imgUrl.includes('r2.cloudflarestorage.com');
+                    return (
+                      <div 
+                        key={idx}
+                        className={`p-2.5 bg-neutral-50 border rounded-xs flex items-center justify-between gap-3 transition-colors ${
+                          isCover ? 'border-brand-charcoal bg-neutral-100/60 shadow-xs' : 'border-neutral-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img 
+                            src={imgUrl} 
+                            alt={`Product image ${idx + 1}`} 
+                            className="w-12 h-14 object-cover bg-white border border-neutral-200 rounded-xs shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = '/images/products/linen-set-1.jpg';
+                            }}
+                          />
+                          <div className="min-w-0 text-left">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {isCover ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-brand-charcoal text-white text-[9px] font-bold uppercase tracking-wider rounded-xs">
+                                  <Star className="w-2.5 h-2.5 fill-amber-300 text-amber-300" /> Cover Image
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 bg-neutral-200 text-neutral-700 text-[9px] font-bold uppercase tracking-wider rounded-xs">
+                                  Gallery #{idx + 1}
+                                </span>
+                              )}
+                              {isR2 && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 text-[8px] font-bold uppercase rounded-xs">
+                                  <Cloud className="w-2 h-2" /> R2
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-neutral-600 font-mono truncate max-w-[170px] mt-1" title={imgUrl}>
+                              {imgUrl.startsWith('data:') ? 'Local preview' : imgUrl}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {!isCover && (
+                            <button
+                              type="button"
+                              onClick={() => handleSetAsCover(idx)}
+                              title="Set as the main cover photo for cards"
+                              className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider bg-white border border-neutral-200 hover:border-brand-charcoal text-neutral-700 hover:text-black rounded-xs transition-colors cursor-pointer"
+                            >
+                              Make Cover
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(idx)}
+                            title="Delete this image"
+                            className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-xs transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFormData(prev => ({ ...prev, imageUrl: '' }));
-                    setUploadMessage('');
-                  }}
-                  className="text-neutral-400 hover:text-red-600 p-1.5 rounded-xs transition-colors cursor-pointer"
-                  title="Clear image"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
             )}
 
-            {/* Manual Path Fallback */}
-            <div className="mt-2">
-              <span className="text-[10px] text-neutral-400 uppercase font-medium">Or enter image URL / public path manually:</span>
-              <input
-                type="text"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
-                placeholder="e.g. /images/products/linen-set-1.jpg"
-                className="w-full mt-1 border border-neutral-200 p-2 focus:outline-none focus:border-brand-charcoal text-[11px]"
-              />
+            {/* Manual Path or URL Input */}
+            <div className="pt-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-medium block mb-1">
+                Or add image by URL / public path:
+              </span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={manualUrlInput}
+                  onChange={(e) => setManualUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddManualUrl();
+                    }
+                  }}
+                  placeholder="e.g. /images/products/linen-set-1.jpg or https://..."
+                  className="w-full border border-neutral-200 p-2 focus:outline-none focus:border-brand-charcoal text-[11px]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddManualUrl}
+                  disabled={!manualUrlInput.trim()}
+                  className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 disabled:opacity-40 text-brand-charcoal text-xs font-bold uppercase tracking-wider rounded-xs shrink-0 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 inline mr-1" /> Add
+                </button>
+              </div>
             </div>
           </div>
 

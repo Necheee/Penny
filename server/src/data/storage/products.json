@@ -1,5 +1,40 @@
 [
   {
+    "id": "p-8111",
+    "slug": "the-candix-denim-2",
+    "name": "The Candix Denim 2",
+    "category": "outerwear",
+    "subcategory": "Overshirts & Shackets",
+    "subtype": "Denim",
+    "price": 27500,
+    "description": "Premium menswear essential.",
+    "material": "100% Cotton",
+    "fit": "Relaxed fit.",
+    "care": "Machine wash cold inside out. Hang dry.",
+    "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
+    "images": {
+      "gallery": [],
+      "primary": "https://pub-8348f753b9dc4996a2494d7f301bda21.r2.dev/products/1795099801858-6e495ky.webp"
+    },
+    "colors": [
+      "Black",
+      "White"
+    ],
+    "availableSizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XS",
+      "XXL"
+    ],
+    "featured": false,
+    "inStock": true,
+    "isArchived": false,
+    "createdAt": "2026-11-19T14:50:12.119Z",
+    "updatedAt": "2026-11-19T14:50:12.119Z"
+  },
+  {
     "id": "p-8110",
     "slug": "the-candix-denim",
     "name": "The Candix Denim",
@@ -13,9 +48,7 @@
     "care": "Machine wash cold inside out. Hang dry.",
     "shipping": "Free delivery on orders above ₦200,000. Ships within 1-3 business days in Lagos.",
     "images": {
-      "gallery": [
-        "/images/products/linen-set-2.jpg"
-      ],
+      "gallery": [],
       "primary": "https://pub-8348f753b9dc4996a2494d7f301bda21.r2.dev/products/1794921032251-qxvn172.webp"
     },
     "colors": [

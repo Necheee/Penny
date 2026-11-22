@@ -297,25 +297,27 @@ export default function ProductModal({ productId, closeModal }) {
         <div className="flex flex-col md:flex-row w-full">
           {/* Left Column: Image Gallery */}
           <div className="w-full md:w-1/2 flex flex-col-reverse sm:flex-row bg-[#f8f8f8]">
-          <div className="flex sm:flex-col gap-2 p-4 overflow-x-auto sm:overflow-y-auto hide-scrollbar shrink-0">
-            {allImages.map((img, idx) => (
-              <button 
-                key={idx} 
-                onClick={() => setActiveImage(img)}
-                className={`relative aspect-[3/4] w-16 sm:w-20 shrink-0 overflow-hidden bg-brand-beige/20 border transition-all ${activeImage === img ? 'border-brand-charcoal opacity-100' : 'border-transparent opacity-50 hover:opacity-100'}`}
-              >
-                <img 
-                  src={img} 
-                  alt={`${product.name} view ${idx + 1}`} 
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = '/images/products/linen-set-1.jpg';
-                  }}
-                  className="w-full h-full object-cover" 
-                />
-              </button>
-            ))}
-          </div>
+          {allImages.length > 1 && (
+            <div className="flex sm:flex-col gap-2 p-4 overflow-x-auto sm:overflow-y-auto hide-scrollbar shrink-0">
+              {allImages.map((img, idx) => (
+                <button 
+                  key={idx} 
+                  onClick={() => setActiveImage(img)}
+                  className={`relative aspect-[3/4] w-16 sm:w-20 shrink-0 overflow-hidden bg-brand-beige/20 border transition-all ${activeImage === img ? 'border-brand-charcoal opacity-100' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                >
+                  <img 
+                    src={img} 
+                    alt={`${product.name} view ${idx + 1}`} 
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = '/images/products/linen-set-1.jpg';
+                    }}
+                    className="w-full h-full object-cover" 
+                  />
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="relative aspect-[4/5] sm:aspect-auto sm:h-full w-full bg-[#f4f4f0] overflow-hidden">
             <AnimatePresence mode="wait">

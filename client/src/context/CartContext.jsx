@@ -111,7 +111,12 @@ export function CartProvider({ children }) {
           variantId,
           name: product.name,
           price: product.price,
-          image: product.images?.primary || product.image || '',
+          cartId,
+          productId: product.id,
+          variantId,
+          name: product.name,
+          price: product.price,
+          image: product.images?.primary || product.image || (typeof product.images === 'string' ? product.images : '/images/products/linen-set-1.jpg'),
           size,
           color,
           quantity
