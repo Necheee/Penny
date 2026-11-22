@@ -163,11 +163,24 @@ export function CartProvider({ children }) {
   }, [cartItems]);
 
   const cartSubtotal = useMemo(() => {
-    const subtotalMinorUnits = cartItems.reduce(
-      (total, item) => total + (toMinorUnits(item.price) * item.quantity),
-      0n,
-    );
-    return fromMinorUnits(subtotalMinorUnits);
+    try {
+      const subtotalMinorUnits = cartItems.reduce(
+        (total, item) => {
+          const qty = BigInt(Math.max(1, Math.round(Number(item.quantity) || 1)));
+          const priceMinor = toMinorUnits(item.price);
+          return total + (priceMinor * qty);
+        },
+        0n,
+      );
+      return fromMinorUnits(subtotalMinorUnits);
+    } catch (err) {
+      console.warn('Error computing cart subtotal:', err);
+      const fallbackSum = cartItems.reduce(
+        (sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 1),
+        0
+      );
+      return fallbackSum.toFixed(2);
+    }
   }, [cartItems]);
 
   return (
