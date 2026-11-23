@@ -38,6 +38,7 @@ export default function ForgotPassword() {
     setIsSubmitting(true);
     setErrorMsg('');
     setSuccessMsg('');
+    setSuccessMsg('');
 
     try {
       const res = await fetch('/api/auth/forgot-password', {
@@ -90,6 +91,7 @@ export default function ForgotPassword() {
 
     setIsSubmitting(true);
     setErrorMsg('');
+    setSuccessMsg('');
 
     try {
       const res = await fetch('/api/auth/reset-password', {
@@ -167,7 +169,7 @@ export default function ForgotPassword() {
             {devCode && (
               <div className="mb-4 p-2.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xs flex items-center justify-between">
                 <span>Dev Preview Code: <strong>{devCode}</strong></span>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-xs">Auto-filled</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-xs">Offline Dev</span>
               </div>
             )}
 
@@ -178,7 +180,7 @@ export default function ForgotPassword() {
               </div>
             )}
 
-            {successMsg && (
+            {!errorMsg && successMsg && (
               <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xs">
                 {successMsg}
               </div>

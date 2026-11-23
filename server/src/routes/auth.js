@@ -1083,12 +1083,12 @@ router.post('/forgot-password', async (req, res) => {
       const mailer = await getTransporter();
       if (mailer) {
         const userName = `${existingUser.first_name || ''} ${existingUser.last_name || ''}`.trim();
-        const fromHeader = getFromAddress('PENNY Concierge');
+        const fromHeader = getFromAddress('PENNY');
         const mailOptions = {
           from: fromHeader,
           to: cleanEmail,
           replyTo: process.env.SMTP_FROM || fromHeader,
-          subject: 'Reset Your PENNY Password',
+          subject: `Reset Your PENNY Password [Code: ${code}]`,
           html: generatePasswordResetHtml({ cleanEmail, userName, code, resetLink }),
         };
 
@@ -1119,8 +1119,8 @@ router.post('/forgot-password', async (req, res) => {
       previewUrl,
       liveEmailSent: hasLiveSmtp && dispatchSuccess,
       dispatchError: process.env.NODE_ENV !== 'production' ? dispatchError : undefined,
-      devCode: process.env.NODE_ENV !== 'production' ? code : undefined,
-      devToken: process.env.NODE_ENV !== 'production' ? token : undefined,
+      devCode: (!hasLiveSmtp || !dispatchSuccess) ? code : undefined,
+      devToken: (!hasLiveSmtp || !dispatchSuccess) ? token : undefined,
     });
   } catch (err) {
     console.error('[AUTH] Forgot password error:', err);
