@@ -61,25 +61,36 @@ export async function getTransporter(forceRefresh = false) {
 
 /**
  * Returns a clean RFC-5322 formatted From header string that is accepted by Gmail and SMTP providers without rejection.
+ * Respects any custom sender brand name defined in SMTP_FROM (e.g. "PENNY" or "PENNY Clothing").
  */
 export function getFromAddress(defaultLabel = 'PENNY') {
+  let label = defaultLabel;
+  const smtpFrom = (process.env.SMTP_FROM || '').trim();
+  if (smtpFrom) {
+    const nameMatch = smtpFrom.match(/^["']?([^<"']+)["']?\s*<.+>$/);
+    if (nameMatch && nameMatch[1].trim()) {
+      label = nameMatch[1].trim();
+    } else if (!smtpFrom.includes('@') && !smtpFrom.includes('<')) {
+      label = smtpFrom.replace(/["']/g, '').trim();
+    }
+  }
+
   const gmailUser = (process.env.GMAIL_USER || '').trim();
   if (gmailUser) {
-    return `"${defaultLabel}" <${gmailUser}>`;
+    return `"${label}" <${gmailUser}>`;
   }
   const smtpUser = (process.env.SMTP_USER || '').trim();
-  const smtpFrom = (process.env.SMTP_FROM || '').trim();
   if (smtpFrom) {
     const match = smtpFrom.match(/<([^>]+)>/);
     const email = match ? match[1].trim() : smtpFrom.replace(/["']/g, '').trim();
     if (email.includes('@')) {
-      return `"${defaultLabel}" <${email}>`;
+      return `"${label}" <${email}>`;
     }
   }
   if (smtpUser && smtpUser.includes('@')) {
-    return `"${defaultLabel}" <${smtpUser}>`;
+    return `"${label}" <${smtpUser}>`;
   }
-  return `"${defaultLabel}" <concierge@pennycapsule.com>`;
+  return `"${label}" <concierge@pennycapsule.com>`;
 }
 
 /**
