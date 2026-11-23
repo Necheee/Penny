@@ -6,7 +6,7 @@ import { generateToken } from '../utils/token.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getPool } from '../utils/cloudDb.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
-import { getTransporter } from '../utils/receiptEmail.js';
+import { getTransporter, getFromAddress } from '../utils/receiptEmail.js';
 
 const router = express.Router();
 
@@ -1076,33 +1076,49 @@ router.post('/forgot-password', async (req, res) => {
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
     const resetLink = `${clientUrl}/reset-password?token=${token}&email=${encodeURIComponent(cleanEmail)}`;
     let previewUrl = null;
+    let dispatchSuccess = false;
+    let dispatchError = null;
 
     try {
       const mailer = await getTransporter();
       if (mailer) {
         const userName = `${existingUser.first_name || ''} ${existingUser.last_name || ''}`.trim();
+        const fromHeader = getFromAddress('PENNY Concierge');
         const mailOptions = {
-          from: process.env.SMTP_FROM || 'PENNY Concierge <concierge@pennycapsule.com>',
+          from: fromHeader,
           to: cleanEmail,
+          replyTo: process.env.SMTP_FROM || fromHeader,
           subject: 'Reset Your PENNY Password',
           html: generatePasswordResetHtml({ cleanEmail, userName, code, resetLink }),
         };
 
         const info = await mailer.sendMail(mailOptions);
-        if (info && info.messageId && mailer.transporter?.name === 'SMTP' && mailer.options?.host?.includes('ethereal')) {
+        dispatchSuccess = true;
+        console.log(`[AUTH] Password reset email dispatched successfully to ${cleanEmail}. MessageId: ${info?.messageId || 'sent'}`);
+        if (info && info.messageId && (mailer.options?.host?.includes('ethereal') || (mailer.transporter?.name === 'SMTP' && mailer.options?.host?.includes('ethereal')))) {
           previewUrl = nodemailer.getTestMessageUrl(info) || null;
+          console.log(`[AUTH] Ethereal Dev Preview URL: ${previewUrl}`);
         }
+      } else {
+        console.warn('[AUTH] No email transporter could be initialized.');
       }
     } catch (mailErr) {
-      console.warn('[AUTH] Nodemailer dispatch error:', mailErr.message);
+      dispatchError = mailErr.message;
+      console.error('[AUTH] Nodemailer dispatch error:', mailErr.message);
     }
 
-    console.log(`[AUTH] Password reset code generated for ${cleanEmail}: ${code}`);
+    const hasLiveSmtp = Boolean((process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) || (process.env.SMTP_USER && process.env.SMTP_PASS));
+
+    console.log(`[AUTH] Password reset code generated for ${cleanEmail}: ${code} (Live SMTP active: ${hasLiveSmtp})`);
 
     return res.status(200).json({
       success: true,
-      message: `Password reset instructions have been dispatched to ${cleanEmail}.`,
+      message: hasLiveSmtp && dispatchSuccess
+        ? `A 6-digit verification code has been dispatched directly to ${cleanEmail}. Please check your inbox and spam folder.`
+        : `Password reset instructions initiated for ${cleanEmail}.`,
       previewUrl,
+      liveEmailSent: hasLiveSmtp && dispatchSuccess,
+      dispatchError: process.env.NODE_ENV !== 'production' ? dispatchError : undefined,
       devCode: process.env.NODE_ENV !== 'production' ? code : undefined,
       devToken: process.env.NODE_ENV !== 'production' ? token : undefined,
     });

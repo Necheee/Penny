@@ -4,6 +4,7 @@ import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { verifyToken } from '../utils/token.js';
+import { getTransporter, getFromAddress } from '../utils/receiptEmail.js';
 
 const router = express.Router();
 
@@ -22,56 +23,6 @@ const defaultInquiries = [
 ];
 
 let inquiriesStore = readJsonFile('inquiries.json', defaultInquiries) || defaultInquiries;
-
-let transporter = null;
-
-async function getTransporter() {
-  if (transporter) return transporter;
-
-  // 1. Production / Custom SMTP (Resend, SendGrid, Amazon SES, Mailgun)
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: Number(process.env.SMTP_PORT) === 465,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-    return transporter;
-  }
-
-  // 2. Direct Gmail with App Password
-  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
-    });
-    return transporter;
-  }
-
-  // 3. Fallback: Ethereal test account
-  try {
-    const testAccount = await nodemailer.createTestAccount();
-    transporter = nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
-    });
-    return transporter;
-  } catch (err) {
-    console.warn('Could not initialize Ethereal contact mailer:', err.message);
-    return null;
-  }
-}
 
 /**
  * GET /api/contact/messages
@@ -231,9 +182,11 @@ router.post('/messages/:id/reply', requireAuth, requireAdmin, async (req, res) =
       try {
         const mailer = await getTransporter();
         if (mailer) {
+          const fromHeader = getFromAddress('PENNY');
           const info = await mailer.sendMail({
-            from: `"PENNY" <${process.env.SMTP_FROM || 'support@penny.com'}>`,
+            from: fromHeader,
             to: item.email,
+            replyTo: process.env.SMTP_FROM || fromHeader,
             subject: `Response to your PENNY inquiry ${item.orderNumber ? `[Order #${item.orderNumber}]` : ''}`,
             html: `
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 28px; color: #232220; background: #ffffff; border: 1px solid #e8e7e4;">
@@ -523,8 +476,9 @@ router.post('/', async (req, res) => {
       try {
         const mailer = await getTransporter();
         if (mailer) {
+          const fromHeader = getFromAddress('PENNY Customer Care');
           const info = await mailer.sendMail({
-            from: `"PENNY Customer Care" <${senderFrom}>`,
+            from: fromHeader,
             to: adminEmail,
             replyTo: `"${cleanName}" <${cleanEmail}>`,
             subject: finalType === 'custom_color'

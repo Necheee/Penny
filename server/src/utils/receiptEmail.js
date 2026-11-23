@@ -3,30 +3,38 @@ import { formatMoney, multiplyMoney } from './money.js';
 
 let transporter = null;
 
-export async function getTransporter() {
-  if (transporter) return transporter;
+export async function getTransporter(forceRefresh = false) {
+  if (transporter && !forceRefresh) return transporter;
 
-  // 1. Production / Custom SMTP (Resend, SendGrid, Amazon SES, Mailgun)
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  const gmailUser = (process.env.GMAIL_USER || '').trim();
+  const gmailPass = (process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '').trim();
+
+  // 1. Direct Gmail with App Password (preferred for direct personal delivery)
+  if (gmailUser && gmailPass) {
     transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: Number(process.env.SMTP_PORT) === 465,
+      service: 'gmail',
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: gmailUser,
+        pass: gmailPass,
       },
     });
     return transporter;
   }
 
-  // 2. Direct Gmail with App Password
-  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+  // 2. Production / Custom SMTP (Resend, SendGrid, Amazon SES, Mailgun, custom Gmail SMTP)
+  const smtpHost = (process.env.SMTP_HOST || '').trim();
+  const smtpUser = (process.env.SMTP_USER || '').trim();
+  const smtpPass = (process.env.SMTP_PASS || '').trim();
+
+  if (smtpHost && smtpUser && smtpPass) {
+    const port = Number(process.env.SMTP_PORT) || 587;
     transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: smtpHost,
+      port,
+      secure: port === 465,
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
+        user: smtpUser,
+        pass: smtpPass,
       },
     });
     return transporter;
@@ -46,9 +54,32 @@ export async function getTransporter() {
     });
     return transporter;
   } catch (err) {
-    console.warn('Could not initialize Ethereal test inbox:', err.message);
+    console.warn('[NODEMAILER] Could not initialize Ethereal test inbox:', err.message);
     return null;
   }
+}
+
+/**
+ * Returns a clean RFC-5322 formatted From header string that is accepted by Gmail and SMTP providers without rejection.
+ */
+export function getFromAddress(defaultLabel = 'PENNY') {
+  const gmailUser = (process.env.GMAIL_USER || '').trim();
+  if (gmailUser) {
+    return `"${defaultLabel}" <${gmailUser}>`;
+  }
+  const smtpUser = (process.env.SMTP_USER || '').trim();
+  const smtpFrom = (process.env.SMTP_FROM || '').trim();
+  if (smtpFrom) {
+    const match = smtpFrom.match(/<([^>]+)>/);
+    const email = match ? match[1].trim() : smtpFrom.replace(/["']/g, '').trim();
+    if (email.includes('@')) {
+      return `"${defaultLabel}" <${email}>`;
+    }
+  }
+  if (smtpUser && smtpUser.includes('@')) {
+    return `"${defaultLabel}" <${smtpUser}>`;
+  }
+  return `"${defaultLabel}" <concierge@pennycapsule.com>`;
 }
 
 /**
@@ -147,7 +178,7 @@ export const generateOrderReceiptHtml = (order) => {
  */
 export const sendOrderConfirmationEmail = async (order) => {
   const receiptHtml = generateOrderReceiptHtml(order);
-  const senderEmail = process.env.SMTP_FROM || process.env.GMAIL_USER || 'support@penny.com';
+  const fromHeader = getFromAddress('PENNY');
 
   let previewUrl = null;
   let info = null;
@@ -156,8 +187,9 @@ export const sendOrderConfirmationEmail = async (order) => {
     const mailer = await getTransporter();
     if (mailer) {
       info = await mailer.sendMail({
-        from: `"PENNY" <${senderEmail}>`,
+        from: fromHeader,
         to: order.email,
+        replyTo: process.env.SMTP_FROM || fromHeader,
         subject: `Official Purchase Receipt & Order Confirmation #${order.id} - PENNY`,
         html: receiptHtml,
       });

@@ -53,10 +53,12 @@ export default function ForgotPassword() {
       }
 
       setStep(2);
-      setSuccessMsg(`A 6-digit verification code has been dispatched to ${cleanEmail}.`);
+      setSuccessMsg(data.message || `A 6-digit verification code has been dispatched to ${cleanEmail}.`);
       if (data.devCode) {
         setDevCode(data.devCode);
-        setCode(data.devCode); // Auto-fill in local dev for instant testing convenience
+        if (!data.liveEmailSent) {
+          setCode(data.devCode); // Auto-fill in local dev only if real email is not active
+        }
       }
     } catch (err) {
       console.error('Forgot password error:', err);
