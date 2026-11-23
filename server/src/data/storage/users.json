@@ -53,5 +53,17 @@
       }
     ],
     "role": "customer"
+  },
+  {
+    "id": "usr_1795356823126",
+    "email": "andalineimekaeze@gmail.com",
+    "firstName": "Andaline",
+    "lastName": "Imekaeze",
+    "phone": "",
+    "addresses": [],
+    "cart": [],
+    "role": "customer",
+    "password_hash": "$2b$10$Ll/aHmqVh01UHKvIRjQr1ufJvFIImu0GVn8Xu52AEVO1pEE26TR76",
+    "seen_notifications": []
   }
 ]

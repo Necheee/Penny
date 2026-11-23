@@ -59,6 +59,9 @@ export async function initCloudDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS seen_notifications TEXT DEFAULT '[]';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS dismissed_notifications TEXT DEFAULT '[]';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_token VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_code VARCHAR(20);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expires TIMESTAMP WITH TIME ZONE;
       CREATE TABLE IF NOT EXISTS orders (
         id VARCHAR(100) PRIMARY KEY,
         reference VARCHAR(100),

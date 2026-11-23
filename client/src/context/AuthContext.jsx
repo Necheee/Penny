@@ -84,6 +84,10 @@ export function AuthProvider({ children }) {
     setUser(null);
     localStorage.removeItem('penny_user');
     localStorage.removeItem('penny_customer_token');
+    localStorage.removeItem('penny_cart');
+    localStorage.removeItem('penny_dismissed_notifications');
+    localStorage.removeItem('penny_seen_notifications');
+    sessionStorage.removeItem('penny_account_tab');
   };
 
   /**
@@ -119,6 +123,12 @@ export function AuthProvider({ children }) {
       if (data.token) {
         localStorage.setItem('penny_customer_token', data.token);
       }
+
+      // Ensure clean slate: brand new account must not inherit old localhost guest cart or notifications
+      localStorage.removeItem('penny_cart');
+      localStorage.removeItem('penny_dismissed_notifications');
+      localStorage.removeItem('penny_seen_notifications');
+      sessionStorage.removeItem('penny_account_tab');
 
       setUser(newUser);
       localStorage.setItem('penny_user', JSON.stringify(newUser));

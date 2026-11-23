@@ -63,10 +63,8 @@ export function NotificationProvider({ children }) {
 
       const userOrders = backendOrders.filter(ord => {
         const orderEmail = (ord.email || '').toLowerCase().trim();
-        const orderCustomer = (ord.customer || '').toLowerCase().trim();
         if (userId && ord.userId && ord.userId === userId) return true;
         if (userEmail && orderEmail && orderEmail === userEmail) return true;
-        if (userFullName && orderCustomer && (orderCustomer === userFullName.toLowerCase() || orderCustomer.includes(userFullName.toLowerCase()) || userFullName.toLowerCase().includes(orderCustomer))) return true;
         return false;
       });
 

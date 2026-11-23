@@ -6,6 +6,7 @@ import Checkout from './pages/Checkout';
 import SignIn from './pages/SignIn';
 import CreateAccount from './pages/CreateAccount';
 import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Account from './pages/Account';
 import Wishlist from './pages/Wishlist';
 import About from './pages/About';
@@ -49,6 +50,8 @@ function App() {
                         <Route path="/account/login" element={<SignIn />} />
                         <Route path="/account/register" element={<CreateAccount />} />
                         <Route path="/account/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/account/reset-password" element={<ResetPassword />} />
+                        <Route path="/reset-password" element={<ResetPassword />} />
                         <Route path="/account" element={<Account />} />
                         <Route path="/signin" element={<SignIn />} />
                         <Route path="/login" element={<SignIn />} />

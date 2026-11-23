@@ -56,16 +56,12 @@ export function CartProvider({ children }) {
         const data = await res.json();
         if (data.success && Array.isArray(data.cart)) {
           const cloudCart = data.cart;
-          // If cloud cart is empty and we already marked initial sync done, update local
-          if (cloudCart.length === 0 && isInitialSyncDone.current) {
-            setCartItems([]);
-            localStorage.setItem('penny_cart', JSON.stringify([]));
-          } else if (cloudCart.length > 0) {
+          if (cloudCart.length > 0) {
             setCartItems(cloudCart);
             localStorage.setItem('penny_cart', JSON.stringify(cloudCart));
-          } else if (cloudCart.length === 0 && cartItems.length > 0) {
-            // First time login with guest items: save guest items to cloud
-            syncCartToCloud(cartItems);
+          } else {
+            setCartItems([]);
+            localStorage.setItem('penny_cart', JSON.stringify([]));
           }
           isInitialSyncDone.current = true;
         }

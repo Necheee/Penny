@@ -3,7 +3,7 @@ import { formatMoney, multiplyMoney } from './money.js';
 
 let transporter = null;
 
-async function getTransporter() {
+export async function getTransporter() {
   if (transporter) return transporter;
 
   // 1. Production / Custom SMTP (Resend, SendGrid, Amazon SES, Mailgun)

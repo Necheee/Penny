@@ -1,9 +1,12 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 import { generateToken } from '../utils/token.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getPool } from '../utils/cloudDb.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
+import { getTransporter } from '../utils/receiptEmail.js';
 
 const router = express.Router();
 
@@ -846,6 +849,291 @@ router.post('/customer-sync', requireAuth, async (req, res) => {
     return res.status(200).json({ success: true, user: userObj });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * Helper to generate a luxury styled HTML email for password reset
+ */
+const generatePasswordResetHtml = ({ cleanEmail, userName, code, resetLink }) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #FAF9F6; margin: 0; padding: 20px; color: #222222; }
+    .container { max-width: 580px; margin: 0 auto; background: #ffffff; border: 1px solid #EBE5D9; padding: 40px; }
+    .logo { text-align: center; margin-bottom: 30px; }
+    .logo-text { font-size: 26px; font-weight: bold; letter-spacing: 0.25em; text-transform: uppercase; color: #222222; }
+    .heading { font-size: 20px; font-weight: 300; text-align: center; margin-bottom: 24px; color: #222222; }
+    .code-box { background: #FAF9F6; border: 1px solid #D1CCC5; padding: 24px; text-align: center; margin: 28px 0; }
+    .code { font-size: 32px; font-weight: bold; letter-spacing: 0.35em; font-family: monospace; color: #222222; }
+    .btn { display: inline-block; padding: 14px 28px; background-color: #222222; color: #ffffff !important; text-decoration: none; text-align: center; font-size: 11px; font-weight: bold; letter-spacing: 0.2em; text-transform: uppercase; border-radius: 2px; }
+    .footer { font-size: 11px; color: #8C837A; text-align: center; margin-top: 36px; border-top: 1px solid #EBE5D9; padding-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-text">PENNY</div>
+    </div>
+    <h2 class="heading">Reset Your Password</h2>
+    <p style="font-size: 13px; line-height: 1.6; color: #555555;">
+      Hello${userName ? ` ${userName}` : ''},
+    </p>
+    <p style="font-size: 13px; line-height: 1.6; color: #555555;">
+      We received a request to reset the password for your PENNY account (<strong>${cleanEmail}</strong>).
+    </p>
+    <div class="code-box">
+      <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: #8C837A; margin-bottom: 10px; font-weight: bold;">Your 6-Digit Verification Code</div>
+      <div class="code">${code}</div>
+    </div>
+    <p style="font-size: 13px; line-height: 1.6; color: #555555; text-align: center;">
+      Alternatively, you can click the button below to reset your password directly:
+    </p>
+    <div style="text-align: center; margin: 20px 0;">
+      <a href="${resetLink}" class="btn">Reset Password Online</a>
+    </div>
+    <p style="font-size: 12px; color: #888888; text-align: center; margin-top: 24px;">
+      This code and link are valid for 1 hour. If you did not request this change, you can safely ignore this email.
+    </p>
+    <div class="footer">
+      PENNY Luxury Capsule Wardrobe &copy; ${new Date().getFullYear()} &bull; Lagos, Nigeria
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+/**
+ * POST /api/auth/forgot-password
+ * Validates that the customer account exists first.
+ * Generates a 6-digit code + reset token, stores expiry, and sends email.
+ */
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, message: 'Please provide an email address.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 1. Check if user exists in Neon DB or local storage
+    let existingUser = null;
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        const checkRes = await pool.query(
+          'SELECT id, email, first_name, last_name FROM users WHERE LOWER(email) = $1 LIMIT 1',
+          [cleanEmail]
+        );
+        if (checkRes.rows.length > 0) {
+          existingUser = checkRes.rows[0];
+        }
+      } catch (dbErr) {
+        console.warn('[AUTH] Error checking user in DB for forgot-password:', dbErr.message);
+      }
+    }
+
+    if (!existingUser) {
+      const localUsers = readJsonFile('users.json', []) || [];
+      const found = localUsers.find(u => u.email?.trim().toLowerCase() === cleanEmail);
+      if (found) {
+        existingUser = {
+          id: found.id,
+          email: found.email,
+          first_name: found.firstName || found.first_name || '',
+          last_name: found.lastName || found.last_name || '',
+        };
+      }
+    }
+
+    // STRICT CHECK: Return explicit error if account does not exist
+    if (!existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this email address. Please check your spelling or register a new account.',
+      });
+    }
+
+    // 2. Generate 6-digit verification code and secure token
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 3600000); // 1 hour
+
+    // 3. Save code, token, and expiry to Neon DB and local users.json
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          `UPDATE users 
+           SET reset_password_token = $1, reset_password_code = $2, reset_password_expires = $3 
+           WHERE LOWER(email) = $4`,
+          [token, code, expires.toISOString(), cleanEmail]
+        );
+      } catch (dbErr) {
+        console.warn('[AUTH] Error saving reset token in DB:', dbErr.message);
+      }
+    }
+
+    const localUsers = readJsonFile('users.json', []) || [];
+    const idx = localUsers.findIndex(u => u.email?.trim().toLowerCase() === cleanEmail);
+    if (idx !== -1) {
+      localUsers[idx].reset_password_token = token;
+      localUsers[idx].reset_password_code = code;
+      localUsers[idx].reset_password_expires = expires.toISOString();
+      writeJsonFile('users.json', localUsers);
+    }
+
+    // 4. Send Email via Nodemailer
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const resetLink = `${clientUrl}/reset-password?token=${token}&email=${encodeURIComponent(cleanEmail)}`;
+    let previewUrl = null;
+
+    try {
+      const mailer = await getTransporter();
+      if (mailer) {
+        const userName = `${existingUser.first_name || ''} ${existingUser.last_name || ''}`.trim();
+        const mailOptions = {
+          from: process.env.SMTP_FROM || 'PENNY Concierge <concierge@pennycapsule.com>',
+          to: cleanEmail,
+          subject: 'Reset Your PENNY Password',
+          html: generatePasswordResetHtml({ cleanEmail, userName, code, resetLink }),
+        };
+
+        const info = await mailer.sendMail(mailOptions);
+        if (info && info.messageId && mailer.transporter?.name === 'SMTP' && mailer.options?.host?.includes('ethereal')) {
+          previewUrl = nodemailer.getTestMessageUrl(info) || null;
+        }
+      }
+    } catch (mailErr) {
+      console.warn('[AUTH] Nodemailer dispatch error:', mailErr.message);
+    }
+
+    console.log(`[AUTH] Password reset code generated for ${cleanEmail}: ${code}`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Password reset instructions have been dispatched to ${cleanEmail}.`,
+      previewUrl,
+      devCode: process.env.NODE_ENV !== 'production' ? code : undefined,
+      devToken: process.env.NODE_ENV !== 'production' ? token : undefined,
+    });
+  } catch (err) {
+    console.error('[AUTH] Forgot password error:', err);
+    return res.status(500).json({ success: false, message: 'Server error processing password reset.' });
+  }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Resets user password using either the 6-digit code or the email token
+ */
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, token, code, newPassword } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email address is required.' });
+    }
+    if (!token && !code) {
+      return res.status(400).json({ success: false, message: 'Reset token or 6-digit verification code is required.' });
+    }
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanToken = (token || '').trim();
+    const cleanCode = (code || '').trim();
+
+    // 1. Look up user
+    let userRow = null;
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        const { rows } = await pool.query(
+          'SELECT * FROM users WHERE LOWER(email) = $1 LIMIT 1',
+          [cleanEmail]
+        );
+        if (rows.length > 0) userRow = rows[0];
+      } catch (dbErr) {
+        console.warn('[AUTH] DB lookup error in reset-password:', dbErr.message);
+      }
+    }
+
+    if (!userRow) {
+      const localUsers = readJsonFile('users.json', []) || [];
+      const found = localUsers.find(u => u.email?.trim().toLowerCase() === cleanEmail);
+      if (found) userRow = found;
+    }
+
+    if (!userRow) {
+      return res.status(404).json({ success: false, message: 'User account not found.' });
+    }
+
+    // 2. Validate token or code
+    const storedToken = userRow.reset_password_token;
+    const storedCode = userRow.reset_password_code;
+    const expiresStr = userRow.reset_password_expires;
+
+    if (!expiresStr || new Date(expiresStr).getTime() < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password reset link or verification code has expired. Please request a new code.',
+      });
+    }
+
+    const matchesToken = cleanToken && storedToken && cleanToken === storedToken;
+    const matchesCode = cleanCode && storedCode && cleanCode === storedCode;
+
+    if (!matchesToken && !matchesCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid 6-digit code or reset link. Please verify your details or request a new code.',
+      });
+    }
+
+    // 3. Hash new password securely with bcrypt
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // 4. Update in Neon DB
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          `UPDATE users 
+           SET password_hash = $1, reset_password_token = NULL, reset_password_code = NULL, reset_password_expires = NULL 
+           WHERE LOWER(email) = $2`,
+          [passwordHash, cleanEmail]
+        );
+      } catch (dbErr) {
+        console.warn('[AUTH] DB update error during reset-password:', dbErr.message);
+      }
+    }
+
+    // 5. Update in local users.json
+    const localUsers = readJsonFile('users.json', []) || [];
+    const idx = localUsers.findIndex(u => u.email?.trim().toLowerCase() === cleanEmail);
+    if (idx !== -1) {
+      localUsers[idx].password_hash = passwordHash;
+      delete localUsers[idx].password;
+      delete localUsers[idx].reset_password_token;
+      delete localUsers[idx].reset_password_code;
+      delete localUsers[idx].reset_password_expires;
+      writeJsonFile('users.json', localUsers);
+    }
+
+    console.log(`[AUTH] Password successfully reset for ${cleanEmail}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Your password has been reset successfully! You can now sign in with your new password.',
+    });
+  } catch (err) {
+    console.error('[AUTH] Reset password execution error:', err);
+    return res.status(500).json({ success: false, message: 'Server error resetting password.' });
   }
 });
 
