@@ -58,32 +58,12 @@ export default function Account() {
     }
   }, [location.search]);
 
-  const [seenInquiryIds, setSeenInquiryIds] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('penny_seen_inquiries') || '[]');
-    } catch {
-      return [];
-    }
-  });
-
-  // Mark notifications and messages seen when their tabs are active
+  // Mark notifications seen when activeTab is notifications
   useEffect(() => {
     if (activeTab === 'notifications') {
       markAllAsSeen?.();
     }
-    if (activeTab === 'messages' && userInquiries.length > 0) {
-      const repliedIds = userInquiries.filter(i => i.status === 'replied').map(i => i.id);
-      if (repliedIds.length > 0) {
-        setSeenInquiryIds(prev => {
-          const updated = Array.from(new Set([...prev, ...repliedIds]));
-          try {
-            localStorage.setItem('penny_seen_inquiries', JSON.stringify(updated));
-          } catch {}
-          return updated;
-        });
-      }
-    }
-  }, [activeTab, userInquiries, markAllAsSeen]);
+  }, [activeTab, markAllAsSeen]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -298,6 +278,30 @@ export default function Account() {
   const [userInquiries, setUserInquiries] = useState([]);
   const [isLoadingInquiries, setIsLoadingInquiries] = useState(false);
   const [messageFilter, setMessageFilter] = useState('all');
+
+  const [seenInquiryIds, setSeenInquiryIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('penny_seen_inquiries') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  // When viewing messages, mark all replied inquiries as seen
+  useEffect(() => {
+    if (activeTab === 'messages' && userInquiries.length > 0) {
+      const repliedIds = userInquiries.filter(i => i.status === 'replied').map(i => i.id);
+      if (repliedIds.length > 0) {
+        setSeenInquiryIds(prev => {
+          const updated = Array.from(new Set([...prev, ...repliedIds]));
+          try {
+            localStorage.setItem('penny_seen_inquiries', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+    }
+  }, [activeTab, userInquiries]);
 
   const [dismissedNotifications, setDismissedNotifications] = useState(() => {
     if (typeof window !== 'undefined') {
