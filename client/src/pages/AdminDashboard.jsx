@@ -737,11 +737,15 @@ export default function AdminDashboard() {
     }
 
     try {
-      await fetch(`/api/payments/orders/${orderId}/status`, {
+      const response = await fetch(`/api/payments/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: adminAuthHeaders(),
         body: JSON.stringify({ status: newStatus }),
       });
+      if (response.ok) {
+        setEmailNotificationMsg(`Order #${orderId} status set to "${newStatus}". Customer notification email dispatched.`);
+        setTimeout(() => setEmailNotificationMsg(''), 4500);
+      }
     } catch (e) {
       console.warn('Could not sync status update with backend:', e);
     }

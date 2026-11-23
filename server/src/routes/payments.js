@@ -1,7 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { randomUUID } from 'node:crypto';
-import { sendOrderConfirmationEmail, sendAdminNewOrderAlert, sendCustomerBankInstructionsEmail } from '../utils/receiptEmail.js';
+import { sendOrderConfirmationEmail, sendAdminNewOrderAlert, sendCustomerBankInstructionsEmail, sendOrderStatusUpdateEmail } from '../utils/receiptEmail.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
 import { minorUnitsToDecimal, toMinorUnits } from '../utils/money.js';
@@ -748,6 +748,11 @@ router.patch('/orders/:id/status', requireAuth, requireAdmin, async (req, res) =
         }
         const dbRes = await pool.query(`${relationalOrderSelect} WHERE o.id = $1 GROUP BY o.id`, [id]);
         order = dbRes.rows[0] ? mapDbOrder(dbRes.rows[0]) : null;
+        if (order) {
+          sendOrderStatusUpdateEmail(order, status).catch(err => {
+            console.warn('[ORDERS] Background status email dispatch failed:', err.message);
+          });
+        }
         return res.status(200).json({
           success: true,
           message: `Order status updated to ${status}.`,
@@ -766,6 +771,9 @@ router.patch('/orders/:id/status', requireAuth, requireAdmin, async (req, res) =
   if (order) {
     order.status = status;
     writeJsonFile('orders.json', ordersStore);
+    sendOrderStatusUpdateEmail(order, status).catch(err => {
+      console.warn('[ORDERS] Background status email dispatch failed:', err.message);
+    });
   }
 
   return res.status(200).json({

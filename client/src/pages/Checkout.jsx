@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
@@ -64,11 +64,46 @@ const Checkout = () => {
     loadBankConfig();
   }, []);
 
-  // Sync logged in user profile with checkout fields
-  useEffect(() => {
-    if (user && checkoutMode === 'member') {
-      const defaultAddr = user.addresses?.find(a => a.isDefault) || user.addresses?.[0];
-      setFormData(prev => ({
+  // Track whether we have initialized form data once from the member profile
+  const hasPrefilledRef = useRef(false);
+
+  // Form State initialized with user profile if available
+  const [formData, setFormData] = useState(() => {
+    const defaultAddr = user?.addresses?.find(a => a.isDefault) || user?.addresses?.[0];
+    return {
+      email: user?.email || '',
+      phone: user?.phone || '',
+      firstName: user?.firstName || '',
+      lastName: user?.lastName || '',
+      address: defaultAddr?.street || '',
+      city: defaultAddr?.city || 'Lagos',
+      state: defaultAddr?.state || 'Lagos',
+      postalCode: '',
+      shippingMethod: 'standard', // 'standard' or 'express'
+      paymentMethod: 'bank_transfer', // direct bank transfer active by default
+      transferAccountName: '', // Name on the transferring bank account
+      notes: ''
+    };
+  });
+
+  // Safe helper to apply profile data on demand without auto-clobbering user input while typing
+  const applyProfileData = (force = false) => {
+    if (!user) return;
+    const defaultAddr = user.addresses?.find(a => a.isDefault) || user.addresses?.[0];
+    setFormData(prev => {
+      if (!force) {
+        return {
+          ...prev,
+          email: prev.email || user.email || '',
+          phone: prev.phone || user.phone || '',
+          firstName: prev.firstName || user.firstName || '',
+          lastName: prev.lastName || user.lastName || '',
+          address: prev.address || defaultAddr?.street || '',
+          city: prev.city || defaultAddr?.city || 'Lagos',
+          state: prev.state || defaultAddr?.state || 'Lagos',
+        };
+      }
+      return {
         ...prev,
         email: user.email || prev.email,
         phone: user.phone || prev.phone,
@@ -77,25 +112,17 @@ const Checkout = () => {
         address: defaultAddr?.street || prev.address,
         city: defaultAddr?.city || prev.city,
         state: defaultAddr?.state || prev.state,
-      }));
+      };
+    });
+  };
+
+  // Only pre-fill once if user object arrived asynchronously after initial mount
+  useEffect(() => {
+    if (user && checkoutMode === 'member' && !hasPrefilledRef.current) {
+      hasPrefilledRef.current = true;
+      applyProfileData(false);
     }
   }, [user, checkoutMode]);
-
-  // Form State
-  const [formData, setFormData] = useState({
-    email: '',
-    phone: '',
-    firstName: '',
-    lastName: '',
-    address: '',
-    city: 'Lagos',
-    state: 'Lagos',
-    postalCode: '',
-    shippingMethod: 'standard', // 'standard' or 'express'
-    paymentMethod: 'bank_transfer', // direct bank transfer active by default
-    transferAccountName: '', // Name on the transferring bank account
-    notes: ''
-  });
 
   const [errors, setErrors] = useState({});
 
@@ -376,7 +403,7 @@ const Checkout = () => {
           {isBankTransfer 
             ? ' Please complete your bank transfer using the details below. Once confirmed by the store owner, a digital receipt and dispatch notification will be sent to ' 
             : ' A confirmation and receipt has been sent to '}
-          <span className="font-sans font-medium text-brand-charcoal">{formData.email}</span>.
+          <span className="font-sans font-medium text-brand-charcoal">{completedOrder?.email || formData.email}</span>.
         </p>
 
         {/* Bank Transfer Instructions Card on Receipt Screen */}
@@ -386,7 +413,7 @@ const Checkout = () => {
               <Building2 className="w-4 h-4 text-amber-800" />
               <span>Complete Payment to Process Your Order</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs">
               <div className="bg-white p-2.5 border border-amber-200/50 rounded-xs">
                 <span className="text-[10px] text-neutral-400 uppercase font-bold">Bank</span>
                 <p className="font-bold text-brand-charcoal text-xs mt-0.5">{bankDetails.bankName}</p>
@@ -399,6 +426,12 @@ const Checkout = () => {
                 <span className="text-[10px] text-neutral-400 uppercase font-bold">Account Number</span>
                 <p className="font-mono font-bold text-brand-charcoal text-xs mt-0.5">{bankDetails.accountNumber}</p>
               </div>
+              <div className="bg-white p-2.5 border border-amber-200/50 rounded-xs">
+                <span className="text-[10px] text-neutral-400 uppercase font-bold">Amount to Transfer</span>
+                <p className="font-mono font-bold text-brand-charcoal text-xs mt-0.5">
+                  ₦ {formatMoney(completedOrder?.total != null ? completedOrder.total : grandTotal)}
+                </p>
+              </div>
             </div>
             <p className="text-[11px] text-amber-800/90 leading-relaxed">
               * Use order reference <strong>{orderId}</strong> as your payment narration. Once the transfer is received and verified by the admin, your order will transition to <strong>Processing</strong> and your official receipt will be emailed immediately.
@@ -409,20 +442,22 @@ const Checkout = () => {
         <div className="bg-brand-offwhite border border-brand-charcoal/10 p-6 w-full text-left space-y-3 mb-8 text-xs font-sans">
           <div className="flex justify-between border-b border-brand-charcoal/10 pb-2">
             <span className="text-brand-charcoal/60 uppercase tracking-wider">Recipient</span>
-            <span className="font-bold">{formData.firstName} {formData.lastName}</span>
+            <span className="font-bold">{completedOrder?.customer || `${formData.firstName} ${formData.lastName}`}</span>
           </div>
           <div className="flex justify-between border-b border-brand-charcoal/10 pb-2">
             <span className="text-brand-charcoal/60 uppercase tracking-wider">Delivery To</span>
-            <span className="font-medium text-right">{formData.address}, {formData.city}</span>
+            <span className="font-medium text-right">
+              {completedOrder?.address ? `${completedOrder.address}, ${completedOrder.city}, ${completedOrder.state}` : `${formData.address}, ${formData.city}, ${formData.state}`}
+            </span>
           </div>
           <div className="flex justify-between border-b border-brand-charcoal/10 pb-2">
             <span className="text-brand-charcoal/60 uppercase tracking-wider">Payment Method</span>
             <span className="font-medium">{formData.paymentMethod === 'paystack' ? 'Paystack / Card' : 'Direct Bank Transfer'}</span>
           </div>
-          {isBankTransfer && formData.transferAccountName && (
+          {isBankTransfer && (formData.transferAccountName || completedOrder?.transferAccountName) && (
             <div className="flex justify-between border-b border-brand-charcoal/10 pb-2">
               <span className="text-brand-charcoal/60 uppercase tracking-wider">Transfer Account</span>
-              <span className="font-medium text-brand-charcoal">{formData.transferAccountName}</span>
+              <span className="font-medium text-brand-charcoal">{completedOrder?.transferAccountName || formData.transferAccountName}</span>
             </div>
           )}
           <div className="flex justify-between border-b border-brand-charcoal/10 pb-2">
@@ -430,12 +465,14 @@ const Checkout = () => {
             <span className={`font-bold uppercase tracking-wider text-[10px] px-2 py-0.5 rounded-xs ${
               isBankTransfer ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-emerald-100 text-emerald-900'
             }`}>
-              {isBankTransfer ? 'Awaiting Bank Transfer Confirmation' : 'Paid & Confirmed'}
+              {completedOrder?.status ? completedOrder.status.toUpperCase() : (isBankTransfer ? 'Awaiting Bank Transfer Confirmation' : 'Paid & Confirmed')}
             </span>
           </div>
           <div className="flex justify-between pt-1">
             <span className="text-brand-charcoal/60 uppercase tracking-wider font-bold">Total Amount</span>
-            <span className="font-bold text-sm">₦ {formatMoney(grandTotal)}</span>
+            <span className="font-bold text-sm">
+              ₦ {formatMoney(completedOrder?.total != null ? completedOrder.total : grandTotal)}
+            </span>
           </div>
         </div>
 
@@ -454,10 +491,10 @@ const Checkout = () => {
                 paymentMethod: formData.paymentMethod,
                 paymentConfirmed: !isBankTransfer,
                 status: isBankTransfer ? 'Awaiting Payment' : 'Processing',
-                subtotal: cartSubtotal,
-                deliveryFee: shippingCost,
-                total: grandTotal,
-                items: cartItems,
+                subtotal: completedOrder?.subtotal != null ? completedOrder.subtotal : cartSubtotal,
+                deliveryFee: completedOrder?.deliveryFee != null ? completedOrder.deliveryFee : shippingCost,
+                total: completedOrder?.total != null ? completedOrder.total : grandTotal,
+                items: completedOrder?.items?.length ? completedOrder.items : cartItems,
                 createdAt: new Date().toISOString()
               });
             }}
@@ -579,8 +616,15 @@ const Checkout = () => {
                   {user ? (
                     <button
                       type="button"
-                      onClick={() => setCheckoutMode(checkoutMode === 'member' ? 'guest' : 'member')}
-                      className="text-xs font-bold uppercase tracking-wider text-brand-charcoal underline underline-offset-4 hover:text-black"
+                      onClick={() => {
+                        if (checkoutMode === 'member') {
+                          setCheckoutMode('guest');
+                        } else {
+                          setCheckoutMode('member');
+                          applyProfileData(true);
+                        }
+                      }}
+                      className="text-xs font-bold uppercase tracking-wider text-brand-charcoal underline underline-offset-4 hover:text-black cursor-pointer"
                     >
                       {checkoutMode === 'member' ? 'Switch to Guest' : 'Use Saved Profile'}
                     </button>
@@ -631,7 +675,7 @@ const Checkout = () => {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full sm:w-auto bg-brand-charcoal text-white px-8 py-3.5 text-xs font-bold uppercase tracking-[0.15em] hover:bg-black transition-colors"
+                    className="w-full sm:w-auto bg-brand-charcoal text-white px-8 py-3.5 text-xs font-bold uppercase tracking-[0.15em] hover:bg-black transition-colors cursor-pointer"
                   >
                     Continue to Shipping
                   </button>
@@ -648,14 +692,25 @@ const Checkout = () => {
           {/* STEP 2: Shipping Address */}
           <div className={`border border-brand-charcoal/10 p-6 md:p-8 bg-white transition-opacity ${step !== 2 ? 'opacity-60' : 'opacity-100'}`}>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-sm font-bold tracking-[0.15em] uppercase text-brand-charcoal">
-                2. Shipping Address
-              </h2>
+              <div>
+                <h2 className="text-sm font-bold tracking-[0.15em] uppercase text-brand-charcoal">
+                  2. Shipping Address
+                </h2>
+                {step === 2 && user && (
+                  <button
+                    type="button"
+                    onClick={() => applyProfileData(true)}
+                    className="text-[11px] text-brand-taupe hover:text-brand-charcoal underline underline-offset-2 mt-1 inline-flex items-center gap-1 font-medium cursor-pointer"
+                  >
+                    <Sparkles className="w-3 h-3" /> Auto-fill from saved profile
+                  </button>
+                )}
+              </div>
               {step > 2 && (
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="text-xs uppercase font-bold tracking-wider text-brand-taupe underline underline-offset-4 hover:text-brand-charcoal"
+                  className="text-xs uppercase font-bold tracking-wider text-brand-taupe underline underline-offset-4 hover:text-brand-charcoal cursor-pointer"
                 >
                   Edit
                 </button>

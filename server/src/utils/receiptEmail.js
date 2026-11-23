@@ -469,4 +469,283 @@ export const sendCustomerBankInstructionsEmail = async (order, bankConfig) => {
   }
 };
 
+/**
+ * Generates an executive luxury status update email for the customer
+ * Supports: 'Awaiting Payment', 'Processing', 'Shipped', 'Delivered', 'Cancelled'
+ */
+export const generateOrderStatusUpdateHtml = (order, status, customNotes = '') => {
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const isBank = order.paymentMethod === 'bank_transfer';
+
+  // Config per status
+  const statusConfigs = {
+    'Awaiting Payment': {
+      title: 'Payment Pending',
+      badge: 'AWAITING PAYMENT',
+      badgeBg: '#fffbeb',
+      badgeBorder: '#fef3c7',
+      badgeColor: '#b45309',
+      icon: '⏳',
+      headline: 'Your Order is Awaiting Payment Confirmation',
+      message: `Your order <strong>#${order.id}</strong> has been placed and is currently awaiting payment. Please complete your bank transfer of <strong>₦ ${formatMoney(order.total || 0)}</strong> using our official business account details below. Once confirmed by our team, tailoring and preparation will begin immediately.`,
+      actionText: 'View Order Details',
+      actionUrl: `${clientUrl}/account?tab=orders`,
+    },
+    'Processing': {
+      title: 'In Processing & Tailoring',
+      badge: 'PROCESSING & TAILORING',
+      badgeBg: '#f0fdfa',
+      badgeBorder: '#ccfbf1',
+      badgeColor: '#0f766e',
+      icon: '🧵',
+      headline: 'Your Capsule Wardrobe is Being Crafted & Tailored',
+      message: `Great news! Payment for order <strong>#${order.id}</strong> has been verified. Our skilled tailoring team in Lagos is now carefully cutting, fitting, and inspecting your selected capsule pieces to meet our highest standards of quality.`,
+      actionText: 'View Order in Account',
+      actionUrl: `${clientUrl}/account?tab=orders`,
+    },
+    'Shipped': {
+      title: 'Dispatched & On The Way',
+      badge: 'SHIPPED • IN TRANSIT',
+      badgeBg: '#eef2ff',
+      badgeBorder: '#e0e7ff',
+      badgeColor: '#3730a3',
+      icon: '🚚',
+      headline: 'Your Order Has Been Dispatched',
+      message: `Your order <strong>#${order.id}</strong> has departed our Lagos facility and is now in transit with our logistics courier. Please ensure someone is available at your delivery destination to receive the package.`,
+      actionText: 'Track Delivery Status',
+      actionUrl: `${clientUrl}/account?tab=orders`,
+    },
+    'Delivered': {
+      title: 'Order Delivered',
+      badge: 'DELIVERED',
+      badgeBg: '#f0fdf4',
+      badgeBorder: '#dcfce7',
+      badgeColor: '#15803d',
+      icon: '✨',
+      headline: 'Your PENNY Order Has Been Delivered',
+      message: `Your package for order <strong>#${order.id}</strong> has been successfully delivered! We hope your new capsule essentials bring timeless elegance and effortless styling to your wardrobe.`,
+      actionText: 'Shop New Arrivals',
+      actionUrl: `${clientUrl}/shop`,
+    },
+    'Cancelled': {
+      title: 'Order Cancelled',
+      badge: 'ORDER CANCELLED',
+      badgeBg: '#fef2f2',
+      badgeBorder: '#fee2e2',
+      badgeColor: '#991b1b',
+      icon: '✕',
+      headline: 'Notice of Order Cancellation',
+      message: `Your order <strong>#${order.id}</strong> has been cancelled. Any items originally reserved for this order have been returned to our inventory. If you did not request this cancellation or would like to discuss an exchange or refund, please reply directly to this email.`,
+      actionText: 'Contact Concierge',
+      actionUrl: `${clientUrl}/contact`,
+    },
+  };
+
+  const config = statusConfigs[status] || {
+    title: `Order Status: ${status}`,
+    badge: (status || 'UPDATED').toUpperCase(),
+    badgeBg: '#f7f6f4',
+    badgeBorder: '#e8e7e4',
+    badgeColor: '#232220',
+    icon: 'ℹ️',
+    headline: `Order #${order.id} Status Update`,
+    message: `The status of your order has been updated to <strong>${status}</strong>.`,
+    actionText: 'View Your Order',
+    actionUrl: `${clientUrl}/account?tab=orders`,
+  };
+
+  const itemsRows = (order.items || []).map(item => `
+    <tr style="border-bottom: 1px solid #f0f0f0;">
+      <td style="padding: 10px 0; font-size: 13px; color: #232220;">
+        <strong>${item.name}</strong><br/>
+        <span style="font-size: 11px; color: #767471;">Size: ${item.size || 'Standard'} • Color: ${item.color || 'Default'} • Qty: ${item.quantity || 1}</span>
+      </td>
+      <td style="padding: 10px 0; text-align: right; font-size: 13px; color: #232220; font-family: monospace;">
+        ₦ ${formatMoney(multiplyMoney(item.price || 0, item.quantity || 1))}
+      </td>
+    </tr>
+  `).join('');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><title>${config.title} - #${order.id}</title></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #fbfbfa; margin: 0; padding: 40px 16px; color: #232220;">
+      <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border: 1px solid #e8e7e4; padding: 36px 32px; border-radius: 2px;">
+        
+        <!-- Header -->
+        <div style="text-align: center; border-bottom: 1px solid #e8e7e4; padding-bottom: 20px; margin-bottom: 24px;">
+          <h1 style="letter-spacing: 0.35em; font-size: 24px; font-weight: 300; margin: 0; text-transform: uppercase;">PENNY</h1>
+          <p style="font-size: 11px; letter-spacing: 0.15em; color: #8e8d8a; margin-top: 6px; text-transform: uppercase;">Effortless Dressing by Design</p>
+        </div>
+
+        <!-- Status Hero Banner -->
+        <div style="background-color: ${config.badgeBg}; border: 1px solid ${config.badgeBorder}; padding: 18px 20px; border-radius: 2px; margin-bottom: 24px; text-align: left;">
+          <div style="display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.15em; text-transform: uppercase; color: ${config.badgeColor}; margin-bottom: 6px;">
+            ${config.icon} ${config.badge}
+          </div>
+          <h2 style="font-size: 16px; font-weight: 600; color: #232220; margin: 0 0 6px 0; line-height: 1.3;">
+            ${config.headline}
+          </h2>
+          <p style="font-size: 13px; color: #555350; line-height: 1.6; margin: 0;">
+            ${config.message}
+          </p>
+        </div>
+
+        <!-- Custom Notes (if supplied by admin) -->
+        ${customNotes ? `
+          <div style="background-color: #faf9f6; border-left: 3px solid #232220; padding: 12px 16px; margin-bottom: 24px; font-size: 12px; color: #44423f; font-style: italic;">
+            <strong>Special Note from Store Concierge:</strong> "${customNotes}"
+          </div>
+        ` : ''}
+
+        <!-- Order Summary Card -->
+        <div style="background-color: #fcfbf9; border: 1px solid #eee; padding: 16px; margin-bottom: 24px; font-size: 12px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: #767471;">Order Reference:</span>
+            <strong style="font-family: monospace; color: #232220;">#${order.id}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: #767471;">Recipient:</span>
+            <strong>${order.customer}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: #767471;">Delivery Address:</span>
+            <span style="text-align: right; max-width: 60%;">${order.address}, ${order.city}, ${order.state}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: #767471;">Contact Phone:</span>
+            <span>${order.phone}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #767471;">Fulfillment Status:</span>
+            <strong style="color: ${config.badgeColor}; text-transform: uppercase;">${status}</strong>
+          </div>
+        </div>
+
+        <!-- Items Table -->
+        ${(order.items && order.items.length > 0) ? `
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="border-bottom: 1px solid #e8e7e4; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #8e8d8a;">
+                <th style="padding-bottom: 8px;">Item Description</th>
+                <th style="padding-bottom: 8px; text-align: right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsRows}
+            </tbody>
+          </table>
+
+          <div style="border-top: 1px solid #e8e7e4; padding-top: 12px; margin-bottom: 24px; font-size: 13px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #767471;">
+              <span>Subtotal:</span>
+              <span>₦ ${formatMoney(order.subtotal || 0)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #767471;">
+              <span>Delivery Fee:</span>
+              <span>₦ ${formatMoney(order.deliveryFee || 0)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #232220; padding-top: 6px; border-top: 1px dashed #d5d3ce;">
+              <span>Total:</span>
+              <span style="font-family: monospace;">₦ ${formatMoney(order.total || 0)}</span>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Garment Care Guide (Shown on Delivered) -->
+        ${status === 'Delivered' ? `
+          <div style="background-color: #faf9f7; border: 1px solid #e8e7e4; padding: 14px 16px; border-radius: 2px; margin-bottom: 24px; font-size: 11px; color: #555350; line-height: 1.6;">
+            <strong style="color: #232220; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 4px;">🌿 Luxury Garment Care Guide</strong>
+            To prolong the silhouette and texture of your PENNY pieces: Hand wash cold or use a gentle cycle with like colors. Avoid bleach and tumble drying; reshape and dry flat in the shade. Warm iron on reverse.
+          </div>
+        ` : ''}
+
+        <!-- Delivery Courier Note (Shown on Shipped) -->
+        ${status === 'Shipped' ? `
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 14px 16px; border-radius: 2px; margin-bottom: 24px; font-size: 11px; color: #475569; line-height: 1.6;">
+            <strong style="color: #1e293b; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 4px;">📦 Courier Contact Information</strong>
+            Our dispatch rider will contact you at <strong>${order.phone}</strong> when approaching your delivery location. If you need to update delivery instructions, please reply immediately to this email.
+          </div>
+        ` : ''}
+
+        <!-- Call to Action Button -->
+        <div style="text-align: center; margin: 28px 0 16px 0;">
+          <a href="${config.actionUrl}" style="display: inline-block; background-color: #232220; color: #ffffff !important; padding: 14px 28px; font-size: 11px; font-weight: bold; letter-spacing: 0.2em; text-transform: uppercase; text-decoration: none; border-radius: 2px;">
+            ${config.actionText}
+          </a>
+        </div>
+
+        <div style="border-top: 1px solid #e8e7e4; padding-top: 16px; text-align: center; font-size: 11px; color: #8e8d8a; line-height: 1.5;">
+          Questions about this order? Reply directly to this email or reach our concierge team at <a href="mailto:concierge@pennycapsule.com" style="color: #232220; text-decoration: underline;">concierge@pennycapsule.com</a>.<br/>
+          &copy; ${new Date().getFullYear()} PENNY Capsule Wardrobe. All rights reserved.
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+/**
+ * Dispatches a fulfillment status update email to the customer
+ * Supports: 'Awaiting Payment', 'Processing', 'Shipped', 'Delivered', 'Cancelled'
+ */
+export const sendOrderStatusUpdateEmail = async (order, newStatus, customNotes = '') => {
+  if (!order || !order.email) {
+    console.warn('[NOTIFICATIONS] Cannot send status email: missing order or recipient email.');
+    return { success: false, reason: 'missing_email' };
+  }
+
+  const fromHeader = getFromAddress('PENNY Orders');
+
+  // Concise luxury subject line with status
+  let subject = `Order #${order.id} Status: ${newStatus} - PENNY`;
+  if (newStatus === 'Awaiting Payment') {
+    subject = `Order #${order.id} Awaiting Payment - PENNY`;
+  } else if (newStatus === 'Processing') {
+    subject = `Order #${order.id} In Processing & Tailoring - PENNY`;
+  } else if (newStatus === 'Shipped') {
+    subject = `Your PENNY Order #${order.id} Has Shipped 🚚`;
+  } else if (newStatus === 'Delivered') {
+    subject = `Your PENNY Order #${order.id} Has Been Delivered ✨`;
+  } else if (newStatus === 'Cancelled') {
+    subject = `PENNY Order #${order.id} Cancellation Notice`;
+  }
+
+  const html = generateOrderStatusUpdateHtml(order, newStatus, customNotes);
+
+  try {
+    const mailer = await getTransporter();
+    if (mailer) {
+      const info = await mailer.sendMail({
+        from: fromHeader,
+        to: order.email,
+        replyTo: process.env.SMTP_FROM || fromHeader,
+        subject,
+        html,
+      });
+
+      console.log(`\n============================================================`);
+      console.log(`[CUSTOMER STATUS NOTIFICATION] Dispatched ${newStatus} Email`);
+      console.log(`To: ${order.customer} <${order.email}>`);
+      console.log(`Subject: ${subject}`);
+      console.log(`Order ID: #${order.id}`);
+      console.log(`MessageId: ${info?.messageId || 'sent'}`);
+      console.log(`============================================================\n`);
+
+      return {
+        success: true,
+        messageId: info?.messageId || `msg_${Date.now()}`,
+        status: newStatus,
+        recipient: order.email,
+      };
+    }
+  } catch (err) {
+    console.warn(`[CUSTOMER STATUS NOTIFICATION] Failed to send ${newStatus} email for #${order.id}:`, err.message);
+    return { success: false, error: err.message };
+  }
+  return { success: false };
+};
+
+
 
