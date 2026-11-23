@@ -1,7 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { randomUUID } from 'node:crypto';
-import { sendOrderConfirmationEmail } from '../utils/receiptEmail.js';
+import { sendOrderConfirmationEmail, sendAdminNewOrderAlert, sendCustomerBankInstructionsEmail } from '../utils/receiptEmail.js';
 import { readJsonFile, writeJsonFile } from '../utils/persistentStorage.js';
 import { getPool } from '../utils/cloudDb.js';
 import { minorUnitsToDecimal, toMinorUnits } from '../utils/money.js';
@@ -563,6 +563,15 @@ router.post('/verify', async (req, res) => {
         }
         await client.query('COMMIT');
         console.log(`[ORDERS] Order #${newOrder.id} and inventory successfully saved to PostgreSQL.`);
+
+        // Dispatch background email notifications: Instant Admin Order Alert & Customer Acknowledgement
+        sendAdminNewOrderAlert(newOrder).catch(err => console.warn('[ORDERS] Admin alert notice:', err.message));
+        if (!isBankTransfer) {
+          sendOrderConfirmationEmail(newOrder).catch(err => console.warn('[ORDERS] Customer receipt notice:', err.message));
+        } else {
+          sendCustomerBankInstructionsEmail(newOrder, bankDetailsStore).catch(err => console.warn('[ORDERS] Customer bank instructions notice:', err.message));
+        }
+
         return res.status(200).json({
           success: true,
           message: isBankTransfer
@@ -593,6 +602,14 @@ router.post('/verify', async (req, res) => {
       ordersStore.unshift(newOrder);
     }
     writeJsonFile('orders.json', ordersStore);
+
+    // Dispatch background email notifications: Instant Admin Order Alert & Customer Acknowledgement
+    sendAdminNewOrderAlert(newOrder).catch(err => console.warn('[ORDERS] Admin alert notice:', err.message));
+    if (!isBankTransfer) {
+      sendOrderConfirmationEmail(newOrder).catch(err => console.warn('[ORDERS] Customer receipt notice:', err.message));
+    } else {
+      sendCustomerBankInstructionsEmail(newOrder, bankDetailsStore).catch(err => console.warn('[ORDERS] Customer bank instructions notice:', err.message));
+    }
 
     return res.status(200).json({
       success: true,
