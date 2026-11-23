@@ -42,11 +42,14 @@ A full audit of the PENNY architecture identified **15 distinct concerns** acros
    - In `POST /api/payments/verify`, recalculated order subtotals and delivery fees directly from PostgreSQL database prices (`product_variants JOIN products FOR UPDATE`).
    - Validated Paystack kobo amount and NGN currency before confirming card orders.
 
-### Phase 3 Remediation Summary (Completed 2026-11-22)
+### Phase 3 Remediation Summary (Completed 2026-11-23)
 1. **Catalogue Privacy & Pagination (Issue 11):** Enforced that `GET /api/products` only exposes active, non-archived products to public users. Draft and archived reads require verified admin tokens. Added `page` and `limit` pagination parameters to prevent payload bloat.
 2. **Variant Stock Toggle Persistence (Issue 13):** Fixed `inStock` calculation in `formatProductRow` in [products.js](../server/src/routes/products.js) to respect both `row.in_stock` and variant stock quantities. Explicit stock toggles (`inStock: false`) now zero out variant stock, and toggling back on restores base stock.
 3. **Database Performance & DDL Hygiene (Issue 14):** Relocated runtime `ALTER TABLE users ADD COLUMN IF NOT EXISTS...` queries out of user request loops into `initCloudDatabase()` in [cloudDb.js](../server/src/utils/cloudDb.js), eliminating schema locks on GET/POST requests.
 4. **Auth Link Aliases & Rich Color Palettes (Issue 15):** Added `/signin`, `/login`, `/create-account`, `/register`, and `/forgot-password` route aliases to [App.jsx](../client/src/App.jsx). Expanded color swatches in [ProductModal.jsx](../client/src/components/shop/ProductModal.jsx) with case-insensitive matching, hex input support, and variant-assigned `colorHex` fallbacks across 60+ fashion colors.
+5. **Forgot Password & Account Verification (Issue 16):** Replaced placeholder forgot password UI with a real 2-step verification system. The backend strictly checks account existence first before generating a 6-digit verification code and reset token, hashing updated passwords securely with `bcrypt`.
+6. **Per-Account Wishlist & Data Isolation (Issue 17):** Completely decoupled wishlists between accounts. Each user now has their own isolated wishlist in Neon Cloud PostgreSQL (`wishlist` column) and scoped local storage (`penny_wishlist_${userId}`).
+7. **Notification & Message Unread State Synchronization (Issue 18):** Eliminated the notification unread badge race condition by automatically marking notifications as read when the tab is active. Fixed the inquiry refresh button and updated the Messages badge to reflect unread replies rather than total inquiry count.
 
 ---
 
