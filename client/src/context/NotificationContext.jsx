@@ -80,7 +80,9 @@ export function NotificationProvider({ children }) {
       // 4. Fetch customer care inquiries
       let userInquiries = [];
       try {
-        const inqRes = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user.id || '')}`);
+        const inqRes = await fetch(`/api/contact/my-inquiries?email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user.id || '')}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         if (inqRes.ok) {
           const inqData = await inqRes.json();
           userInquiries = Array.isArray(inqData.data) ? inqData.data : [];
@@ -134,26 +136,49 @@ export function NotificationProvider({ children }) {
       } catch (e) {}
 
       const unreadItems = items.filter(item => !seenKeys.has(item.versionKey));
-      setUnreadCount(unreadItems.length);
-      setHasUnreadNotifications(unreadItems.length > 0);
+
+      // If user is actively viewing the notifications tab, mark them seen immediately to prevent persistent badge
+      const isViewingNotifications = typeof window !== 'undefined' && 
+        window.location.pathname === '/account' && 
+        (new URLSearchParams(window.location.search).get('tab') === 'notifications' || sessionStorage.getItem('penny_account_tab') === 'notifications');
+
+      if (isViewingNotifications && unreadItems.length > 0) {
+        const existing = JSON.parse(localStorage.getItem('penny_seen_notifications') || '[]');
+        const updated = Array.from(new Set([...existing, ...items.map(n => n.versionKey)]));
+        localStorage.setItem('penny_seen_notifications', JSON.stringify(updated));
+        setUnreadCount(0);
+        setHasUnreadNotifications(false);
+        if (token) {
+          fetch('/api/auth/notifications-state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ email: user.email, userId: user.id, seenNotifications: updated }),
+          }).catch(() => {});
+        }
+      } else {
+        setUnreadCount(unreadItems.length);
+        setHasUnreadNotifications(unreadItems.length > 0);
+      }
     } catch (err) {
       console.warn('Error fetching notifications:', err);
     }
   }, [user]);
 
   // Mark all active notifications as seen with cross-device cloud sync
-  const markAllAsSeen = useCallback(() => {
-    if (notifications.length === 0) {
-      setHasUnreadNotifications(false);
-      setUnreadCount(0);
-      return;
-    }
+  const markAllAsSeen = useCallback((targetNotifications) => {
+    const listToMark = Array.isArray(targetNotifications) && targetNotifications.length > 0 
+      ? targetNotifications 
+      : notifications;
+
+    setHasUnreadNotifications(false);
+    setUnreadCount(0);
+
+    if (listToMark.length === 0) return;
+
     try {
       const existing = JSON.parse(localStorage.getItem('penny_seen_notifications') || '[]');
-      const updated = Array.from(new Set([...existing, ...notifications.map(n => n.versionKey)]));
+      const updated = Array.from(new Set([...existing, ...listToMark.map(n => n.versionKey)]));
       localStorage.setItem('penny_seen_notifications', JSON.stringify(updated));
-      setHasUnreadNotifications(false);
-      setUnreadCount(0);
 
       if (user) {
         const token = localStorage.getItem('penny_customer_token');

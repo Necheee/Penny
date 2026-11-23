@@ -58,12 +58,32 @@ export default function Account() {
     }
   }, [location.search]);
 
-  // Mark notifications seen when activeTab is notifications
+  const [seenInquiryIds, setSeenInquiryIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('penny_seen_inquiries') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  // Mark notifications and messages seen when their tabs are active
   useEffect(() => {
     if (activeTab === 'notifications') {
       markAllAsSeen?.();
     }
-  }, [activeTab, markAllAsSeen]);
+    if (activeTab === 'messages' && userInquiries.length > 0) {
+      const repliedIds = userInquiries.filter(i => i.status === 'replied').map(i => i.id);
+      if (repliedIds.length > 0) {
+        setSeenInquiryIds(prev => {
+          const updated = Array.from(new Set([...prev, ...repliedIds]));
+          try {
+            localStorage.setItem('penny_seen_inquiries', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+    }
+  }, [activeTab, userInquiries, markAllAsSeen]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -418,7 +438,7 @@ export default function Account() {
   const fetchUserInquiries = async (isSilent = false) => {
     if (!user?.email) return;
     try {
-      if (!isSilent && userInquiries.length === 0) {
+      if (isSilent !== true) {
         setIsLoadingInquiries(true);
       }
       const token = localStorage.getItem('penny_customer_token');
@@ -487,11 +507,12 @@ export default function Account() {
   }
 
   const repliedInquiriesCount = userInquiries.filter(i => i.status === 'replied').length;
+  const unreadInquiriesCount = userInquiries.filter(i => i.status === 'replied' && !seenInquiryIds.includes(i.id)).length;
 
   const navItems = [
     { id: 'profile', label: 'Personal Details', shortLabel: 'Details', icon: User, desc: 'Name, email, contact phone' },
     { id: 'orders', label: 'Order History', shortLabel: 'Orders', icon: ShoppingBag, desc: 'Purchases & itemized breakdown' },
-    { id: 'messages', label: 'Messages & Requests', shortLabel: 'Messages', icon: Mail, desc: 'Custom color requests & PENNY responses', count: userInquiries.length, repliedCount: repliedInquiriesCount },
+    { id: 'messages', label: 'Messages & Requests', shortLabel: 'Messages', icon: Mail, desc: 'Custom color requests & PENNY responses', count: unreadInquiriesCount, repliedCount: repliedInquiriesCount },
     { id: 'notifications', label: 'Order Notifications', shortLabel: 'Notifications', icon: Bell, desc: 'Real-time order confirmation & delivery status' },
     { id: 'addresses', label: 'Saved Addresses', shortLabel: 'Addresses', icon: MapPin, desc: 'Shipping & delivery destinations' },
     { id: 'security', label: 'Security & Password', shortLabel: 'Security', icon: Lock, desc: 'Password and session security' },
@@ -1167,7 +1188,7 @@ export default function Account() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={fetchUserInquiries}
+                      onClick={() => fetchUserInquiries(false)}
                       disabled={isLoadingInquiries}
                       className="p-2 border border-brand-charcoal/20 hover:border-black rounded-xs text-xs text-brand-charcoal flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                       title="Refresh Messages"

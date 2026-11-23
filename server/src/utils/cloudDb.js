@@ -56,6 +56,7 @@ export async function initCloudDatabase() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
       ALTER TABLE users ADD COLUMN IF NOT EXISTS cart TEXT DEFAULT '[]';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS wishlist TEXT DEFAULT '[]';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS seen_notifications TEXT DEFAULT '[]';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS dismissed_notifications TEXT DEFAULT '[]';

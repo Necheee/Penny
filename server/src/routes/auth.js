@@ -291,6 +291,92 @@ router.post('/cart', requireAuth, async (req, res) => {
 });
 
 /**
+ * GET /api/auth/wishlist
+ * Retrieves synced cloud wishlist for logged-in user
+ */
+router.get('/wishlist', requireAuth, async (req, res) => {
+  try {
+    const email = (req.query.email || req.user.email || '').trim().toLowerCase();
+    const userId = (req.query.userId || req.user.id || '').trim();
+
+    if (!isAuthorizedUserOrAdmin(req, email, userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden. You may only access your own wishlist.',
+      });
+    }
+
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        const { rows } = await pool.query(
+          'SELECT wishlist FROM users WHERE (LOWER(email) = $1 AND $1 != \'\') OR (id = $2 AND $2 != \'\') LIMIT 1',
+          [email, userId]
+        );
+        if (rows.length > 0 && rows[0].wishlist) {
+          const list = typeof rows[0].wishlist === 'string' ? JSON.parse(rows[0].wishlist) : rows[0].wishlist;
+          return res.status(200).json({ success: true, wishlist: Array.isArray(list) ? list : [] });
+        }
+      } catch (dbErr) {
+        console.warn('Could not query cloud db wishlist:', dbErr.message);
+      }
+    }
+
+    const localUsers = readJsonFile('users.json', []) || [];
+    const found = localUsers.find(u => (u.email?.trim().toLowerCase() === email && email !== '') || (u.id === userId && userId !== ''));
+    const wishlist = found?.wishlist || [];
+    return res.status(200).json({ success: true, wishlist: Array.isArray(wishlist) ? wishlist : [] });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/wishlist
+ * Updates cloud wishlist for logged-in user across devices
+ */
+router.post('/wishlist', requireAuth, async (req, res) => {
+  try {
+    const { email, userId, wishlist } = req.body;
+    const cleanEmail = (email || req.user.email || '').trim().toLowerCase();
+    const cleanUserId = (userId || req.user.id || '').trim();
+
+    if (!isAuthorizedUserOrAdmin(req, cleanEmail, cleanUserId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden. You may only update your own wishlist.',
+      });
+    }
+
+    const safeWishlist = Array.isArray(wishlist) ? wishlist : [];
+    const wishlistJson = JSON.stringify(safeWishlist);
+
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          'UPDATE users SET wishlist = $1 WHERE (LOWER(email) = $2 AND $2 != \'\') OR (id = $3 AND $3 != \'\')',
+          [wishlistJson, cleanEmail, cleanUserId]
+        );
+      } catch (dbErr) {
+        console.warn('Could not update cloud db wishlist:', dbErr.message);
+      }
+    }
+
+    const localUsers = readJsonFile('users.json', []) || [];
+    const idx = localUsers.findIndex(u => (u.email?.trim().toLowerCase() === cleanEmail && cleanEmail !== '') || (u.id === cleanUserId && cleanUserId !== ''));
+    if (idx !== -1) {
+      localUsers[idx].wishlist = safeWishlist;
+      writeJsonFile('users.json', localUsers);
+    }
+
+    return res.status(200).json({ success: true, wishlist: safeWishlist });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * GET /api/auth/notifications-state
  * Retrieves seen and dismissed notification IDs from user profile
  */
