@@ -1,6 +1,16 @@
 // server/test-email.js - Diagnostic & Verification Script for PENNY Real Email Delivery
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Explicitly resolve server/.env whether executed from workspace root or inside server/
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), 'server/.env') });
+
 import { getTransporter, getFromAddress } from './src/utils/receiptEmail.js';
 
 async function main() {
