@@ -7,9 +7,15 @@ const CartContext = createContext();
 export function CartProvider({ children }) {
   const { user } = useAuth();
 
+  // Storage key scoped strictly to active user id, preventing cross-account and guest cart leaks
+  const storageKey = useMemo(() => {
+    return user?.id ? `penny_cart_${user.id}` : 'penny_cart_guest';
+  }, [user?.id]);
+
   const [cartItems, setCartItems] = useState(() => {
     try {
-      const saved = localStorage.getItem('penny_cart');
+      const activeKey = user?.id ? `penny_cart_${user.id}` : 'penny_cart_guest';
+      const saved = localStorage.getItem(activeKey) || localStorage.getItem('penny_cart');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -58,10 +64,10 @@ export function CartProvider({ children }) {
           const cloudCart = data.cart;
           if (cloudCart.length > 0) {
             setCartItems(cloudCart);
-            localStorage.setItem('penny_cart', JSON.stringify(cloudCart));
+            localStorage.setItem(storageKey, JSON.stringify(cloudCart));
           } else {
             setCartItems([]);
-            localStorage.setItem('penny_cart', JSON.stringify([]));
+            localStorage.setItem(storageKey, JSON.stringify([]));
           }
           isInitialSyncDone.current = true;
         }
@@ -69,11 +75,18 @@ export function CartProvider({ children }) {
     } catch (err) {
       console.warn('Could not fetch cloud cart:', err.message);
     }
-  }, [user?.email, user?.id, syncCartToCloud]);
+  }, [user?.email, user?.id, storageKey]);
 
-  // Sync cloud cart on login, email change, or window focus
+  // Sync cloud cart on login, email change, or window focus, and IMMEDIATELY wipe on logout
   useEffect(() => {
     if (user?.email) {
+      try {
+        const userSaved = localStorage.getItem(storageKey);
+        if (userSaved) {
+          setCartItems(JSON.parse(userSaved));
+        }
+      } catch {}
+
       fetchCloudCart();
 
       const onFocus = () => {
@@ -82,18 +95,26 @@ export function CartProvider({ children }) {
       window.addEventListener('focus', onFocus);
       return () => window.removeEventListener('focus', onFocus);
     } else {
+      // User logged out: immediately wipe in-memory cart state so guest view is 100% empty
       isInitialSyncDone.current = false;
+      setCartItems([]);
+      try {
+        localStorage.removeItem('penny_cart_guest');
+        localStorage.removeItem('penny_cart');
+      } catch {}
     }
-  }, [user?.email, fetchCloudCart]);
+  }, [user?.email, user?.id, storageKey, fetchCloudCart]);
 
   // Keep cartItems synchronized in localStorage & push updates to cloud
   useEffect(() => {
     try {
+      localStorage.setItem(storageKey, JSON.stringify(cartItems));
+      // Keep legacy key in sync for any outer consumers
       localStorage.setItem('penny_cart', JSON.stringify(cartItems));
     } catch (e) {
       console.warn('Could not persist cart to storage:', e);
     }
-  }, [cartItems]);
+  }, [cartItems, storageKey]);
 
   const openCart = () => setIsCartOpen(true);
   const closeCart = () => setIsCartOpen(false);
@@ -159,6 +180,7 @@ export function CartProvider({ children }) {
   const clearCart = () => {
     setCartItems([]);
     try {
+      localStorage.setItem(storageKey, JSON.stringify([]));
       localStorage.setItem('penny_cart', JSON.stringify([]));
     } catch {}
     syncCartToCloud([]);
