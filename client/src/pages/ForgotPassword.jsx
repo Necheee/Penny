@@ -13,7 +13,6 @@ export default function ForgotPassword() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [devCode, setDevCode] = useState('');
   
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -55,12 +54,6 @@ export default function ForgotPassword() {
 
       setStep(2);
       setSuccessMsg(data.message || `A 6-digit verification code has been dispatched to ${cleanEmail}.`);
-      if (data.devCode) {
-        setDevCode(data.devCode);
-        if (!data.liveEmailSent) {
-          setCode(data.devCode); // Auto-fill in local dev only if real email is not active
-        }
-      }
     } catch (err) {
       console.error('Forgot password error:', err);
       setErrorMsg(err.message || 'Could not verify email. Please try again.');
@@ -165,13 +158,6 @@ export default function ForgotPassword() {
                 Enter the 6-digit verification code sent to <strong className="font-sans text-brand-charcoal">{email}</strong>
               </p>
             </div>
-
-            {devCode && (
-              <div className="mb-4 p-2.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xs flex items-center justify-between">
-                <span>Dev Preview Code: <strong>{devCode}</strong></span>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-xs">Offline Dev</span>
-              </div>
-            )}
 
             {errorMsg && (
               <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xs flex items-start gap-2">

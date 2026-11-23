@@ -1116,11 +1116,7 @@ router.post('/forgot-password', async (req, res) => {
       message: hasLiveSmtp && dispatchSuccess
         ? `A 6-digit verification code has been dispatched directly to ${cleanEmail}. Please check your inbox and spam folder.`
         : `Password reset instructions initiated for ${cleanEmail}.`,
-      previewUrl,
       liveEmailSent: hasLiveSmtp && dispatchSuccess,
-      dispatchError: process.env.NODE_ENV !== 'production' ? dispatchError : undefined,
-      devCode: (!hasLiveSmtp || !dispatchSuccess) ? code : undefined,
-      devToken: (!hasLiveSmtp || !dispatchSuccess) ? token : undefined,
     });
   } catch (err) {
     console.error('[AUTH] Forgot password error:', err);
