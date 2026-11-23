@@ -12,10 +12,10 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-brand-offwhite text-brand-charcoal font-sans selection:bg-brand-taupe selection:text-white overflow-x-hidden w-full max-w-full">
+    <div className="flex flex-col min-h-screen bg-brand-offwhite text-brand-charcoal font-sans selection:bg-brand-taupe selection:text-white w-full max-w-full">
       <AnnouncementBar />
       <Header />
-      <main className="flex-grow w-full max-w-full overflow-x-hidden">
+      <main className="flex-grow w-full max-w-full">
         {children}
       </main>
       <Footer />

@@ -12,10 +12,13 @@
 }
 
 @layer base {
+  html,
   body {
     background-color: var(--color-brand-offwhite);
     color: var(--color-brand-charcoal);
     font-family: var(--font-sans);
+    overflow-x: hidden;
+    max-width: 100vw;
   }
   
   h1, h2, h3, h4, h5, h6 {

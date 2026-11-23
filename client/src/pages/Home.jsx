@@ -40,7 +40,7 @@ export default function Home() {
   const goToSlide = (index) => setCurrentSlide(index);
 
   return (
-    <div className="flex flex-col w-full overflow-x-clip">
+    <div className="flex flex-col w-full">
       {/* 1. Hero Carousel */}
       <section className="relative h-[85vh] w-full bg-brand-charcoal overflow-hidden group">
         

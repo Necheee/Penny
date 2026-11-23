@@ -386,7 +386,7 @@ export default function Shop() {
   const currentSortLabel = sortOptions.find(o => o.id === sortOption)?.label;
 
   return (
-    <div className="flex flex-col min-h-screen bg-white w-full max-w-full overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-white w-full max-w-full">
       {/* Page Header */}
       <div className="bg-brand-beige/20 py-10 md:py-16 px-4 md:px-6 border-b border-brand-charcoal/5 w-full">
         <div className="max-w-4xl mx-auto text-center space-y-2">
