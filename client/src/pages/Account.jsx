@@ -564,7 +564,7 @@ export default function Account() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Navigation Sidebar (Desktop Only) */}
-          <aside className="hidden lg:block lg:col-span-4 bg-white border border-brand-charcoal/10 rounded-xs p-3 shadow-xs">
+          <aside className="hidden lg:block lg:col-span-4 lg:sticky lg:top-24 bg-white border border-brand-charcoal/10 rounded-xs p-3 shadow-xs">
             <nav className="space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;

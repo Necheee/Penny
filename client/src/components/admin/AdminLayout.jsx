@@ -42,8 +42,8 @@ export default function AdminLayout({ children, activeTab, setActiveTab, unreadM
 
       {/* Sidebar */}
       <aside className={`
-        fixed lg:static top-0 bottom-0 left-0 z-50
-        w-64 bg-white border-r border-neutral-200 flex flex-col
+        fixed lg:sticky top-0 left-0 h-screen z-50
+        w-64 bg-white border-r border-neutral-200 flex flex-col shrink-0
         transition-transform duration-300 ease-in-out
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>

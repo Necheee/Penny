@@ -25,6 +25,7 @@ import { WishlistProvider } from './context/WishlistContext';
 import { ProductProvider } from './context/ProductContext';
 import { NotificationProvider } from './context/NotificationContext';
 import CartDrawer from './components/cart/CartDrawer';
+import ScrollToTop from './components/common/ScrollToTop';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
           <WishlistProvider>
             <CartProvider>
               <Router>
+                <ScrollToTop />
                 <ModalProvider>
                   <DialogProvider>
                     <CartDrawer />

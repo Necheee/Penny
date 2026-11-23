@@ -427,7 +427,7 @@ export default function Shop() {
       </div>
 
       {/* Main Shop Container */}
-      <div className="flex flex-col md:flex-row max-w-[1400px] mx-auto w-full px-4 md:px-8 py-8 md:py-12 gap-8 md:gap-12 overflow-hidden">
+      <div className="flex flex-col md:flex-row max-w-[1400px] mx-auto w-full px-4 md:px-8 py-8 md:py-12 gap-8 md:gap-12">
         
         {/* Mobile Filter Toggle & Sort Bar */}
         <div className="md:hidden flex justify-between items-center border-b border-brand-charcoal/10 pb-4 w-full">
