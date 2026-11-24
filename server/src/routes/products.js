@@ -15,7 +15,7 @@ function normalizePrice(value) {
 }
 
 async function syncProductRelations(clientOrPool, productId, { images, variants }) {
-  const isPool = typeof clientOrPool.connect === 'function';
+  const isPool = typeof clientOrPool.connect === 'function' && typeof clientOrPool.release !== 'function';
   const client = isPool ? await clientOrPool.connect() : clientOrPool;
   const shouldManageTransaction = isPool;
 
