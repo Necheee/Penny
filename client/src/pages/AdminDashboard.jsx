@@ -454,6 +454,22 @@ export default function AdminDashboard() {
       setTimeout(() => setProductFeedback(''), 4000);
     } catch (err) {
       console.error('Error saving product piece:', err);
+      const isAuthError = err.message?.includes('authentication session') ||
+                          err.message?.includes('token') ||
+                          err.message?.includes('401') ||
+                          err.message?.includes('Access denied');
+      if (isAuthError) {
+        localStorage.removeItem('penny_admin_token');
+        localStorage.removeItem('penny_admin_user');
+        await showAlertDialog({
+          title: 'Session Expired',
+          message: 'Your administrator session has expired or is invalid. Please sign in again to continue managing products.',
+          type: 'error',
+          confirmText: 'Sign In Again',
+        });
+        window.location.href = '/admin/login';
+        return;
+      }
       showAlertDialog({
         title: 'Save Failed',
         message: err.message || 'Could not save product to cloud database. Please verify your admin connection and sign in again if needed.',

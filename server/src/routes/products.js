@@ -184,7 +184,7 @@ async function loadProductRelations(pool, productRows) {
 export function formatProductRow(row, relations = {}) {
   if (!row) return null;
   const hasRelationalImages = Array.isArray(relations.images);
-  const hasRelationalVariants = Array.isArray(relations.variants);
+  const hasRelationalVariants = Array.isArray(relations.variants) && relations.variants.length > 0;
   let images = row.images;
   if (typeof images === 'string') {
     try { images = JSON.parse(images); } catch { images = { primary: '', gallery: [] }; }
@@ -235,7 +235,7 @@ export function formatProductRow(row, relations = {}) {
       : (Array.isArray(availableSizes) ? availableSizes : []),
     featured: !!row.featured,
     inStock: hasRelationalVariants
-      ? (row.in_stock !== false && relationalVariants.some(variant => variant.stockQuantity > 0))
+      ? (row.in_stock !== false && relationalVariants.some(variant => Number(variant.stockQuantity) > 0))
       : row.in_stock !== false,
     status: ['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(row.status)
       ? row.status
@@ -549,9 +549,23 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       ]);
 
       if (dbRes.rows.length > 0) {
+        let finalVariants = Array.isArray(variants) && variants.length > 0 ? variants : [];
+        if (finalVariants.length === 0) {
+          const sizesToUse = newProduct.availableSizes.length > 0 ? newProduct.availableSizes : ['S', 'M', 'L', 'XL'];
+          const colorsToUse = newProduct.colors.length > 0 ? newProduct.colors : ['Standard'];
+          const initialStock = newProduct.inStock ? 10 : 0;
+          finalVariants = sizesToUse.flatMap(size =>
+            colorsToUse.map(color => ({
+              size,
+              colorName: typeof color === 'string' ? color : color?.name || 'Standard',
+              stockQuantity: initialStock,
+            }))
+          );
+        }
+
         await syncProductRelations(client, newProduct.id, {
           images: newProduct.images,
-          variants,
+          variants: finalVariants,
         });
 
         await client.query('COMMIT');
@@ -702,17 +716,47 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
       ]);
 
       if (dbRes.rows.length > 0) {
-        if (Array.isArray(body.variants) || body.images !== undefined) {
+        if (Array.isArray(body.variants) && body.variants.length > 0) {
           await syncProductRelations(client, id, {
             images: body.images,
             variants: body.variants,
           });
-        } else if (body.inStock === false) {
+        } else if (body.images !== undefined) {
+          await syncProductRelations(client, id, {
+            images: body.images,
+          });
+        }
+
+        if (body.inStock === false) {
           // Zero out variant stock when admin explicitly marks product out of stock
-          await client.query('UPDATE product_variants SET stock_quantity = 0 WHERE product_id = $1', [id]);
+          await client.query('UPDATE product_variants SET stock_quantity = 0, updated_at = CURRENT_TIMESTAMP WHERE product_id = $1', [id]);
         } else if (body.inStock === true) {
-          // Restore default stock if all variants were 0
-          await client.query('UPDATE product_variants SET stock_quantity = 10 WHERE product_id = $1 AND stock_quantity = 0', [id]);
+          // Check if product has any existing variants
+          const variantCountRes = await client.query('SELECT COUNT(*) as count FROM product_variants WHERE product_id = $1', [id]);
+          const variantCount = parseInt(variantCountRes.rows[0].count, 10);
+          if (variantCount === 0) {
+            // Auto-generate variants with stock 10 so the product is legitimately in stock
+            const sizes = Array.isArray(updated.availableSizes) && updated.availableSizes.length > 0
+              ? updated.availableSizes
+              : ['S', 'M', 'L', 'XL'];
+            const colors = Array.isArray(updated.colors) && updated.colors.length > 0
+              ? updated.colors
+              : ['Standard'];
+            const defaultVariants = sizes.flatMap(s =>
+              colors.map(c => ({
+                size: s,
+                colorName: typeof c === 'string' ? c : c?.name || 'Standard',
+                stockQuantity: 10,
+              }))
+            );
+            await syncProductRelations(client, id, { variants: defaultVariants });
+          } else {
+            // Restore default stock (10) for variants that are at 0
+            await client.query(
+              'UPDATE product_variants SET stock_quantity = 10, updated_at = CURRENT_TIMESTAMP WHERE product_id = $1 AND stock_quantity = 0',
+              [id]
+            );
+          }
         }
 
         await client.query('COMMIT');

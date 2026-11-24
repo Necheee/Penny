@@ -39,6 +39,41 @@
       "order_PNY-409447_Processing_paid",
       "order_PNY-315893_Delivered_paid",
       "inquiry_INQ-591492_2026-11-14T03:24:36.229Z"
+    ],
+    "cart": [
+      {
+        "cartId": "p-022-8cbf7d43c45ca6eac48e32b4862163bf",
+        "productId": "p-022",
+        "variantId": "8cbf7d43c45ca6eac48e32b4862163bf",
+        "name": "Zip-through Hoodie",
+        "price": "38000.00",
+        "image": "/images/products/hoodie-2.jpg",
+        "size": "L",
+        "color": "Ash/Grey",
+        "quantity": 2
+      },
+      {
+        "cartId": "p-021-cea52e6a9f2dbf0b4d3da84c20dc0309",
+        "productId": "p-021",
+        "variantId": "cea52e6a9f2dbf0b4d3da84c20dc0309",
+        "name": "Collared Quarter-Zip",
+        "price": "44000.00",
+        "image": "/images/products/quarterzip-2.jpg",
+        "size": "L",
+        "color": "Black",
+        "quantity": 1
+      },
+      {
+        "cartId": "p-023-d427e6efafe3df5dc15e1d575211c575",
+        "productId": "p-023",
+        "variantId": "d427e6efafe3df5dc15e1d575211c575",
+        "name": "Classic Oxford Button-Down Shirt",
+        "price": "29000.00",
+        "image": "/images/products/overshirt-1.jpg",
+        "size": "L",
+        "color": "Sky Blue",
+        "quantity": 1
+      }
     ]
   },
   {

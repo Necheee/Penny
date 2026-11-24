@@ -269,17 +269,28 @@ export default function ProductFormModal({
     const finalSubtype = isAddingCustomSubtype && customSubtypeInput.trim()
       ? customSubtypeInput.trim()
       : (formData.subtype || '');
-    const variants = (formData.availableSizes || []).flatMap(size =>
-      (formData.colors || []).map(color => {
+
+    const resolvedSizes = (Array.isArray(formData.availableSizes) && formData.availableSizes.length > 0)
+      ? formData.availableSizes
+      : ['S', 'M', 'L', 'XL'];
+    const resolvedColors = (Array.isArray(formData.colors) && formData.colors.length > 0)
+      ? formData.colors
+      : ['Standard'];
+
+    const variants = resolvedSizes.flatMap(size =>
+      resolvedColors.map(color => {
         const existing = (formData.variants || []).find(
           variant => variant.size === size && (variant.colorName || variant.color) === color
         );
+        const defaultQty = formData.inStock !== false ? 10 : 0;
         return {
           ...(existing?.id ? { id: existing.id } : {}),
           size,
           colorName: color,
           colorHex: existing?.colorHex || null,
-          stockQuantity: Math.max(0, Number(existing?.stockQuantity ?? 10)),
+          stockQuantity: formData.inStock === false
+            ? 0
+            : Math.max(0, Number(existing?.stockQuantity ?? defaultQty)),
           sku: existing?.sku || null,
         };
       })
@@ -311,6 +322,8 @@ export default function ProductFormModal({
 
     onSave({
       ...formData,
+      availableSizes: resolvedSizes,
+      colors: resolvedColors,
       imageUrl: finalImages[0] || '/images/products/linen-set-1.jpg',
       images: {
         primary: finalImages[0] || '/images/products/linen-set-1.jpg',

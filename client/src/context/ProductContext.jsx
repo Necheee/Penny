@@ -41,7 +41,7 @@ const normalizeProduct = (p) => {
   const galleryImgs = hasRelationalImages && Array.isArray(p.images.gallery)
     ? p.images.gallery
     : [];
-  const hasRelationalVariants = Array.isArray(p.variants);
+  const hasRelationalVariants = Array.isArray(p.variants) && p.variants.length > 0;
   const variants = hasRelationalVariants
     ? p.variants.map(variant => ({
         ...variant,
@@ -54,6 +54,11 @@ const normalizeProduct = (p) => {
   const variantSizes = hasRelationalVariants
     ? [...new Set(variants.map(variant => variant.size).filter(Boolean))]
     : [];
+
+  const hasVariantStock = hasRelationalVariants
+    ? variants.some(variant => Number(variant.stockQuantity) > 0)
+    : true;
+  const isCurrentlyInStock = (p.inStock !== false) && hasVariantStock;
 
   return {
     ...p,
@@ -78,12 +83,8 @@ const normalizeProduct = (p) => {
     variants,
     availableVariants: variants,
     price: p.price ?? '0.00',
-    isAvailable: hasRelationalVariants
-      ? variants.some(variant => variant.stockQuantity > 0)
-      : (p.inStock !== undefined ? !!p.inStock : true),
-    inStock: hasRelationalVariants
-      ? variants.some(variant => variant.stockQuantity > 0)
-      : (p.inStock !== undefined ? !!p.inStock : true),
+    isAvailable: isCurrentlyInStock,
+    inStock: isCurrentlyInStock,
   };
 };
 
@@ -393,13 +394,27 @@ export function ProductProvider({ children }) {
       prev.map((p) => {
         if (p.id === productId) {
           nextVal = !p.inStock;
-          return { ...p, inStock: nextVal };
+          const updatedVariants = (p.variants || []).map(v => ({
+            ...v,
+            stockQuantity: nextVal ? (Number(v.stockQuantity) > 0 ? Number(v.stockQuantity) : 10) : 0
+          }));
+          return {
+            ...p,
+            inStock: nextVal,
+            isAvailable: nextVal,
+            variants: updatedVariants,
+            availableVariants: updatedVariants,
+          };
         }
         return p;
       })
     );
     try {
-      await updateProductApi(productId, { inStock: nextVal });
+      const persisted = await updateProductApi(productId, { inStock: nextVal });
+      if (persisted) {
+        const normalized = normalizeProduct(persisted);
+        setAllProducts(prev => prev.map(p => p.id === productId ? normalized : p));
+      }
     } catch (e) {
       console.warn("Failed to persist stock state:", e);
     }

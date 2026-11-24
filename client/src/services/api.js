@@ -63,6 +63,10 @@ export const createProductApi = async (productData) => {
       const data = await res.json();
       return data.data;
     } else {
+      if (res.status === 401 && typeof window !== 'undefined') {
+        localStorage.removeItem('penny_admin_token');
+        localStorage.removeItem('penny_admin_user');
+      }
       const errData = await res.json().catch(() => ({}));
       console.warn("Server rejected product creation:", res.status, errData);
       throw new Error(errData.message || `Server error (${res.status}) saving product.`);
@@ -84,6 +88,10 @@ export const updateProductApi = async (id, productData) => {
       const data = await res.json();
       return data.data;
     } else {
+      if (res.status === 401 && typeof window !== 'undefined') {
+        localStorage.removeItem('penny_admin_token');
+        localStorage.removeItem('penny_admin_user');
+      }
       const errData = await res.json().catch(() => ({}));
       console.warn("Server rejected product update:", res.status, errData);
       throw new Error(errData.message || `Server error (${res.status}) updating product.`);
