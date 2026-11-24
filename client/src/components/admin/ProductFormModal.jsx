@@ -253,10 +253,20 @@ export default function ProductFormModal({
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.price) {
+    const numericPrice = parseFloat(String(formData.price).replace(/,/g, ''));
+    if (!formData.name.trim() || formData.price === '' || isNaN(numericPrice)) {
       showAlertDialog({
         title: 'Missing Details',
         message: 'Please provide both the piece name and retail price before saving.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    if (numericPrice <= 0) {
+      showAlertDialog({
+        title: 'Invalid Price',
+        message: 'Product price must be greater than zero (₦0.00). Negative numbers and zero are not allowed.',
         type: 'warning',
       });
       return;
@@ -389,8 +399,25 @@ export default function ProductFormModal({
               </label>
               <input
                 type="number"
+                min="0.01"
+                step="any"
                 value={formData.price}
-                onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                    e.preventDefault();
+                  }
+                }}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setFormData(prev => ({ ...prev, price: '' }));
+                    return;
+                  }
+                  const num = Number(val);
+                  if (!isNaN(num) && num >= 0) {
+                    setFormData(prev => ({ ...prev, price: val }));
+                  }
+                }}
                 placeholder="e.g. 25000"
                 className="w-full border border-neutral-200 p-2.5 focus:outline-none focus:border-brand-charcoal"
                 required

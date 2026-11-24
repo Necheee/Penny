@@ -11,7 +11,11 @@ const router = express.Router();
 const hasDatabase = () => Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'));
 
 function normalizePrice(value) {
-  return minorUnitsToDecimal(toMinorUnits(value));
+  const minor = toMinorUnits(value);
+  if (minor <= 0n) {
+    throw new Error('Product price must be greater than zero.');
+  }
+  return minorUnitsToDecimal(minor);
 }
 
 async function syncProductRelations(clientOrPool, productId, { images, variants }) {
@@ -431,10 +435,19 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       subtype
     } = req.body;
 
-    if (!name || price === undefined) {
+    if (!name || price === undefined || price === null || price === '') {
       return res.status(400).json({
         success: false,
         message: 'Product name and price are required.',
+      });
+    }
+
+    try {
+      normalizePrice(price);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        message: 'Product price must be greater than zero (₦0.00). Negative numbers are not allowed.',
       });
     }
 
@@ -641,6 +654,17 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
         return res.status(400).json({
           success: false,
           message: 'Maximum limit of 4 featured products reached. Please unfeature another piece before featuring this one.',
+        });
+      }
+    }
+
+    if (body.price !== undefined) {
+      try {
+        normalizePrice(body.price);
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: 'Product price must be greater than zero (₦0.00). Negative numbers are not allowed.',
         });
       }
     }
