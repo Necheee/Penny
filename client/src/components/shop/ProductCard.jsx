@@ -1,9 +1,9 @@
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useModal } from '../../context/ModalContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { useCart } from '../../context/CartContext';
-import { Heart, Zap } from 'lucide-react';
+import { Heart, ShoppingBag, Check } from 'lucide-react';
 import { formatMoney } from '../../utils/money';
 
 // Helper to map color names to simple hex values for the swatches
@@ -22,7 +22,7 @@ export default function ProductCard({ product }) {
   const { openModal } = useModal();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { addToCart } = useCart();
-  const navigate = useNavigate();
+  const [isAdded, setIsAdded] = useState(false);
 
   const isLiked = isInWishlist(product.id);
 
@@ -31,14 +31,21 @@ export default function ProductCard({ product }) {
     toggleWishlist(product);
   };
 
-  const handleBuyNow = (e) => {
-    e.stopPropagation(); // prevent modal from opening
+  const handleAddToCart = (e) => {
+    e.stopPropagation(); // prevent modal from opening so user can seamlessly keep scrolling
+    if (product.isArchived || product.inStock === false) return;
+
     const defaultVariant = (product.variants || []).find(variant => Number(variant.stockQuantity) > 0)
       || (product.variants || [])[0];
     const defaultSize = defaultVariant?.size || product.availableSizes?.[0] || 'M';
     const defaultColor = defaultVariant?.colorName || product.colors?.[0] || 'Standard';
+
     addToCart(product, defaultSize, defaultColor, 1, defaultVariant?.id || null);
-    navigate('/checkout');
+
+    setIsAdded(true);
+    setTimeout(() => {
+      setIsAdded(false);
+    }, 1200);
   };
 
   return (
@@ -87,7 +94,7 @@ export default function ProductCard({ product }) {
         ₦ {formatMoney(product.price)}
       </p>
       
-      {/* Visual Color Swatches & Buy Now Button */}
+      {/* Visual Color Swatches & Add to Cart Button */}
       <div className="flex items-center justify-between gap-2 mt-auto pt-1">
         {product.colors && product.colors.length > 0 ? (
           <div className="flex space-x-1.5 items-center">
@@ -107,11 +114,28 @@ export default function ProductCard({ product }) {
 
         <button
           type="button"
-          onClick={handleBuyNow}
-          className="inline-flex items-center gap-1 px-3 py-1.5 bg-brand-charcoal text-white hover:bg-black text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors shadow-xs z-10 cursor-pointer"
+          onClick={handleAddToCart}
+          disabled={product.isArchived || product.inStock === false}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-all shadow-xs z-10 cursor-pointer ${
+            product.isArchived || product.inStock === false
+              ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
+              : isAdded
+              ? 'bg-emerald-800 text-white'
+              : 'bg-brand-charcoal text-white hover:bg-black'
+          }`}
+          aria-label={`Add ${product.name} to cart`}
         >
-          <Zap className="w-3 h-3" />
-          Buy Now
+          {isAdded ? (
+            <>
+              <Check className="w-3 h-3 text-white" />
+              <span>Added</span>
+            </>
+          ) : (
+            <>
+              <ShoppingBag className="w-3 h-3" />
+              <span>Add to Cart</span>
+            </>
+          )}
         </button>
       </div>
     </motion.div>
